@@ -101,6 +101,26 @@
    catálogo, comprobantes adjuntos también desde el panel (`POST /api/pedidos/:id/comprobante`),
    y rutas estáticas `/media/comprobantes` y `/media/productos`.
 
+### Analíticas y etiquetas en la Bandeja (2026-11-06)
+- **Pestaña Analíticas** (`GET /api/analiticas`): pedidos, abiertos, ventas entregadas, ticket
+  promedio, **perfumes más consultados** (menciones por palabra/frase completa en los mensajes
+  entrantes, sin falsos positivos como "King" dentro de "looking"), **perfumes más pedidos**
+  (unidades), métodos de pago, pedidos por estado y mensajes de los últimos 14 días.
+- **Etiquetas en la lista de chats**: el bot calcula `etiquetas` por conversación según su pedido
+  abierto (`pedidos.etiquetasChat`): *Solo consulta* (borrador), *Falta pagar* (esperando pago),
+  *Verificar pago* (comprobante recibido) y *Falta entregar* / *Paga al entregar* (por entregar).
+- **Regla de pagos actualizada**:
+  - **Efectivo**: la venta se cierra de inmediato como `por_entregar` y se etiqueta
+    **"Paga al entregar"**; el bot manda al cliente la confirmación con el resumen y el total.
+  - **Digital (Yape/Plin/transferencia)**: el bot **nunca** confirma el pago; guarda el
+    comprobante, deja el pedido en `comprobante_recibido` y **siempre avisa al dueño**
+    (evento web con sonido + WhatsApp). El dueño verifica en la pestaña Pedidos.
+- **Aviso al dueño siempre**: pedidos nuevos, comprobantes y derivaciones emiten evento al panel
+  y, además, `notificarDueno()` envía un WhatsApp al dueño.
+- **Precios**: el catálogo de Supabase quedó sincronizado en **S/ 56 (50 ml) y S/ 78 (100 ml)**
+  para los 202 perfumes. El bot lee el precio real del catálogo (caché de 10 min) y la regla 17
+  del prompt obliga a citarlo; reiniciar el bot limpia esa caché.
+
 Variables nuevas en `bot/.env`: `PANEL_URL` (base de las fotos), `SEGUIMIENTO_DIAS_1`,
 `SEGUIMIENTO_DIAS_2`. CORS del bot ahora admite `PATCH` y `DELETE` (pedidos/plantillas).
 

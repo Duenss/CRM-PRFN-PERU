@@ -206,6 +206,17 @@ body.no-anim .card,body.no-anim button{transition:none!important}
 .stat{padding:1rem 1.1rem}.stat b{display:block;font-size:2rem;font-weight:600;color:var(--gold)}.stat span{color:var(--mute);font-size:.86rem}
 .tag{font-style:normal;font-size:.7rem;border:1px solid var(--line);border-radius:99px;padding:.08rem .55rem;margin-left:.35rem;color:var(--info);white-space:nowrap}
 .tag.warn{color:var(--warn);border-color:rgba(240,177,74,.5)}.tag.bad{color:var(--bad);border-color:rgba(255,92,108,.5)}.tag.ok{color:var(--success);border-color:rgba(61,214,140,.5)}
+.etag{font-style:normal;font-size:.6rem;border:1px solid var(--line);border-radius:99px;padding:.02rem .36rem;margin-left:.3rem;white-space:nowrap;color:var(--mute);vertical-align:middle}
+.etag.warn{color:var(--warn);border-color:rgba(240,177,74,.5)}
+.etag.ok{color:var(--success);border-color:rgba(61,214,140,.5)}
+.etag.mute{color:var(--mute)}
+.itags{display:flex;flex-wrap:wrap;gap:.22rem;margin-top:.22rem}
+.an-list{display:flex;flex-direction:column;gap:.55rem}
+.an-row{display:grid;grid-template-columns:1fr 46px;gap:.5rem;align-items:center;font-size:.83rem}
+.an-row .an-name{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.an-row .an-num{text-align:right;color:var(--mute);font-size:.78rem}
+.an-track{grid-column:1/-1;height:7px;background:var(--s2);border-radius:99px;overflow:hidden;margin-top:-.15rem}
+.an-track i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--gold),#f2d79b)}
 .muted{color:var(--mute);font-size:.88rem}.empty{color:var(--mute);padding:1rem .2rem;font-size:.86rem}
 .acts{display:flex;gap:.6rem;justify-content:flex-end;margin-top:1rem;flex-wrap:wrap}
 .two{display:grid;grid-template-columns:1fr 300px;gap:1rem;align-items:start}
@@ -397,6 +408,7 @@ dialog::backdrop{background:rgba(3,4,8,.66);backdrop-filter:blur(8px)}
       <button data-tab="inicio" class="on"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span class="nl">Inicio</span></button>
       <button data-tab="bandeja"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span class="nl">Bandeja</span><i class="nbadge" id="unread-badge" hidden>0</i><i class="nbadge" id="alert-badge" hidden>!</i></button>
       <button data-tab="pedidos"><svg viewBox="0 0 24 24"><path d="M6 2h9l4 4v16H6z"/><path d="M9 8h6M9 12h6M9 16h4"/></svg><span class="nl">Pedidos</span><i class="nbadge" id="pedidos-badge" hidden>0</i></button>
+      <button data-tab="analiticas"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span class="nl">Analíticas</span></button>
       <button data-tab="campanas"><svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg><span class="nl">Campañas</span></button>
       <button data-tab="clientes"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6M17 4a4 4 0 0 1 0 8M22 21c0-3-2-5-5-5.7"/></svg><span class="nl">Clientes</span></button>
       <button data-tab="catalogo"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span class="nl">Catálogo</span></button>
@@ -541,6 +553,38 @@ dialog::backdrop{background:rgba(3,4,8,.66);backdrop-filter:blur(8px)}
             <p class="muted" id="pa-file-name"></p>
           </div>
         </div>
+      </div>
+    </section>
+
+    <section class="tab" id="t-analiticas" hidden>
+      <div class="pagehead">
+        <div><h1>Analíticas</h1><p class="muted" id="an-sub">Qué perfumes te preguntan, qué vendes y cómo te pagan.</p></div>
+        <div class="bar" style="margin:0"><button class="ghost" id="an-refresh" type="button">Actualizar</button></div>
+      </div>
+      <div class="kpis" id="an-kpis"></div>
+      <div class="dash2">
+        <div class="card">
+          <div class="card-h"><b>Perfumes más consultados</b><span class="muted">por menciones en chats</span></div>
+          <div id="an-consultas" style="padding:1rem"><p class="empty">Cargando...</p></div>
+        </div>
+        <div class="card">
+          <div class="card-h"><b>Métodos de pago</b></div>
+          <div id="an-metodos" style="padding:1rem"></div>
+        </div>
+      </div>
+      <div class="dash2">
+        <div class="card">
+          <div class="card-h"><b>Perfumes más pedidos</b><span class="muted">unidades</span></div>
+          <div id="an-vendidos" style="padding:1rem"><p class="empty">Cargando...</p></div>
+        </div>
+        <div class="card">
+          <div class="card-h"><b>Pedidos por estado</b></div>
+          <div id="an-estados" style="padding:1rem"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-h"><b>Mensajes de los últimos 14 días</b><span class="muted" id="an-dias-sub"></span></div>
+        <div class="chart" id="an-chart"></div>
       </div>
     </section>
 
@@ -875,7 +919,7 @@ async function load(){
 }
 
 /* ---------- pestañas ---------- */
-const CRUMBS={inicio:['Inicio','Resumen'],bandeja:['Bandeja','WhatsApp'],pedidos:['Pedidos','Ventas y pagos'],campanas:['Campañas','Envíos'],clientes:['Clientes','Base de datos'],catalogo:['Catálogo','Perfumes'],calendario:['Calendario','Agenda'],ia:['Asistente IA','Automático'],bot:['Ajustes','Conexión']};
+const CRUMBS={inicio:['Inicio','Resumen'],bandeja:['Bandeja','WhatsApp'],pedidos:['Pedidos','Ventas y pagos'],analiticas:['Analíticas','Consultas y ventas'],campanas:['Campañas','Envíos'],clientes:['Clientes','Base de datos'],catalogo:['Catálogo','Perfumes'],calendario:['Calendario','Agenda'],ia:['Asistente IA','Automático'],bot:['Ajustes','Conexión']};
 function irTab(name){
   document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x.dataset.tab===name));
   document.querySelectorAll('.tab').forEach(x=>x.hidden=x.id!=='t-'+name);
@@ -885,6 +929,7 @@ function irTab(name){
   pararQr();pararLogs();pararBandeja();
   if(name==='bandeja'){cargarBandeja();inListTimer=setInterval(()=>{if(!document.hidden)cargarBandeja()},12000);alertasNuevas=0;actualizarAlertBadge();}
   else if(name==='pedidos')cargarPedidos();
+  else if(name==='analiticas')cargarAnaliticas();
   else if(name==='ia')cargarIA();
   else if(name==='inicio')renderInicio();
   else if(name==='bot'){arrancarQr();arrancarLogs();}
@@ -1450,7 +1495,8 @@ function pintarLista(){
     const on=c.telefono===inTel?' on':'';
     const nom=c.nombreWa||c.nombre||('+'+c.telefono);
     const tipo=c.tipo==='empresa'?'<span class="tipo emp">Empresa</span>':c.tipo==='persona'?'<span class="tipo per">Persona</span>':'';
-    return `<div class="in-item${on}" data-tel="${esc(c.telefono)}"><div class="ava">${esc(iniciales(nom))}</div><div class="ib"><b>${esc(nom)}${tipo}</b><small>${esc((c.ultimoTexto||'').slice(0,44)||'—')}</small></div><div class="imeta"><time>${esc(horaWa(c.ultimoEn))}</time>${inPausados.has(c.telefono)?'<span class="paused">IA off</span>':''}${c.seguimiento?'<span class="paused" style="color:var(--success);border-color:rgba(61,214,140,.5)">Seg</span>':''}${c.noLeidos?`<span class="unread">${c.noLeidos}</span>`:''}</div></div>`;
+    const ets=(c.etiquetas||[]).map(e=>`<i class="etag ${esc(e.tipo||'')}">${esc(e.texto)}</i>`).join('');
+    return `<div class="in-item${on}" data-tel="${esc(c.telefono)}"><div class="ava">${esc(iniciales(nom))}</div><div class="ib"><b>${esc(nom)}${tipo}</b><small>${esc((c.ultimoTexto||'').slice(0,44)||'—')}</small>${ets?`<div class="itags">${ets}</div>`:''}</div><div class="imeta"><time>${esc(horaWa(c.ultimoEn))}</time>${inPausados.has(c.telefono)?'<span class="paused">IA off</span>':''}${c.seguimiento?'<span class="paused" style="color:var(--success);border-color:rgba(61,214,140,.5)">Seg</span>':''}${c.noLeidos?`<span class="unread">${c.noLeidos}</span>`:''}</div></div>`;
   }).join('')||'<p class="empty" style="padding:1rem">Sin conversaciones todavía.</p>');
 }
 async function importarHilo(tel){
@@ -1788,6 +1834,57 @@ $('#pa-list')?.addEventListener('click',async e=>{
   catch(err){toast('No se eliminó: '+err.message,'error');b.disabled=false}
 });
 setTimeout(()=>{cargarPedidos();cargarPagos();actualizarBotonAvisos();iniciarEventos();},2600);
+
+/* ---------- analíticas ---------- */
+let anData=null;
+async function cargarAnaliticas(){
+  try{
+    anData=await botFetch('/api/analiticas');
+    renderAnaliticas();
+  }catch(e){
+    const c=$('#an-consultas');
+    if(c)c.innerHTML='<p class="empty">No se pudo cargar. Revisa que el bot esté encendido.</p>';
+  }
+}
+function barrasTop(lista,valor,sufijo){
+  if(!lista?.length)return '<p class="empty">Aún no hay datos.</p>';
+  const max=Math.max(1,...lista.map(x=>Number(x[valor])||0));
+  return '<div class="an-list">'+lista.map(x=>{
+    const n=Number(x[valor])||0;
+    return `<div class="an-row"><span class="an-name">${esc(x.nombre||'—')}</span><span class="an-num">${n}${sufijo?' '+sufijo:''}</span><div class="an-track"><i style="width:${Math.max(4,Math.round(n/max*100))}%"></i></div></div>`;
+  }).join('')+'</div>';
+}
+function chart14(dias){
+  if(!dias?.length)return '<p class="empty">Sin datos.</p>';
+  const max=Math.max(1,...dias.flatMap(d=>[d.entrantes,d.salientes]));
+  const hoy=hoyISO();
+  return dias.map((d,i)=>{
+    const hIn=Math.round(d.entrantes/max*100),hOut=Math.round(d.salientes/max*100);
+    const isToday=d.fecha===hoy;
+    const lbl=new Date(d.fecha+'T12:00:00').toLocaleDateString('es-PE',{weekday:'short'}).replace('.','');
+    return `<div class="cbar" title="${esc(d.fecha)} · ${d.salientes} enviados · ${d.entrantes} recibidos"><div class="colwrap"><span class="col${isToday?' today':''}" style="height:${Math.max(hOut,3)}%;animation-delay:${i*40}ms"></span><span class="col in" style="height:${Math.max(hIn,3)}%;animation-delay:${i*40+20}ms"></span></div><span class="cl">${esc(lbl)}</span></div>`;
+  }).join('');
+}
+function renderAnaliticas(){
+  const d=anData||{};
+  const k=$('#an-kpis');
+  if(k)k.innerHTML=[
+    ['Pedidos',d.totalPedidos??0,'en total','gold'],
+    ['Abiertos',d.pedidosActivos??0,'por atender','warn'],
+    ['Ventas entregadas','S/ '+(d.ventas??0),`${d.entregados??0} entregados`,'green'],
+    ['Ticket promedio','S/ '+(d.ticketPromedio??0),'por pedido','blue']
+  ].map(([l,v,f,c])=>`<div class="kpi ${c}"><div><span class="klabel">${l}</span><b>${esc(String(v))}</b><span class="kfoot">${f}</span></div><div class="kico"><svg viewBox="0 0 24 24"><path d="M4 19h16M7 16V9M12 16V5M17 16v-4"/></svg></div></div>`).join('');
+  if($('#an-consultas'))$('#an-consultas').innerHTML=barrasTop(d.masConsultados||[],'menciones','');
+  if($('#an-vendidos'))$('#an-vendidos').innerHTML=barrasTop(d.masPedidos||[],'cantidad','u.');
+  const metodos=Object.entries(d.porMetodo||{}).filter(([,n])=>n>0);
+  if($('#an-metodos'))$('#an-metodos').innerHTML=metodos.length?`<div class="an-list">${metodos.map(([m,n])=>`<div class="an-row"><span class="an-name">${esc(metodoTxt(m))}</span><span class="an-num">${n}</span></div>`).join('')}</div>`:'<p class="empty">Aún no hay pagos.</p>';
+  const estados=Object.entries(d.porEstado||{}).filter(([,n])=>n>0);
+  if($('#an-estados'))$('#an-estados').innerHTML=estados.length?`<div class="an-list">${estados.map(([e,n])=>`<div class="an-row"><span class="an-name">${esc(ESTADO_TXT[e]||e)}</span><span class="an-num">${n}</span></div>`).join('')}</div>`:'<p class="empty">Aún no hay pedidos.</p>';
+  if($('#an-sub'))$('#an-sub').textContent=`${d.masConsultados?.[0]?('Lo más consultado: '+d.masConsultados[0].nombre):'Sin consultas todavía'} · ${d.chats?.chats||0} chats · ${d.analizados||0} mensajes analizados.`;
+  if($('#an-chart'))$('#an-chart').innerHTML=chart14(d.dias||[]);
+  if($('#an-dias-sub'))$('#an-dias-sub').textContent=`${(d.dias||[]).reduce((n,x)=>n+x.entrantes,0)} recibidos · ${(d.dias||[]).reduce((n,x)=>n+x.salientes,0)} enviados`;
+}
+$('#an-refresh')?.addEventListener('click',cargarAnaliticas);
 
 /* ---------- asistente IA ---------- */
 async function cargarIA(){

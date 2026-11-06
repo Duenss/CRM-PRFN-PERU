@@ -231,4 +231,65 @@ export function resumen() {
   };
 }
 
-export default { crear, listar, obtener, actualizar, ponerItem, agregarComprobante, marcarPagoEnviado, pedidoAbierto, ultimoPedido, resumen, ESTADOS, METODOS };
+/**
+ * Etiquetas que el panel muestra en la lista de chats (Bandeja).
+ * Devuelve [{ texto, tipo }] según el pedido abierto del teléfono.
+ */
+export function etiquetasChat(telefono) {
+  const abierto = pedidoAbierto(telefono);
+  if (!abierto) return [];
+  const e = abierto.estado;
+  if (e === 'borrador') return [{ texto: 'Solo consulta', tipo: 'mute' }];
+  if (e === 'esperando_pago') return [{ texto: 'Falta pagar', tipo: 'warn' }];
+  if (e === 'comprobante_recibido') return [{ texto: 'Verificar pago', tipo: 'warn' }];
+  if (e === 'por_entregar') {
+    return [{ texto: abierto.metodo === 'efectivo' ? 'Paga al entregar' : 'Falta entregar', tipo: 'ok' }];
+  }
+  return [];
+}
+
+/** Métricas para la pestaña Analíticas (pedidos y productos). */
+export function estadisticas() {
+  const activos = pedidos.filter(p => p.estado !== 'cancelado');
+  const entregados = pedidos.filter(p => p.estado === 'entregado');
+  const porProducto = new Map();
+  for (const p of activos) {
+    for (const it of p.items || []) {
+      const clave = String(it.nombre || '').toLowerCase();
+      if (!clave) continue;
+      const fila = porProducto.get(clave) || {
+        nombre: it.nombre,
+        cantidad: 0,
+        pedidos: 0,
+        total: 0
+      };
+      fila.cantidad += num(it.cantidad, 0);
+      fila.total += num(it.precio, 0) * num(it.cantidad, 0);
+      fila.pedidos += 1;
+      porProducto.set(clave, fila);
+    }
+  }
+  const masPedidos = [...porProducto.values()].sort((a, b) => b.cantidad - a.cantidad || b.total - a.total).slice(0, 12);
+
+  const porMetodo = {};
+  for (const m of METODOS) porMetodo[m] = 0;
+  for (const p of activos) if (p.metodo) porMetodo[p.metodo] = (porMetodo[p.metodo] || 0) + 1;
+
+  const porEstado = {};
+  for (const e of ESTADOS) porEstado[e] = 0;
+  for (const p of pedidos) porEstado[p.estado] = (porEstado[p.estado] || 0) + 1;
+
+  const ventas = entregados.reduce((n, p) => n + num(p.total, 0), 0);
+  return {
+    totalPedidos: pedidos.length,
+    pedidosActivos: activos.length,
+    ventas,
+    ticketPromedio: entregados.length ? Math.round((ventas / entregados.length) * 100) / 100 : 0,
+    entregados: entregados.length,
+    porEstado,
+    porMetodo,
+    masPedidos
+  };
+}
+
+export default { crear, listar, obtener, actualizar, ponerItem, agregarComprobante, marcarPagoEnviado, pedidoAbierto, ultimoPedido, resumen, etiquetasChat, estadisticas, ESTADOS, METODOS };

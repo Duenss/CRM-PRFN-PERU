@@ -348,6 +348,20 @@ export function totalNoLeidos() {
   return Object.values(chats).reduce((n, c) => n + (c.noLeidos || 0), 0);
 }
 
+/** Mensajes entrantes de todos los chats (para analíticas de consultas). */
+export function mensajesEntrantes(limite = 20000) {
+  const out = [];
+  for (const c of Object.values(chats)) {
+    for (const m of c.mensajes) {
+      if (m.direccion === 'entrante' && String(m.texto || '').trim()) {
+        out.push({ telefono: c.telefono, texto: String(m.texto), en: m.en });
+      }
+    }
+  }
+  out.sort((a, b) => String(a.en).localeCompare(String(b.en)));
+  return out.slice(-Math.max(1, limite));
+}
+
 export function resumen() {
   const lista = Object.values(chats);
   const hoy = ahora().slice(0, 10);

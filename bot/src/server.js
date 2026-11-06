@@ -3,12 +3,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config, validarConfig, esNumeroPeru, normalizar } from './config.js';
-import { sb, getCliente, getClientes, logMensaje, historial, marcarBaja, importarClientes } from './supabase.js';
+import { sb, getCliente, getClientes, getProductos, logMensaje, historial, marcarBaja, importarClientes } from './supabase.js';
 import { iniciarWhatsApp, enviar, enviarImagen, estadoWa, cerrarSesion, reiniciarSesion, hayConexion, sesionDisponible, listarChatsWa, listarContactosWa, historialWa, resolverTelefonoWa, idMensaje, descargarMediaWa } from './whatsapp.js';
 import { redactarRespuesta, transcribirAudio, redactarBorradores, productoPorId } from './ai.js';
 import { Cola, dormir, esperaEntreEnvios } from './queue.js';
 import { estadoIA, actualizarIA, pausarIA, estaPausado, promptIA, resumenIA } from './ia.js';
-import { registrar, listar, obtener, marcarLeido, respuestasIA, porDia, resumen as resumenChats, registrarCabecera, importarMensajes, yaExisteWa, actualizarAck } from './conversaciones.js';
+import { registrar, listar, obtener, marcarLeido, respuestasIA, porDia, resumen as resumenChats, registrarCabecera, importarMensajes, yaExisteWa, actualizarAck, mensajesEntrantes } from './conversaciones.js';
 import * as pedidos from './pedidos.js';
 import * as pagos from './pagos.js';
 import * as seguimiento from './seguimiento.js';
@@ -170,6 +170,8 @@ async function procesarPedidoIA({ tel, nombre, clienteId, pedidoIA }) {
       producto: prod.nombre,
       detalle: resumenPedido(p)
     });
+    // El dueño se entera siempre, aunque no tenga que aprobar nada.
+    await notificarDueno(`🛒 Nuevo pedido ${p.id} de ${nombre || '+' + tel}\n${resumenPedido(p)}`, null);
     log(`Pedido ${p.id} creado para +${tel}: ${prod.nombre} ${ml} ml · S/ ${p.total} (${p.estado}).`);
   }
   return { pedido: p, producto: prod, nuevo };
@@ -513,7 +515,12 @@ async function manejarMensaje(msg, sesionId = null) {
             archivo,
             detalle: resumenPedido(actualizado)
           });
-          const aviso = 'Recibí tu comprobante ✅ Queda en revisión del encargado. En cuanto lo verifique te confirmo por aquí.';
+          // Aviso al dueño SIEMPRE (web con sonido + WhatsApp).
+          await notificarDueno(
+            `🧾 Comprobante recibido de ${nombreChat} (+${tel})\n${resumenPedido(actualizado)}\nRevísalo en la pestaña Pedidos.`,
+            sesionId
+          );
+          const aviso = 'Recibí tu comprobante ✅ Ya quedó registrado. Te confirmo por aquí en un momento.';
           const env = await enviar(tel, aviso, sesionId);
           await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'saliente', texto: aviso, origen: 'bot' });
           registrar({ telefono: tel, texto: aviso, direccion: 'saliente', nombre: nombreChat, clienteId: cliente?.id, origen: 'bot', waId: env?.waId || '' });
@@ -617,6 +624,15 @@ async function manejarMensaje(msg, sesionId = null) {
       const env = await enviar(tel, ai.texto, sesionId);
       await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'saliente', texto: ai.texto, origen: 'ia' });
       registrar({ telefono: tel, texto: ai.texto, direccion: 'saliente', nombre: nombreChat, clienteId: cliente?.id, origen: 'ia', waId: env?.waId || '' });
+    }
+
+    // Efectivo: la venta se cierra de una vez (se cobra al entregar o recoger).
+    if (pedidoIA && pedidoIA.nuevo && pedidoIA.pedido.metodo === 'efectivo' && pedidoIA.pedido.estado === 'por_entregar') {
+      const items = (pedidoIA.pedido.items || []).map(i => `${i.cantidad} × ${i.nombre} ${i.ml} ml`).join(' · ');
+      const cierre = `✅ Pedido ${pedidoIA.pedido.id} registrado: ${items}. Total S/ ${pedidoIA.pedido.total}. Pago en efectivo al momento de la entrega o recojo. El encargado coordina contigo la entrega 🙌`;
+      const envC = await enviar(tel, cierre, sesionId);
+      await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'saliente', texto: cierre, origen: 'bot' });
+      registrar({ telefono: tel, texto: cierre, direccion: 'saliente', nombre: nombreChat, clienteId: cliente?.id, origen: 'bot', waId: envC?.waId || '' });
     }
 
     if (pagoPendiente) {
@@ -905,6 +921,52 @@ app.post('/api/seguimiento/:telefono', auth, (req, res) => {
   }
 });
 
+/* ---------------- Analíticas ---------------- */
+const sinTildes = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+app.get('/api/analiticas', auth, async (_req, res) => {
+  try {
+    const productos = await getProductos();
+    const msgs = mensajesEntrantes(20000);
+    const escRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const nombres = productos
+      .map(p => ({ nombre: p.nombre, clave: sinTildes(p.nombre) }))
+      .filter(x => x.clave.length >= 4)
+      .map(x => ({
+        nombre: x.nombre,
+        clave: x.clave,
+        // Coincidencia por palabra/frase completa: evita falsos positivos
+        // (p. ej. "King" dentro de "looking").
+        re: new RegExp(`(^|[^a-z0-9])${escRe(x.clave)}([^a-z0-9]|$)`)
+      }));
+    const mapa = new Map();
+    for (const m of msgs) {
+      const t = sinTildes(m.texto);
+      for (const n of nombres) {
+        if (!n.re.test(t)) continue;
+        const fila = mapa.get(n.clave) || { nombre: n.nombre, menciones: 0, chats: new Set() };
+        fila.menciones++;
+        fila.chats.add(m.telefono);
+        mapa.set(n.clave, fila);
+      }
+    }
+    const masConsultados = [...mapa.values()]
+      .map(x => ({ nombre: x.nombre, menciones: x.menciones, chats: x.chats.size }))
+      .sort((a, b) => b.menciones - a.menciones || b.chats - a.chats)
+      .slice(0, 12);
+    res.json({
+      ok: true,
+      chats: resumenChats(),
+      analizados: msgs.length,
+      dias: porDia(14),
+      masConsultados,
+      ...pedidos.estadisticas()
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 /* ---------------- Eventos para el panel (sonido/notificación) ---------------- */
 app.get('/api/eventos', auth, (req, res) => {
   const desdeId = Number(req.query.desde) || 0;
@@ -1056,7 +1118,12 @@ app.get('/api/conversaciones', auth, (req, res) => {
   const ia = estadoIA();
   const pausados = new Set(ia.pausados.map(p => p.telefono));
   res.json({
-    conversaciones: listar(limite).map(c => ({ ...c, pausado: pausados.has(c.telefono), seguimiento: seguimiento.estaActivo(c.telefono) })),
+    conversaciones: listar(limite).map(c => ({
+      ...c,
+      pausado: pausados.has(c.telefono),
+      seguimiento: seguimiento.estaActivo(c.telefono),
+      etiquetas: pedidos.etiquetasChat(c.telefono)
+    })),
     resumen: resumenChats(),
     ia: { activa: ia.activa, autoRespuesta: ia.autoRespuesta, pausadas: ia.pausados }
   });
@@ -1071,7 +1138,8 @@ app.get('/api/conversaciones/:telefono', auth, (req, res) => {
     ...c,
     pausado: ia.pausados.some(p => p.telefono === tel),
     seguimiento: seguimiento.listar(tel),
-    pedidos: pedidos.listar({ telefono: tel, limite: 20 })
+    pedidos: pedidos.listar({ telefono: tel, limite: 20 }),
+    etiquetas: pedidos.etiquetasChat(tel)
   });
 });
 
