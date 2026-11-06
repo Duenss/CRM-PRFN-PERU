@@ -48,6 +48,11 @@
   **Empresa** / **Persona** y prioriza `nombreWa` sobre `notifyName`.
 - **Sin límite de respuestas**: `maxPorConversacion = 0` significa **sin tope** (0 = ilimitado), en
   `bot/src/ia.js`, `bot/data/ia.json` y el campo `#ia-max` del panel (`min=0`).
+- **Pausar IA de la Bandeja**: el botón junto a *Sincronizar WhatsApp* / *Actualizar* es un
+  interruptor **global** (`POST /api/ia { activa }`): detiene/reanuda las respuestas automáticas de
+  **todos** los chats, incluidos los mensajes entrantes nuevos. Aun pausada, la IA sigue guardando
+  los entrantes en la bandeja. La pausa **por conversación** sigue disponible en la pestaña
+  *Asistente IA* (`POST /api/ia/pausar` con `telefono`).
 - **Conexión del bot dentro del dashboard**: chip de estado en la barra superior + tarjeta en IA/Ajustes.
 - **Un solo dashboard**: el QR, el envío de prueba y el registro del bot viven en **Ajustes**;
   ya no se abre el panel externo del bot (`bot/src/panel.html` queda solo como respaldo de la API).

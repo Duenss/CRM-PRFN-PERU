@@ -457,7 +457,7 @@ dialog::backdrop{background:rgba(3,4,8,.66);backdrop-filter:blur(8px)}
     <section class="tab" id="t-bandeja" hidden>
       <div class="pagehead">
         <div><h1>Bandeja de entrada</h1><p class="muted" id="in-sub">Conversaciones de WhatsApp en vivo.</p></div>
-        <div class="bar" style="margin:0"><input id="in-q" type="search" placeholder="Buscar por nombre o número"><button class="ghost" id="in-sync" type="button">Sincronizar WhatsApp</button><button class="ghost" id="in-refresh" type="button">Actualizar</button><button class="ghost" id="in-pause" type="button" disabled>Pausar IA</button></div>
+        <div class="bar" style="margin:0"><input id="in-q" type="search" placeholder="Buscar por nombre o número"><button class="ghost" id="in-sync" type="button">Sincronizar WhatsApp</button><button class="ghost" id="in-refresh" type="button">Actualizar</button><button class="ghost" id="in-pause" type="button" title="Pausar la IA en todos los chats">Pausar IA</button></div>
       </div>
       <div class="inbox">
         <div class="in-list" id="in-list"><p class="empty" style="padding:1rem">Cargando…</p></div>
@@ -1362,13 +1362,14 @@ async function refrescarChip(){
 $('#wa-chip')?.addEventListener('click',()=>irTab('bot'));
 
 /* ---------- bandeja de entrada ---------- */
-let inChats=[],inTel=null,inPausados=new Set();
+let inChats=[],inTel=null,inPausados=new Set(),inIAactiva=true;
 function actualizarBadge(n){const b=$('#unread-badge');if(!b)return;b.hidden=!n;b.textContent=n>99?'99+':n}
 async function cargarBandeja(){
   const l=$('#in-list');if(!l)return;
   try{
     const j=await botFetch('/api/conversaciones?limite=80');
     inChats=j.conversaciones||[];inPausados=new Set((j.ia?.pausados||[]).map(p=>p.telefono));
+    inIAactiva=j.ia?.activa!==false;
     pintarLista();actualizarPausa();actualizarBadge(j.resumen?.noLeidos||0);
     if($('#in-sub'))$('#in-sub').textContent=`${j.resumen?.chats||0} conversaciones · ${j.resumen?.mensajesHoy||0} mensajes hoy`;
   }catch(e){l.innerHTML='<p class="empty" style="padding:1rem">No se pudo cargar. Revisa que el bot esté encendido.</p>';}
@@ -1439,20 +1440,26 @@ function pintarHilo(msgs){
 }
 function actualizarPausa(){
   const b=$('#in-pause');if(!b)return;
-  if(!inTel){b.disabled=true;b.textContent='Pausar IA';b.className='ghost';return;}
+  // El botón de la barra es el interruptor GLOBAL: pausa/reanuda la IA
+  // para todos los chats (incluidos los entrantes nuevos).
   b.disabled=false;
-  const pausado=inPausados.has(inTel);
+  const pausado=!inIAactiva;
   b.textContent=pausado?'Reanudar IA':'Pausar IA';
   b.className=pausado?'':'ghost';
+  b.title=pausado?'La IA está pausada en todos los chats. Clic para reanudar.':'Pausar la IA en todos los chats.';
 }
 async function togglePausa(){
-  if(!inTel)return;
-  const pausado=!inPausados.has(inTel);
-  const b=$('#in-pause');b.disabled=true;
+  const b=$('#in-pause');if(!b)return;
+  const activa=!inIAactiva;
+  b.disabled=true;
   try{
-    await botFetch('/api/ia/pausar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({telefono:inTel,pausado,nombre:$('#in-name').textContent})});
-    if(pausado)inPausados.add(inTel);else inPausados.delete(inTel);
-    actualizarPausa();pintarLista();toast(pausado?'IA pausada en esta conversación':'IA reanudada');
+    await botFetch('/api/ia',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({activa})});
+    inIAactiva=activa;
+    if($('#ia-activa'))$('#ia-activa').checked=activa;
+    actualizarOrbe();
+    actualizarPausa();
+    toast(activa?'IA activada en todos los chats':'IA pausada en todos los chats');
+    cargarBandeja();
   }catch(e){toast('No se pudo cambiar: '+e.message)}
   b.disabled=false;
 }
