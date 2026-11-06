@@ -117,6 +117,8 @@
     (evento web con sonido + WhatsApp). El dueño verifica en la pestaña Pedidos.
 - **Aviso al dueño siempre**: pedidos nuevos, comprobantes y derivaciones emiten evento al panel
   y, además, `notificarDueno()` envía un WhatsApp al dueño.
+- **Acciones rápidas en Pedidos**: con un clic, **Verificar pago** (comprobante → por entregar),
+  **Rechazar** (→ esperando pago) y **Marcar entregado** (dispara el seguimiento post-venta).
 - **Precios**: el catálogo de Supabase quedó sincronizado en **S/ 56 (50 ml) y S/ 78 (100 ml)**
   para los 202 perfumes. El bot lee el precio real del catálogo (caché de 10 min) y la regla 17
   del prompt obliga a citarlo; reiniciar el bot limpia esa caché.

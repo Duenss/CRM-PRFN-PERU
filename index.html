@@ -1629,6 +1629,8 @@ function renderPedidos(j){
       <div class="acts" style="justify-content:flex-end;flex-wrap:wrap">
         <button class="ghost" data-ver-chat="${esc(p.telefono)}" type="button">Chat</button>
         ${comp?`<button class="ghost" data-comp="${esc(p.id)}" type="button">Comprobante</button>`:''}
+        ${p.estado==='comprobante_recibido'?`<button data-verificar="${esc(p.id)}" type="button">Verificar pago</button><button class="ghost" data-rechazar="${esc(p.id)}" type="button">Rechazar</button>`:''}
+        ${p.estado==='por_entregar'?`<button data-entregar="${esc(p.id)}" type="button">Marcar entregado</button>`:''}
         <select data-estado="${esc(p.id)}" style="min-height:34px;min-width:150px">${estados.map(e=>`<option value="${esc(e)}"${e===p.estado?' selected':''}>${esc(ESTADO_TXT[e]||e)}</option>`).join('')}</select>
       </div>
     </div>`;
@@ -1681,6 +1683,13 @@ async function guardarPedido(){
     await cargarPedidos();
   }catch(e){toast('No se guardó: '+e.message,'error')}
   b.disabled=false;
+}
+async function cambiarEstadoPedido(id,estado,mensaje){
+  try{
+    await botFetch('/api/pedidos/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({estado})});
+    toast(mensaje||'Pedido actualizado');
+    await cargarPedidos();
+  }catch(e){toast('No se actualizó: '+e.message,'error')}
 }
 function cargarPagos(){
   return botFetch('/api/pagos').then(j=>{pagosCache=j.plantillas||[];renderPagos()}).catch(()=>{});
@@ -1797,6 +1806,12 @@ $('#pe-ml')?.addEventListener('change',()=>{$('#pe-precio').value=precioPedidoAc
 $('#pe-list')?.addEventListener('click',e=>{
   const b=e.target.closest('[data-ver-chat]');
   if(b){irTab('bandeja');setTimeout(()=>abrirChat(b.dataset.verChat),200);return;}
+  const v=e.target.closest('[data-verificar]');
+  if(v){cambiarEstadoPedido(v.dataset.verificar,'por_entregar','Pago verificado: pedido listo para entregar');return;}
+  const r=e.target.closest('[data-rechazar]');
+  if(r){cambiarEstadoPedido(r.dataset.rechazar,'esperando_pago','Comprobante rechazado: vuelve a esperar pago');return;}
+  const en=e.target.closest('[data-entregar]');
+  if(en){cambiarEstadoPedido(en.dataset.entregar,'entregado','Pedido marcado como entregado');return;}
   const c=e.target.closest('[data-comp]');
   if(c){const p=pedidosCache.find(x=>x.id===c.dataset.comp);const comp=(p?.comprobantes||[]).slice(-1)[0];if(comp)window.open(botURL+'/media/comprobantes/'+encodeURIComponent(comp.archivo),'_blank');else toast('Este pedido no tiene comprobante.','error');}
 });
