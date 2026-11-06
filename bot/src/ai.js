@@ -136,19 +136,38 @@ Responde ahora.`;
 }
 
 async function gemini(prompt) {
-  const model = config.aiModel || 'gemini-2.5-flash';
-  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(config.geminiKey)}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: SYS }] },
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.6, maxOutputTokens: 500, responseMimeType: 'application/json' }
-    })
-  });
-  if (!r.ok) throw new Error(`Gemini ${r.status}: ${(await r.text()).slice(0, 180)}`);
-  const j = await r.json();
-  return j.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || '';
+  const preferido = config.aiModel || 'gemini-3-flash-preview';
+  const modelos = [...new Set([preferido, 'gemini-flash-latest', 'gemini-3.8-flash', 'gemini-3-flash-preview'])];
+  const timeout = (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') ? () => AbortSignal.timeout(60000) : () => undefined;
+  let ultimo;
+  for (const model of modelos) {
+    // Gemini 3 gasta tokens "pensando" y corta el JSON; se desactiva el razonamiento.
+    for (const conThinking of [true, false]) {
+      const generationConfig = { temperature: 0.6, maxOutputTokens: 800, responseMimeType: 'application/json' };
+      if (conThinking) generationConfig.thinkingConfig = { thinkingBudget: 0 };
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(config.geminiKey)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: SYS }] },
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig
+        }),
+        signal: timeout()
+      });
+      if (r.ok) {
+        const j = await r.json();
+        return j.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || '';
+      }
+      const detalle = (await r.text()).slice(0, 200);
+      ultimo = new Error(`Gemini ${r.status}: ${detalle}`);
+      // 400 = el modelo no acepta thinkingConfig: reintenta sin él.
+      if (r.status === 400 && conThinking) continue;
+      // 404 = modelo retirado: pasa al siguiente de la lista.
+      break;
+    }
+  }
+  throw ultimo || new Error('Gemini sin respuesta');
 }
 
 async function anthropic(prompt) {

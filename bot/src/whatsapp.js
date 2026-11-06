@@ -1,6 +1,6 @@
 import pkg from 'whatsapp-web.js';
 import QRCode from 'qrcode';
-import { config } from './config.js';
+import { config, normalizar } from './config.js';
 
 const { Client, LocalAuth } = pkg;
 
@@ -202,6 +202,172 @@ export async function enviar(telefono, texto, sesionId = null) {
   if (!id) throw new Error(`El número +${limpio} no tiene WhatsApp`);
   await s.client.sendMessage(id._serialized, texto);
   return { ok: true, sesion: s.id };
+}
+
+/** Teléfono de un chat o contacto individual (solo dígitos), o '' si es grupo/sin número. */
+function telDe(item) {
+  if (!item || item.isGroup) return '';
+  const candidato = (item.id?.server === 'c.us' ? item.id?.user : '')
+    || item.contact?.number || item.number || '';
+  const tel = normalizar(candidato);
+  return /^\d{8,15}$/.test(tel) ? tel : '';
+}
+
+/** Todos los chats del WhatsApp vinculado (no solo los que vio el bot). */
+export async function listarChatsWa(sesionId = null) {
+  const s = sesionParaEnviar(sesionId);
+  if (!s) throw new Error('Ningún WhatsApp está conectado');
+
+  let crudos;
+  try {
+    // Vía normal: el wrapper de whatsapp-web.js.
+    const chats = await s.client.getChats();
+    crudos = chats.map(c => ({
+      tel: c.id?.server === 'c.us' ? c.id?.user : (c.contact?.number || ''),
+      esGrupo: !!c.isGroup,
+      nombre: c.name || c.contact?.name || c.contact?.pushname || '',
+      ultimoTexto: c.lastMessage?.body || '',
+      ts: c.timestamp || 0,
+      noLeidos: c.unreadCount || 0
+    }));
+  } catch {
+    // Respaldo: `client.getChats()` falla en algunas versiones de WhatsApp Web
+    // cuando un solo chat no se puede serializar. Leemos la colección directo,
+    // toleramos chats problemáticos y resolvemos el número real de cada chat
+    // (los chats nuevos usan identificadores @lid y no traen el teléfono).
+    crudos = await s.client.pupPage.evaluate(async () => {
+      const out = [];
+      const W = window;
+      let apiContact, widFactory;
+      try { apiContact = W.require('WAWebApiContact'); } catch (e) {}
+      try { widFactory = W.require('WAWebWidFactory'); } catch (e) {}
+      try {
+        const col = W.require('WAWebCollections');
+        const arr = (col.Chat && col.Chat.getModelsArray && col.Chat.getModelsArray()) || [];
+        for (const c of arr) {
+          try {
+            const server = c.id && c.id.server;
+            const esGrupo = server === 'g.us' || !!c.groupMetadata;
+            let nombre = '';
+            try { nombre = c.formattedTitle || c.name || (c.contact && (c.contact.name || c.contact.pushname)) || ''; } catch (e) {}
+            let ultimoTexto = '';
+            try { ultimoTexto = (c.lastMessage && c.lastMessage.body) || ''; } catch (e) {}
+            let ts = 0;
+            try { ts = c.timestamp || (c.lastMessage && c.lastMessage.t) || 0; } catch (e) {}
+            let noLeidos = 0;
+            try { noLeidos = c.unreadCount || 0; } catch (e) {}
+
+            let tel = '';
+            if (!esGrupo) {
+              // 1) El contacto suele traer el número real aunque el chat use @lid.
+              try {
+                const pn = c.contact && c.contact.phoneNumber;
+                if (pn && pn._serialized) tel = String(pn._serialized).split('@')[0];
+              } catch (e) {}
+              // 2) Chat @c.us clásico.
+              if (!tel && server === 'c.us' && c.id && c.id.user) tel = String(c.id.user);
+              // 3) Resolver el @lid a teléfono.
+              if (!tel && server === 'lid' && widFactory && apiContact) {
+                try {
+                  const wid = widFactory.createWid((c.id && c.id._serialized) || '');
+                  let phone = apiContact.getPhoneNumber(wid);
+                  if (!phone && W.WWebJS && W.WWebJS.enforceLidAndPnRetrieval) {
+                    const r = await W.WWebJS.enforceLidAndPnRetrieval((c.id && c.id._serialized) || '');
+                    phone = r && r.phone;
+                  }
+                  if (phone && phone._serialized) tel = String(phone._serialized).split('@')[0];
+                } catch (e) {}
+              }
+            }
+
+            out.push({
+              tel,
+              esGrupo,
+              nombre: String(nombre || ''),
+              ultimoTexto: String(ultimoTexto || ''),
+              ts,
+              noLeidos
+            });
+          } catch (e) {}
+        }
+      } catch (e) {}
+      return out;
+    });
+  }
+
+  const propio = normalizar(s.numero);
+  return crudos
+    .map(c => ({
+      telefono: telDe({ isGroup: c.esGrupo, number: c.tel }),
+      esGrupo: !!c.esGrupo,
+      nombre: String(c.nombre || '').trim(),
+      ultimoTexto: String(c.ultimoTexto || '').slice(0, 300),
+      ultimoEn: c.ts ? new Date(c.ts * 1000).toISOString() : null,
+      noLeidos: c.noLeidos || 0
+    }))
+    .filter(c => !c.esGrupo ? (c.telefono && c.telefono !== propio) : true);
+}
+
+/** Todos los contactos guardados/iniciados en el WhatsApp vinculado. */
+export async function listarContactosWa(sesionId = null) {
+  const s = sesionParaEnviar(sesionId);
+  if (!s) throw new Error('Ningún WhatsApp está conectado');
+  const contactos = await s.client.getContacts();
+  const propio = normalizar(s.numero);
+  const porTel = new Map();
+  for (const c of contactos) {
+    if (c.isGroup || c.id?.server !== 'c.us') continue;
+    const tel = telDe(c);
+    if (!tel || tel === propio) continue;
+    const nombre = String(c.name || c.pushname || c.shortName || '').trim();
+    const previo = porTel.get(tel);
+    if (!previo || (!previo.nombre && nombre)) porTel.set(tel, { telefono: tel, nombre });
+  }
+  return [...porTel.values()];
+}
+
+/** Historial reciente de un chat, leído directo de WhatsApp. */
+export async function historialWa(telefono, limite = 50, sesionId = null) {
+  const s = sesionParaEnviar(sesionId);
+  if (!s) throw new Error('Ningún WhatsApp está conectado');
+  const limpio = String(telefono || '').replace(/\D/g, '');
+  const numId = await s.client.getNumberId(limpio);
+  if (!numId) throw new Error(`El número +${limpio} no tiene WhatsApp`);
+  const chatId = numId._serialized;
+  // Se lee directo de la página y sin serializar: `getChatById`/`fetchMessages`
+  // de whatsapp-web.js fallan ("r") al serializar chats en la versión actual.
+  const msgs = await s.client.pupPage.evaluate(async ({ chatId, limite }) => {
+    const W = window;
+    const filtro = m => !m.isNotification;
+    let chat = null;
+    try { chat = await W.WWebJS.getChat(chatId, { getAsModel: false }); } catch (e) { chat = null; }
+    if (!chat) return null;
+    let lista = (chat.msgs && chat.msgs.getModelsArray && chat.msgs.getModelsArray()) || [];
+    lista = lista.filter(filtro);
+    const tope = Math.min(100, Math.max(1, limite));
+    let vueltas = 0;
+    while (lista.length < tope && vueltas < 8) {
+      vueltas++;
+      try {
+        const cargados = await W.require('WAWebChatLoadMessages').loadEarlierMsgs({ chat });
+        if (!cargados || !cargados.length) break;
+        lista = [...cargados.filter(filtro), ...lista];
+      } catch (e) { break; }
+    }
+    if (lista.length > tope) {
+      lista.sort((a, b) => (a.t > b.t ? 1 : -1));
+      lista = lista.slice(lista.length - tope);
+    }
+    return lista
+      .map(m => ({
+        waId: (m.id && m.id._serialized) || '',
+        direccion: m.id && m.id.fromMe ? 'saliente' : 'entrante',
+        texto: String((m.body || m.caption || '')).slice(0, 4000),
+        en: m.t ? new Date(m.t * 1000).toISOString() : new Date().toISOString()
+      }))
+      .filter(m => m.texto);
+  }, { chatId, limite });
+  return msgs || [];
 }
 
 export async function cerrarSesion(sesionId) {

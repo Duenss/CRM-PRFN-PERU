@@ -2,6 +2,6 @@
 # En Cloudflare Pages estas variables se configuran en Settings > Environment variables.
 GEMINI_API_KEY=
 # ANTHROPIC_API_KEY=
-AI_MODEL=gemini-2.5-flash
+AI_MODEL=gemini-3-flash-preview
 SUPABASE_URL=https://pcesvmsewfpvmqmfmswn.supabase.co
 SUPABASE_PUBLISHABLE_KEY=sb_publishable_UHjFrmSZodpuHDpDSh4zWg_pVfhseeS

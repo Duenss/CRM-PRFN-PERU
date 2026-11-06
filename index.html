@@ -451,7 +451,7 @@ dialog::backdrop{background:rgba(3,4,8,.66);backdrop-filter:blur(8px)}
     <section class="tab" id="t-bandeja" hidden>
       <div class="pagehead">
         <div><h1>Bandeja de entrada</h1><p class="muted" id="in-sub">Conversaciones de WhatsApp en vivo.</p></div>
-        <div class="bar" style="margin:0"><input id="in-q" type="search" placeholder="Buscar por nombre o número"><button class="ghost" id="in-refresh" type="button">Actualizar</button></div>
+        <div class="bar" style="margin:0"><input id="in-q" type="search" placeholder="Buscar por nombre o número"><button class="ghost" id="in-sync" type="button">Sincronizar WhatsApp</button><button class="ghost" id="in-refresh" type="button">Actualizar</button></div>
       </div>
       <div class="inbox">
         <div class="in-list" id="in-list"><p class="empty" style="padding:1rem">Cargando…</p></div>
@@ -543,7 +543,7 @@ dialog::backdrop{background:rgba(3,4,8,.66);backdrop-filter:blur(8px)}
     </section>
 
     <section class="tab" id="t-clientes" hidden>
-      <div class="bar"><input id="cq" type="search" placeholder="Buscar por nombre, teléfono o etiqueta"><button id="c-new">Nuevo cliente</button><button class="ghost" id="c-imp">Importar CSV</button></div>
+      <div class="bar"><input id="cq" type="search" placeholder="Buscar por nombre, teléfono o etiqueta"><button id="c-new">Nuevo cliente</button><button class="ghost" id="c-sync" type="button">Recaudar contactos del WhatsApp</button><button class="ghost" id="c-imp">Importar CSV</button></div>
       <input type="file" id="c-file" accept=".csv,text/csv,.txt" hidden>
       <p class="muted" id="c-count"></p><div id="c-list"></div>
     </section>
@@ -582,11 +582,22 @@ dialog::backdrop{background:rgba(3,4,8,.66);backdrop-filter:blur(8px)}
         <div id="qr-wrap" hidden style="text-align:center;margin-top:.9rem">
           <img id="qr-img" alt="QR de WhatsApp" style="width:min(320px,82%);background:#fff;padding:12px;border-radius:12px;display:block;margin:0 auto">
           <p class="muted" style="margin-top:.6rem">WhatsApp → <b>Dispositivos vinculados</b> → <b>Vincular dispositivo</b></p>
+          <p class="muted" style="margin-top:.35rem">El QR rota cada pocos segundos: escanéalo rápido. Si aún falla, escanea el QR que aparece en la ventana de Chrome del bot (es el mismo).</p>
         </div>
         <div class="acts" style="justify-content:flex-start">
           <button class="ghost" id="qr-refresh" type="button">Generar / reiniciar QR</button>
           <button class="ghost" id="qr-logout" type="button">Cerrar sesión de WhatsApp</button>
         </div>
+      </div>
+      <div class="box">
+        <h2>Sincronizar chats y contactos</h2>
+        <p class="muted">Trae a la <b>Bandeja</b> todos los chats del WhatsApp vinculado y guarda los <b>contactos</b> (nombre y número) en Clientes. Los contactos se guardan <b>sin consentimiento</b>: tú luego completas cumpleaños y etiquetas. No sobrescribe a quien ya tengas cargado.</p>
+        <div class="acts" style="justify-content:flex-start">
+          <button id="b-sync-todo" type="button">Sincronizar ahora</button>
+          <button class="ghost" id="b-sync-chats" type="button">Solo chats (Bandeja)</button>
+          <button class="ghost" id="b-sync-contactos" type="button">Solo contactos (Clientes)</button>
+        </div>
+        <p id="b-sync-status" class="muted" style="margin-top:.8rem">Sin sincronizar.</p>
       </div>
       <div class="grid2">
         <div class="box">
@@ -1196,7 +1207,7 @@ let botToken=localStorage.getItem('bot_token')||'';
 $('#b-url').value=botURL;$('#b-token').value=botToken;
 function guardarBot(){botURL=$('#b-url').value.trim().replace(/\/$/,'');botToken=$('#b-token').value.trim();localStorage.setItem('bot_url',botURL);localStorage.setItem('bot_token',botToken)}
 async function botFetch(path,opts={}){
-  const r=await fetch(botURL+path,{...opts,headers:{...(opts.headers||{}),...(botToken?{'x-bot-token':botToken}:{})}});
+  const r=await fetch(botURL+path,{cache:'no-store',...opts,headers:{...(opts.headers||{}),...(botToken?{'x-bot-token':botToken}:{})}});
   const j=await r.json().catch(()=>({error:'Respuesta inválida del bot'}));
   if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
   return j;
@@ -1249,7 +1260,7 @@ function pararQr(){if(qrTimer){clearInterval(qrTimer);qrTimer=null}}
 async function refrescarQR(){
   const est=$('#qr-estado');if(!est)return;
   try{
-    const j=await botFetch('/api/estado');
+    const j=await botFetch('/api/estado?t='+Date.now());
     const ses=j.sesiones||[];
     const con=ses.find(s=>s.conectado);
     const qrSes=ses.find(s=>s.estado==='qr'&&s.qr);
@@ -1271,7 +1282,7 @@ async function refrescarQR(){
     $('#qr-wrap').hidden=true;
   }
 }
-function arrancarQr(){refrescarQR();pararQr();qrTimer=setInterval(refrescarQR,4000)}
+function arrancarQr(){refrescarQR();pararQr();qrTimer=setInterval(refrescarQR,2500)}
 $('#qr-refresh')?.addEventListener('click',async()=>{
   if(!confirm('¿Reiniciar la conexión del bot? Si ya está vinculado se reconectará; para vincular otro número primero cierra la sesión.'))return;
   try{await botFetch('/api/sesion/reiniciar',{method:'POST'});toast('Reiniciando…');arrancarQr()}catch(e){toast('Error: '+e.message)}
@@ -1280,6 +1291,39 @@ $('#qr-logout')?.addEventListener('click',async()=>{
   if(!confirm('¿Cerrar la sesión de WhatsApp del bot? Tendrás que volver a escanear el QR.'))return;
   try{await botFetch('/api/logout',{method:'POST'});await botFetch('/api/sesion/reiniciar',{method:'POST'});toast('Sesión cerrada. Escanea el nuevo QR.');arrancarQr()}catch(e){toast('Error: '+e.message)}
 });
+
+/* ---------- sincronizar chats y contactos desde WhatsApp ---------- */
+async function sincronizar(opts = {}) {
+  const { chats = true, contactos = false, btn = null, origen = '' } = opts;
+  const estado = $('#b-sync-status');
+  const antes = btn?.textContent;
+  if (btn) { btn.disabled = true; btn.textContent = 'Sincronizando…'; }
+  if (estado) estado.textContent = 'Leyendo WhatsApp… puede tardar unos segundos.';
+  try {
+    const j = await botFetch('/api/sincronizar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chats, contactos })
+    });
+    const partes = [];
+    if (chats) partes.push(`${j.chats} chats en la Bandeja`);
+    if (contactos) partes.push(`${j.contactosNuevos} contactos nuevos (${j.contactosExistentes} ya existían)`);
+    const msg = (partes.join(' · ') || 'Sin cambios') + '.';
+    toast('Sincronizado: ' + msg);
+    if (estado) estado.textContent = msg + ` Revisado en WhatsApp: ${j.chatsTotal || j.contactos || 0}.`;
+    if (contactos && typeof load === 'function') await load();
+    if (origen === 'bandeja') cargarBandeja();
+  } catch (e) {
+    toast('No se pudo sincronizar: ' + e.message, 'error');
+    if (estado) estado.textContent = 'Error: ' + e.message;
+  }
+  if (btn) { btn.disabled = false; if (antes) btn.textContent = antes; }
+}
+$('#b-sync-todo')?.addEventListener('click', e => sincronizar({ chats: true, contactos: true, btn: e.currentTarget }));
+$('#b-sync-chats')?.addEventListener('click', e => sincronizar({ chats: true, contactos: false, btn: e.currentTarget }));
+$('#b-sync-contactos')?.addEventListener('click', e => sincronizar({ chats: false, contactos: true, btn: e.currentTarget }));
+$('#in-sync')?.addEventListener('click', e => sincronizar({ chats: true, contactos: false, btn: e.currentTarget, origen: 'bandeja' }));
+$('#c-sync')?.addEventListener('click', e => sincronizar({ chats: false, contactos: true, btn: e.currentTarget }));
 
 /* ---------- vista previa ---------- */
 function prev(){
@@ -1335,7 +1379,13 @@ async function abrirChat(tel){
   $('#in-tel').textContent='+'+tel;
   $('#in-ava').textContent=iniciales(item?.nombre);
   try{
-    const c=await botFetch('/api/conversaciones/'+tel);
+    let c=await botFetch('/api/conversaciones/'+tel);
+    if((c.mensajes||[]).length===0&&c.wa){
+      try{
+        await botFetch('/api/conversaciones/'+tel+'/importar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({limite:50})});
+        c=await botFetch('/api/conversaciones/'+tel);
+      }catch(e){}
+    }
     if(c.pausado)inPausados.add(tel);else inPausados.delete(tel);
     pintarHilo(c.mensajes||[]);actualizarPausa();
     botFetch('/api/conversaciones/'+tel+'/leido',{method:'POST'}).catch(()=>{});

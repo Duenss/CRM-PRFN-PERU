@@ -58,7 +58,7 @@ Sube el proyecto a un repositorio y conéctalo a Cloudflare Pages:
 - Output directory: `/`
 - Variables de entorno:
   - `GEMINI_API_KEY` (o `ANTHROPIC_API_KEY`)
-  - `AI_MODEL` (opcional, por defecto `gemini-2.5-flash`)
+  - `AI_MODEL` (opcional, por defecto `gemini-3-flash-preview`)
   - `SUPABASE_URL`
   - `SUPABASE_PUBLISHABLE_KEY`
 
@@ -147,6 +147,8 @@ Todo se controla desde el bot (`/api/ia`), así que los cambios sobreviven al re
 | GET | `/api/conversaciones/:telefono` | Hilo completo |
 | POST | `/api/conversaciones/:telefono/enviar` | Enviar mensaje manual |
 | POST | `/api/conversaciones/:telefono/leido` | Marcar como leído |
+| POST | `/api/conversaciones/:telefono/importar` | Traer el historial del chat desde WhatsApp |
+| POST | `/api/sincronizar` | Traer **todos** los chats a la Bandeja y/o los contactos a Clientes (`{chats,contactos}`) |
 | GET/POST | `/api/ia` | Leer/guardar estado de la IA |
 | POST | `/api/ia/pausar` | Pausar/reanudar IA por teléfono |
 | POST | `/api/prueba` | Enviar mensaje de prueba a OWNER_NUMBER/NUMEROS_PRUEBA |

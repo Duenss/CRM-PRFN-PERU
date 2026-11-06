@@ -11,6 +11,21 @@
 - Panel rediseñado (wacrm-style, acento dorado) en un solo `index.html`.
 - 8 pestañas: Inicio, Bandeja, Campañas, Clientes, Catálogo, Calendario, Asistente IA, Ajustes.
 - **Bandeja de entrada** en vivo y **Asistente IA** conectados al bot (`/api/ia`, `/api/conversaciones`).
+- **Sincronización con WhatsApp**: "Sincronizar WhatsApp" (Bandeja) trae **todos** los chats del
+  número vinculado, no solo los que recibió el bot; "Recaudar contactos" (Clientes) y la tarjeta de
+  Ajustes guardan nombre + número en `clientes` **sin consentimiento** (no sobrescriben datos ya
+  cargados). Al abrir un chat sincronizado se importa su historial desde WhatsApp a demanda.
+  Rutas: `POST /api/sincronizar` y `POST /api/conversaciones/:telefono/importar`.
+  - Los chats `@lid` (identificadores nuevos de WhatsApp Web) se resuelven a teléfono real vía
+    `contact.phoneNumber` / `enforceLidAndPnRetrieval`; se excluye el chat propio.
+  - `registrarCabecera` guarda a disco, así los chats sincronizados persisten tras reiniciar.
+  - `getChats`/`getChatById`/`fetchMessages` de whatsapp-web.js fallan ("r") en la versión actual de
+    WhatsApp Web: se leen chats y mensajes directo de la página, tolerando errores por chat.
+- **QR sin caché**: `/api/estado` responde `Cache-Control: no-store` y el panel lo pide con
+  cache-buster y refresca cada 2.5 s, para no mostrar un QR caducado ("no se puede conectar al dispositivo").
+- **Modelo de IA**: `gemini-3-flash-preview` (el más rápido medido, ~1.2 s) con cadena de respaldo
+  `gemini-flash-latest` → `gemini-3.8-flash`; `thinkingConfig:{thinkingBudget:0}` porque Gemini 3
+  gasta tokens "pensando" y corta el JSON; timeout de 60 s por intento.
 - **Conexión del bot dentro del dashboard**: chip de estado en la barra superior + tarjeta en IA/Ajustes.
 - **Un solo dashboard**: el QR, el envío de prueba y el registro del bot viven en **Ajustes**;
   ya no se abre el panel externo del bot (`bot/src/panel.html` queda solo como respaldo de la API).

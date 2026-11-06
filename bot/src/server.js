@@ -1,16 +1,21 @@
 import express from 'express';
 import { fileURLToPath } from 'node:url';
 import { config, validarConfig, esNumeroPeru, normalizar } from './config.js';
-import { sb, getCliente, getClientes, logMensaje, historial, marcarBaja } from './supabase.js';
-import { iniciarWhatsApp, enviar, estadoWa, cerrarSesion, reiniciarSesion, hayConexion, sesionDisponible } from './whatsapp.js';
+import { sb, getCliente, getClientes, logMensaje, historial, marcarBaja, importarClientes } from './supabase.js';
+import { iniciarWhatsApp, enviar, estadoWa, cerrarSesion, reiniciarSesion, hayConexion, sesionDisponible, listarChatsWa, listarContactosWa, historialWa } from './whatsapp.js';
 import { redactarRespuesta } from './ai.js';
 import { Cola, dormir, esperaEntreEnvios } from './queue.js';
 import { estadoIA, actualizarIA, pausarIA, estaPausado, promptIA, resumenIA } from './ia.js';
-import { registrar, listar, obtener, marcarLeido, respuestasIA, porDia, resumen as resumenChats } from './conversaciones.js';
+import { registrar, listar, obtener, marcarLeido, respuestasIA, porDia, resumen as resumenChats, registrarCabecera, importarMensajes } from './conversaciones.js';
 
 const panelPath = fileURLToPath(new URL('./panel.html', import.meta.url));
 const app = express();
 app.use(express.json({ limit: '64kb' }));
+// Evita que el navegador cachee respuestas de la API (el QR rota cada pocos segundos).
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/')) res.set('Cache-Control', 'no-store');
+  next();
+});
 
 /* ---------------- utilidades ---------------- */
 const logs = [];
@@ -428,6 +433,73 @@ app.get('/api/estadisticas', auth, (req, res) => {
 });
 
 /* ---------------- Bandeja de entrada ---------------- */
+/* ---------------- sincronización desde WhatsApp ---------------- */
+app.post('/api/sincronizar', auth, async (req, res) => {
+  if (!config.modoPrueba && !sesionDisponible(req.body?.sesion || null)) {
+    return res.status(503).json({ error: 'Ningún WhatsApp está conectado.' });
+  }
+  const hacerChats = req.body?.chats !== false;
+  const hacerContactos = req.body?.contactos !== false;
+  const salida = { ok: true, chats: 0, chatsTotal: 0, contactos: 0, contactosNuevos: 0, contactosExistentes: 0 };
+  try {
+    if (hacerChats) {
+      const lista = await listarChatsWa(req.body?.sesion || null);
+      salida.chatsTotal = lista.length;
+      for (const c of lista) {
+        if (c.esGrupo || !/^\d{8,15}$/.test(c.telefono)) continue;
+        registrarCabecera({
+          telefono: c.telefono,
+          nombre: c.nombre,
+          ultimoTexto: c.ultimoTexto,
+          ultimoEn: c.ultimoEn,
+          noLeidos: c.noLeidos
+        });
+        salida.chats++;
+      }
+    }
+    if (hacerContactos) {
+      if (!sb) return res.status(503).json({ error: 'Falta SUPABASE_SERVICE_ROLE_KEY en el bot.' });
+      const contactos = await listarContactosWa(req.body?.sesion || null);
+      salida.contactos = contactos.length;
+      const actuales = await getClientes();
+      const existentes = new Set(actuales.map(c => c.telefono));
+      const nuevos = contactos
+        .filter(c => esNumeroPeru(c.telefono) && !existentes.has(c.telefono))
+        .map(c => ({
+          nombre: c.nombre || `+${c.telefono}`,
+          telefono: c.telefono,
+          activo: true,
+          consentimiento: false,
+          etiquetas: []
+        }));
+      salida.contactosExistentes = contactos.filter(c => esNumeroPeru(c.telefono)).length - nuevos.length;
+      const r = await importarClientes(nuevos);
+      salida.contactosNuevos = r.insertados;
+    }
+    log(`Sincronización: ${salida.chats} chats · ${salida.contactosNuevos} contactos nuevos (de ${salida.contactos}).`);
+    res.json(salida);
+  } catch (e) {
+    log('Error al sincronizar: ' + (e?.stack || e?.message || e));
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/conversaciones/:telefono/importar', auth, async (req, res) => {
+  const tel = normalizar(req.params.telefono);
+  if (!/^\d{8,15}$/.test(tel)) return res.status(400).json({ error: 'Teléfono inválido.' });
+  if (!config.modoPrueba && !sesionDisponible(req.body?.sesion || null)) {
+    return res.status(503).json({ error: 'Ningún WhatsApp está conectado.' });
+  }
+  try {
+    const msgs = await historialWa(tel, Number(req.body?.limite) || 50, req.body?.sesion || null);
+    const nuevos = importarMensajes(tel, msgs);
+    res.json({ ok: true, leidos: msgs.length, nuevos });
+  } catch (e) {
+    log('Error al importar historial de +' + tel + ': ' + (e?.stack || e?.message || e));
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.get('/api/conversaciones', auth, (req, res) => {
   const limite = Math.min(100, Math.max(1, Number(req.query.limite) || 40));
   const ia = estadoIA();

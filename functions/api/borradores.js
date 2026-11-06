@@ -117,20 +117,34 @@ Redacta exactamente 3 versiones distintas. Devuelve solo el JSON indicado.`;
 }
 
 async function gemini(env, prompt) {
-  const model = env.AI_MODEL || 'gemini-2.5-flash';
-  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(env.GEMINI_API_KEY)}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: SYS }] },
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.85, maxOutputTokens: 1200, responseMimeType: 'application/json' }
-    })
-  });
-  if (!r.ok) throw new Error(`Gemini ${r.status}: ${(await r.text()).slice(0, 200)}`);
-  const j = await r.json();
-  const txt = j.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || '';
-  return parseDrafts(txt);
+  const preferido = env.AI_MODEL || 'gemini-3-flash-preview';
+  const modelos = [...new Set([preferido, 'gemini-flash-latest', 'gemini-3.8-flash', 'gemini-3-flash-preview'])];
+  let ultimo;
+  for (const model of modelos) {
+    for (const conThinking of [true, false]) {
+      const generationConfig = { temperature: 0.85, maxOutputTokens: 1600, responseMimeType: 'application/json' };
+      if (conThinking) generationConfig.thinkingConfig = { thinkingBudget: 0 };
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(env.GEMINI_API_KEY)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: SYS }] },
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig
+        })
+      });
+      if (r.ok) {
+        const j = await r.json();
+        const txt = j.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || '';
+        return parseDrafts(txt);
+      }
+      const detalle = (await r.text()).slice(0, 200);
+      ultimo = new Error(`Gemini ${r.status}: ${detalle}`);
+      if (r.status === 400 && conThinking) continue;
+      break;
+    }
+  }
+  throw ultimo || new Error('Gemini sin respuesta');
 }
 
 async function anthropic(env, prompt) {

@@ -63,3 +63,22 @@ export async function marcarBaja(cliente) {
   }).eq('id', cliente.id);
   if (error) throw error;
 }
+
+/**
+ * Importa contactos a la tabla clientes sin sobrescribir los que ya existen.
+ * `ignoreDuplicates` deja intactos cumpleaños, etiquetas y consentimiento ya cargados.
+ */
+export async function importarClientes(lista = []) {
+  if (!sb || !lista.length) return { insertados: 0, total: lista.length };
+  let insertados = 0;
+  for (let i = 0; i < lista.length; i += 200) {
+    const lote = lista.slice(i, i + 200);
+    const { data, error } = await sb
+      .from('clientes')
+      .upsert(lote, { onConflict: 'telefono', ignoreDuplicates: true })
+      .select('id');
+    if (error) throw error;
+    insertados += data?.length || 0;
+  }
+  return { insertados, total: lista.length };
+}

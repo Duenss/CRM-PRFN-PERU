@@ -81,6 +81,71 @@ function recortar() {
     .forEach(k => delete chats[k]);
 }
 
+/** Crea/actualiza un chat solo con su cabecera (sincronización desde WhatsApp). */
+export function registrarCabecera({ telefono, nombre = '', ultimoTexto = '', ultimoEn = null, noLeidos = 0 }) {
+  const tel = limpiarTel(telefono);
+  if (!tel) return null;
+  const chat = chats[tel] || {
+    telefono: tel,
+    nombre: nombre || `+${tel}`,
+    clienteId: null,
+    noLeidos: 0,
+    ultimoTexto: '',
+    ultimoEn: ultimoEn || ahora(),
+    mensajes: []
+  };
+  if (nombre && (!chat.nombre || chat.nombre === `+${tel}`)) chat.nombre = String(nombre).slice(0, 120);
+  if (ultimoTexto && String(ultimoEn || '') >= String(chat.ultimoEn || '')) chat.ultimoTexto = String(ultimoTexto).slice(0, 300);
+  if (ultimoEn && String(ultimoEn) > String(chat.ultimoEn || '')) chat.ultimoEn = ultimoEn;
+  if (noLeidos && noLeidos > (chat.noLeidos || 0)) chat.noLeidos = noLeidos;
+  chat.wa = true;
+  chats[tel] = chat;
+  recortar();
+  guardar();
+  return chat;
+}
+
+/** Importa mensajes históricos de WhatsApp sin duplicar (dedupe por waId). */
+export function importarMensajes(telefono, mensajes = []) {
+  const tel = limpiarTel(telefono);
+  if (!tel || !Array.isArray(mensajes) || !mensajes.length) return 0;
+  const chat = chats[tel] || {
+    telefono: tel,
+    nombre: `+${tel}`,
+    clienteId: null,
+    noLeidos: 0,
+    ultimoTexto: '',
+    ultimoEn: ahora(),
+    mensajes: []
+  };
+  const vistos = new Set(chat.mensajes.map(m => m.waId).filter(Boolean));
+  let nuevos = 0;
+  for (const m of mensajes) {
+    if (m.waId && vistos.has(m.waId)) continue;
+    const item = {
+      id: m.waId || `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      waId: m.waId || '',
+      direccion: m.direccion === 'saliente' ? 'saliente' : 'entrante',
+      texto: String(m.texto || '').slice(0, 4000),
+      origen: m.direccion === 'saliente' ? 'bot' : 'cliente',
+      estado: 'ok',
+      en: m.en || ahora()
+    };
+    if (item.waId) vistos.add(item.waId);
+    chat.mensajes.push(item);
+    nuevos++;
+  }
+  if (!nuevos) return 0;
+  chat.mensajes.sort((a, b) => String(a.en).localeCompare(String(b.en)));
+  if (chat.mensajes.length > MAX_MENSAJES) chat.mensajes = chat.mensajes.slice(-MAX_MENSAJES);
+  const ult = chat.mensajes[chat.mensajes.length - 1];
+  if (ult) { chat.ultimoTexto = ult.texto; chat.ultimoEn = ult.en; }
+  chats[tel] = chat;
+  recortar();
+  guardar();
+  return nuevos;
+}
+
 export function listar(limite = 40) {
   return Object.values(chats)
     .sort((a, b) => String(b.ultimoEn).localeCompare(String(a.ultimoEn)))
@@ -92,7 +157,8 @@ export function listar(limite = 40) {
       noLeidos: c.noLeidos || 0,
       ultimoTexto: c.ultimoTexto,
       ultimoEn: c.ultimoEn,
-      total: c.mensajes.length
+      total: c.mensajes.length,
+      wa: !!c.wa
     }));
 }
 
@@ -106,6 +172,7 @@ export function obtener(telefono) {
     noLeidos: c.noLeidos || 0,
     ultimoTexto: c.ultimoTexto,
     ultimoEn: c.ultimoEn,
+    wa: !!c.wa,
     mensajes: c.mensajes.slice(-MAX_MENSAJES)
   };
 }
