@@ -263,8 +263,8 @@ code{background:var(--s2);padding:.05rem .35rem;border-radius:5px;font-size:.85e
 @keyframes breathe{0%,100%{transform:scale(1);box-shadow:0 0 22px var(--glow)}50%{transform:scale(1.06);box-shadow:0 0 40px var(--glow)}}
 
 /* ---------- bandeja ---------- */
-.inbox{display:grid;grid-template-columns:320px 1fr;gap:0;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--s1);height:calc(100vh - 190px);min-height:460px}
-.in-list{border-right:1px solid var(--line);overflow:auto;background:var(--s1)}
+.inbox{display:grid;grid-template-columns:320px 1fr;grid-template-rows:minmax(0,1fr);gap:0;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--s1);height:calc(100vh - 190px);min-height:460px}
+.in-list{border-right:1px solid var(--line);overflow:auto;min-height:0;background:var(--s1)}
 .in-item{display:flex;gap:.7rem;padding:.7rem .9rem;border-bottom:1px solid var(--line);cursor:pointer;transition:background .16s var(--ease);position:relative}
 .in-item:hover{background:var(--s2)}
 .in-item.on{background:var(--gold-soft)}
@@ -278,10 +278,10 @@ code{background:var(--s2);padding:.05rem .35rem;border-radius:5px;font-size:.85e
 .in-item .imeta time{font-size:.68rem;color:var(--mute2)}
 .in-item .paused{font-size:.62rem;color:var(--warn);border:1px solid rgba(240,177,74,.5);border-radius:99px;padding:0 .35rem}
 .in-item .unread{background:var(--gold);color:#0B0A06;font-size:.66rem;font-weight:700;border-radius:99px;min-width:18px;text-align:center;padding:0 .35rem}
-.in-chat{display:flex;flex-direction:column;background:#0B0F16;min-width:0}
+.in-chat{display:flex;flex-direction:column;background:#0B0F16;min-width:0;min-height:0;overflow:hidden}
 .in-empty{flex:1;display:grid;place-items:center;text-align:center;color:var(--mute);padding:1rem}
 .in-empty-ico{font-size:2.2rem;margin-bottom:.5rem;opacity:.7}
-.in-thread{flex:1;display:flex;flex-direction:column;min-height:0}
+.in-thread{flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden}
 .in-head{display:flex;align-items:center;justify-content:space-between;gap:.7rem;padding:.7rem .9rem;border-bottom:1px solid var(--line);background:var(--s1)}
 .in-id{display:flex;align-items:center;gap:.7rem;min-width:0}
 .in-id b{display:block;font-size:.92rem}
@@ -290,7 +290,7 @@ code{background:var(--s2);padding:.05rem .35rem;border-radius:5px;font-size:.85e
 .ava.g{background:linear-gradient(135deg,#3ee07a,#1f9c4d);color:#04210f}
 .in-head-act{display:flex;gap:.5rem}
 .in-head-act button{min-height:34px;font-size:.78rem;padding:.35rem .75rem}
-.in-msgs{flex:1;overflow:auto;padding:1rem;display:flex;flex-direction:column;gap:.5rem;background-image:radial-gradient(circle at 20% 10%,rgba(221,183,95,.04),transparent 50%)}
+.in-msgs{flex:1;min-height:0;overflow:auto;padding:1rem;display:flex;flex-direction:column;gap:.5rem;background-image:radial-gradient(circle at 20% 10%,rgba(221,183,95,.04),transparent 50%)}
 .msg{max-width:74%;padding:.55rem .75rem;border-radius:12px;font-size:.88rem;white-space:pre-wrap;word-break:break-word;position:relative;animation:fade .22s var(--ease-out)}
 .msg time{display:block;font-size:.62rem;opacity:.65;text-align:right;margin-top:.25rem}
 .msg.in{align-self:flex-start;background:var(--s2);border:1px solid var(--line);border-bottom-left-radius:3px}
@@ -356,8 +356,9 @@ dialog::backdrop{background:rgba(3,4,8,.66);backdrop-filter:blur(8px)}
   .topbar{padding:.6rem 1rem}
   .crumb span{display:none}
   .page{padding:1rem 1rem 6rem}
-  .inbox{grid-template-columns:1fr;height:auto}
+  .inbox{grid-template-columns:1fr;grid-template-rows:none;height:auto}
   .in-list{max-height:44vh}
+  .in-chat,.in-thread,.in-msgs{overflow:visible;min-height:0}
   .cal .day{min-height:62px}
   #toast{bottom:5.4rem}
 }
@@ -788,9 +789,13 @@ async function load(){
     sb.from('productos').select('*').order('codigo'),
     sb.from('plantillas').select('*').order('nombre'),
     sb.from('campanas').select('*').order('creado_en',{ascending:false}).limit(200)]);
-  const err=c.error||p.error||t.error||k.error;
-  if(err)throw new Error(err.message);
+  if(p.error)throw new Error(p.error.message);
+  if(c.error||t.error||k.error)console.warn('Aviso al cargar:',(c.error||t.error||k.error).message);
   clientes=c.data||[];
+  // Respaldo: si la sesión/RLS no deja ver clientes, los pide al bot (servicio).
+  if(!clientes.length){
+    try{const j=await botFetch('/api/clientes');if(j.clientes?.length)clientes=j.clientes;}catch(e){}
+  }
   productos=(p.data||[]).filter(x=>x.activo!==false);
   plantillas=t.data||[];campanas=k.data||[];
   $('#k-pla').innerHTML='<option value="">Escribir desde cero</option>'+plantillas.map(x=>`<option value="${esc(x.id)}">${esc(x.nombre)}</option>`).join('');
@@ -806,8 +811,8 @@ function irTab(name){
   const c=CRUMBS[name]||['',''];
   if($('#crumb'))$('#crumb').textContent=c[0];
   if($('#crumb-sub'))$('#crumb-sub').textContent=c[1];
-  pararQr();pararLogs();
-  if(name==='bandeja')cargarBandeja();
+  pararQr();pararLogs();pararBandeja();
+  if(name==='bandeja'){cargarBandeja();inListTimer=setInterval(()=>{if(!document.hidden)cargarBandeja()},12000);}
   else if(name==='ia')cargarIA();
   else if(name==='inicio')renderInicio();
   else if(name==='bot'){arrancarQr();arrancarLogs();}
@@ -1371,6 +1376,14 @@ function pintarLista(){
     return `<div class="in-item${on}" data-tel="${esc(c.telefono)}"><div class="ava">${esc(iniciales(c.nombre))}</div><div class="ib"><b>${esc(c.nombre||('+'+c.telefono))}</b><small>${esc((c.ultimoTexto||'').slice(0,44)||'—')}</small></div><div class="imeta"><time>${esc(hace(c.ultimoEn))}</time>${inPausados.has(c.telefono)?'<span class="paused">IA off</span>':''}${c.noLeidos?`<span class="unread">${c.noLeidos}</span>`:''}</div></div>`;
   }).join('')||'<p class="empty" style="padding:1rem">Sin conversaciones todavía.</p>');
 }
+async function importarHilo(tel){
+  try{
+    await botFetch('/api/conversaciones/'+tel+'/importar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({limite:60})});
+    if(inTel!==tel)return;
+    const c=await botFetch('/api/conversaciones/'+tel);
+    pintarHilo(c.mensajes||[]);
+  }catch(e){}
+}
 async function abrirChat(tel){
   inTel=tel;
   const item=inChats.find(c=>c.telefono===tel);
@@ -1378,21 +1391,24 @@ async function abrirChat(tel){
   $('#in-name').textContent=item?.nombre||('+'+tel);
   $('#in-tel').textContent='+'+tel;
   $('#in-ava').textContent=iniciales(item?.nombre);
+  $('#in-msgs').innerHTML='<p class="empty">Cargando mensajes…</p>';
+  arrancarRefrescoHilo();
   try{
-    let c=await botFetch('/api/conversaciones/'+tel);
-    if((c.mensajes||[]).length===0&&c.wa){
-      try{
-        await botFetch('/api/conversaciones/'+tel+'/importar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({limite:50})});
-        c=await botFetch('/api/conversaciones/'+tel);
-      }catch(e){}
-    }
+    const c=await botFetch('/api/conversaciones/'+tel);
     if(c.pausado)inPausados.add(tel);else inPausados.delete(tel);
     pintarHilo(c.mensajes||[]);actualizarPausa();
     botFetch('/api/conversaciones/'+tel+'/leido',{method:'POST'}).catch(()=>{});
     const i=inChats.find(x=>x.telefono===tel);if(i)i.noLeidos=0;
     pintarLista();actualizarBadge(inChats.reduce((n,x)=>n+(x.noLeidos||0),0));
+    // Completa y ordena con el historial real de WhatsApp (incluye tus propios envíos).
+    if(c.wa) importarHilo(tel);
   }catch(e){$('#in-msgs').innerHTML='<p class="empty">No se pudo abrir la conversación.</p>';}
 }
+let inHiloTimer=null;
+function arrancarRefrescoHilo(){pararRefrescoHilo();inHiloTimer=setInterval(()=>{if(inTel&&!document.hidden)importarHilo(inTel)},20000)}
+function pararRefrescoHilo(){if(inHiloTimer){clearInterval(inHiloTimer);inHiloTimer=null}}
+let inListTimer=null;
+function pararBandeja(){if(inListTimer){clearInterval(inListTimer);inListTimer=null}pararRefrescoHilo()}
 function pintarHilo(msgs){
   const c=$('#in-msgs');
   c.innerHTML=msgs.map(m=>{

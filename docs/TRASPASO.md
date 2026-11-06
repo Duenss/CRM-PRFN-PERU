@@ -39,6 +39,28 @@
 - Repo git inicializado con commit inicial; `.env`, `node_modules`, `wwebjs_auth` y `bot/data` ignorados.
 - Probado end-to-end (sesión previa): entrante → respuesta IA; maestro off y pausa por chat cortan las respuestas.
 
+### Correcciones de sincronización y bandeja
+- **Entrantes de cualquier país**: `manejarMensaje` ya no descarta números que no son de Perú
+  (antes `esNumeroPeru` bloqueaba, p. ej., el propio número del bot +56). Se valida solo que sea
+  un número de 8–15 dígitos.
+- **Chats `@lid`**: el teléfono real se resuelve con `resolverTelefonoWa()` (vía `WAWebApiContact` /
+  `enforceLidAndPnRetrieval`) tanto para entrantes como para los mensajes que envías tú.
+- **Multimedia**: imágenes, videos, audios, stickers y documentos se guardan como marcadores
+  (`[imagen]`, `[video]`, `[nota de voz]`, …) para que el hilo quede completo; no disparan IA.
+- **Tus propios mensajes**: `message_create` registra lo que envías desde el celular (origen "panel");
+  los que manda el bot se descartan para no duplicar.
+- **Historial completo y en orden**: `historialWa` ordena por fecha ascendente, incluye multimedia
+  y deduplica por `waId` (obtenido de `id._serialized || id.id || key.id`). Al abrir un chat
+  **siempre** se reimporta y se refresca cada 20 s; la lista cada 12 s.
+- **Sin duplicados**: `importarMensajes` deduplica por `waId` y, si falta, por huella
+  (`fecha|dirección|texto`). Verificado: importar dos veces seguidas da `nuevos: 0`.
+- **Scroll de la Bandeja**: `grid-template-rows:minmax(0,1fr)` y `min-height:0` para que la lista
+  de contactos y el hilo tengan su propio scroll.
+- **Clientes**: el panel lee `clientes` con sesión de Supabase; si por RLS/sesión viniera vacío,
+  cae al respaldo `GET /api/clientes` (servicio) para que la lista nunca se vea en blanco.
+- **Números de prueba**: `NUMEROS_PRUEBA` y `OWNER_NUMBER` reciben respuesta de la IA aunque sea
+  fuera del horario de atención (para poder probar a cualquier hora).
+
 Pendiente del dueño antes de producción (ver `README.md` → *Puesta en producción*):
 `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`, ejecutar SQL 01–03, crear usuario dueño,
 y decidir dónde vive el bot 24/7.

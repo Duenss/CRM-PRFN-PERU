@@ -7,6 +7,9 @@ const { Client, LocalAuth } = pkg;
 /** id -> { id, estado, conectado, qr, qrDataUrl, numero, error, client, reintentos } */
 export const sesiones = new Map();
 
+/** Ids de mensajes que envió el propio bot (para no duplicarlos en 'message_create'). */
+const enviadosPorBot = new Set();
+
 let logFn = console.log;
 
 function crearEstado(id) {
@@ -24,7 +27,7 @@ function crearEstado(id) {
   };
 }
 
-export async function iniciarWhatsApp({ onMensaje, log, sesionIds = ['1'] }) {
+export async function iniciarWhatsApp({ onMensaje, onMensajePropio, log, sesionIds = ['1'] }) {
   logFn = log || console.log;
 
   if (config.modoPrueba) {
@@ -45,7 +48,7 @@ export async function iniciarWhatsApp({ onMensaje, log, sesionIds = ['1'] }) {
     const espera = retraso;
     retraso += 12000;
     setTimeout(() => {
-      crearSesion(key, { onMensaje, log }).catch(e => {
+      crearSesion(key, { onMensaje, onMensajePropio, log }).catch(e => {
         const s = sesiones.get(key);
         if (s) { s.estado = 'desconectado'; s.error = e.message; }
         log(`No se pudo iniciar la sesión ${key}: ${e.message}`);
@@ -54,7 +57,7 @@ export async function iniciarWhatsApp({ onMensaje, log, sesionIds = ['1'] }) {
   }
 }
 
-async function crearSesion(id, { onMensaje, log }) {
+async function crearSesion(id, { onMensaje, onMensajePropio, log }) {
   const s = sesiones.get(id);
   const opciones = {
     authStrategy: new LocalAuth({ clientId: `sesion-${id}`, dataPath: config.sessionPath }),
@@ -123,6 +126,16 @@ async function crearSesion(id, { onMensaje, log }) {
   client.on('message', async msg => {
     try { await onMensaje(msg, id); }
     catch (e) { log(`[${id}] Error al procesar mensaje: ${e.message}`); }
+  });
+
+  // Mensajes creados por este número (los que envías tú desde el celular).
+  // Los que manda el propio bot se descartan aquí para no duplicarlos.
+  client.on('message_create', async msg => {
+    try {
+      const wid = msg?.id?._serialized;
+      if (wid && enviadosPorBot.has(wid)) { enviadosPorBot.delete(wid); return; }
+      if (onMensajePropio) await onMensajePropio(msg, id);
+    } catch (e) { log(`[${id}] Error al procesar mensaje propio: ${e.message}`); }
   });
 
   // Arranca también un vigilante por si 'authenticated' nunca llega.
@@ -200,8 +213,13 @@ export async function enviar(telefono, texto, sesionId = null) {
 
   const id = await s.client.getNumberId(limpio);
   if (!id) throw new Error(`El número +${limpio} no tiene WhatsApp`);
-  await s.client.sendMessage(id._serialized, texto);
-  return { ok: true, sesion: s.id };
+  const enviado = await s.client.sendMessage(id._serialized, texto);
+  const waId = (enviado && enviado.id && enviado.id._serialized) || '';
+  if (waId) {
+    enviadosPorBot.add(waId);
+    if (enviadosPorBot.size > 500) enviadosPorBot.delete(enviadosPorBot.values().next().value);
+  }
+  return { ok: true, sesion: s.id, waId };
 }
 
 /** Teléfono de un chat o contacto individual (solo dígitos), o '' si es grupo/sin número. */
@@ -211,6 +229,38 @@ function telDe(item) {
     || item.contact?.number || item.number || '';
   const tel = normalizar(candidato);
   return /^\d{8,15}$/.test(tel) ? tel : '';
+}
+
+/** Dado el id de un chat (@lid o @c.us), devuelve el teléfono real (solo dígitos) o ''. */
+export async function resolverTelefonoWa(widSerializado, sesionId = null) {
+  const wid = String(widSerializado || '');
+  if (!wid) return '';
+  const [user, server] = wid.split('@');
+  if (server === 'c.us') return normalizar(user);
+  const s = sesionParaEnviar(sesionId) || [...sesiones.values()].find(x => x.client && x.client.pupPage);
+  if (!s) return '';
+  try {
+    const real = await s.client.pupPage.evaluate(async (wid) => {
+      const W = window;
+      try {
+        const apiContact = W.require('WAWebApiContact');
+        const widFactory = W.require('WAWebWidFactory');
+        const w = widFactory.createWid(wid);
+        const phone = apiContact.getPhoneNumber(w);
+        if (phone && phone._serialized) return String(phone._serialized).split('@')[0];
+      } catch (e) {}
+      try {
+        if (W.WWebJS && W.WWebJS.enforceLidAndPnRetrieval) {
+          const r = await W.WWebJS.enforceLidAndPnRetrieval(wid);
+          if (r && r.phone && r.phone._serialized) return String(r.phone._serialized).split('@')[0];
+        }
+      } catch (e) {}
+      return '';
+    }, wid);
+    return real ? normalizar(real) : '';
+  } catch (e) {
+    return '';
+  }
 }
 
 /** Todos los chats del WhatsApp vinculado (no solo los que vio el bot). */
@@ -354,18 +404,32 @@ export async function historialWa(telefono, limite = 50, sesionId = null) {
         lista = [...cargados.filter(filtro), ...lista];
       } catch (e) { break; }
     }
-    if (lista.length > tope) {
-      lista.sort((a, b) => (a.t > b.t ? 1 : -1));
-      lista = lista.slice(lista.length - tope);
-    }
+    lista.sort((a, b) => (a.t || 0) - (b.t || 0));
+    if (lista.length > tope) lista = lista.slice(lista.length - tope);
+    const vistos = new Set();
     return lista
-      .map(m => ({
-        waId: (m.id && m.id._serialized) || '',
-        direccion: m.id && m.id.fromMe ? 'saliente' : 'entrante',
-        texto: String((m.body || m.caption || '')).slice(0, 4000),
-        en: m.t ? new Date(m.t * 1000).toISOString() : new Date().toISOString()
-      }))
-      .filter(m => m.texto);
+      .map(m => {
+        let texto = String((m.body || m.caption || '')).trim();
+        if (!texto) {
+          const t = String(m.type || '');
+          texto = ({
+            image: '[imagen]', video: '[video]', audio: '[audio]', ptt: '[nota de voz]',
+            document: '[documento]', sticker: '[sticker]', location: '[ubicación]',
+            vcard: '[contacto]', multi_vcard: '[contactos]'
+          })[t] || (m.hasMedia ? '[archivo]' : '');
+        }
+        const idObj = m.id || {};
+        const waId = idObj._serialized || idObj.id || (m.key && m.key.id) || '';
+        if (!texto && !waId) return null;
+        if (waId) { if (vistos.has(waId)) return null; vistos.add(waId); }
+        return {
+          waId,
+          direccion: m.id && m.id.fromMe ? 'saliente' : 'entrante',
+          texto: texto.slice(0, 4000),
+          en: m.t ? new Date(m.t * 1000).toISOString() : new Date().toISOString()
+        };
+      })
+      .filter(Boolean);
   }, { chatId, limite });
   return msgs || [];
 }

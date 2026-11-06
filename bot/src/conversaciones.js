@@ -6,7 +6,7 @@ const dataDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'd
 const archivo = path.join(dataDir, 'conversaciones.json');
 
 const MAX_CHATS = 400;
-const MAX_MENSAJES = 300;
+const MAX_MENSAJES = 500;
 
 /** @type {Record<string, {telefono:string,nombre:string,clienteId:string|null,noLeidos:number,ultimoTexto:string,ultimoEn:string,mensajes:Array<any>}>} */
 let chats = cargar();
@@ -37,7 +37,7 @@ function guardar() {
 const limpiarTel = t => String(t || '').replace(/\D/g, '');
 const ahora = () => new Date().toISOString();
 
-export function registrar({ telefono, texto, direccion = 'entrante', nombre = '', clienteId = null, origen = '', estado = 'ok' }) {
+export function registrar({ telefono, texto, direccion = 'entrante', nombre = '', clienteId = null, origen = '', estado = 'ok', waId = '', en = null }) {
   const tel = limpiarTel(telefono);
   if (!tel) return null;
   const chat = chats[tel] || {
@@ -52,13 +52,17 @@ export function registrar({ telefono, texto, direccion = 'entrante', nombre = ''
   if (nombre) chat.nombre = String(nombre).slice(0, 120);
   if (clienteId) chat.clienteId = clienteId;
 
+  // Dedupe por identificador de WhatsApp (evita duplicar al reimportar historial).
+  if (waId && chat.mensajes.some(m => m.waId === waId)) return null;
+
   const mensaje = {
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    id: waId || `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    waId: waId || '',
     direccion,
     texto: String(texto || '').slice(0, 4000),
     origen: origen || (direccion === 'entrante' ? 'cliente' : 'bot'),
     estado,
-    en: ahora()
+    en: en || ahora()
   };
   chat.mensajes.push(mensaje);
   if (chat.mensajes.length > MAX_MENSAJES) chat.mensajes = chat.mensajes.slice(-MAX_MENSAJES);
@@ -118,10 +122,12 @@ export function importarMensajes(telefono, mensajes = []) {
     ultimoEn: ahora(),
     mensajes: []
   };
-  const vistos = new Set(chat.mensajes.map(m => m.waId).filter(Boolean));
+  const clave = m => m.waId || `${m.en || ''}|${m.direccion || ''}|${String(m.texto || '').slice(0, 120)}`;
+  const vistos = new Set(chat.mensajes.map(clave));
   let nuevos = 0;
   for (const m of mensajes) {
-    if (m.waId && vistos.has(m.waId)) continue;
+    const k = clave({ ...m, texto: String(m.texto || '') });
+    if (vistos.has(k)) continue;
     const item = {
       id: m.waId || `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       waId: m.waId || '',
@@ -131,7 +137,7 @@ export function importarMensajes(telefono, mensajes = []) {
       estado: 'ok',
       en: m.en || ahora()
     };
-    if (item.waId) vistos.add(item.waId);
+    vistos.add(k);
     chat.mensajes.push(item);
     nuevos++;
   }
@@ -140,10 +146,18 @@ export function importarMensajes(telefono, mensajes = []) {
   if (chat.mensajes.length > MAX_MENSAJES) chat.mensajes = chat.mensajes.slice(-MAX_MENSAJES);
   const ult = chat.mensajes[chat.mensajes.length - 1];
   if (ult) { chat.ultimoTexto = ult.texto; chat.ultimoEn = ult.en; }
+  chat.wa = true;
   chats[tel] = chat;
   recortar();
   guardar();
   return nuevos;
+}
+
+/** ¿Ya está registrado este mensaje (por su id de WhatsApp)? */
+export function yaExisteWa(telefono, waId) {
+  const c = chats[limpiarTel(telefono)];
+  if (!c || !waId) return false;
+  return c.mensajes.some(m => m.waId === waId);
 }
 
 export function listar(limite = 40) {
