@@ -2,11 +2,11 @@ import express from 'express';
 import { fileURLToPath } from 'node:url';
 import { config, validarConfig, esNumeroPeru, normalizar } from './config.js';
 import { sb, getCliente, getClientes, logMensaje, historial, marcarBaja, importarClientes } from './supabase.js';
-import { iniciarWhatsApp, enviar, estadoWa, cerrarSesion, reiniciarSesion, hayConexion, sesionDisponible, listarChatsWa, listarContactosWa, historialWa, resolverTelefonoWa, idMensaje } from './whatsapp.js';
+import { iniciarWhatsApp, enviar, estadoWa, cerrarSesion, reiniciarSesion, hayConexion, sesionDisponible, listarChatsWa, listarContactosWa, historialWa, resolverTelefonoWa, idMensaje, descargarMediaWa } from './whatsapp.js';
 import { redactarRespuesta, transcribirAudio } from './ai.js';
 import { Cola, dormir, esperaEntreEnvios } from './queue.js';
 import { estadoIA, actualizarIA, pausarIA, estaPausado, promptIA, resumenIA } from './ia.js';
-import { registrar, listar, obtener, marcarLeido, respuestasIA, porDia, resumen as resumenChats, registrarCabecera, importarMensajes, yaExisteWa } from './conversaciones.js';
+import { registrar, listar, obtener, marcarLeido, respuestasIA, porDia, resumen as resumenChats, registrarCabecera, importarMensajes, yaExisteWa, actualizarAck } from './conversaciones.js';
 
 const panelPath = fileURLToPath(new URL('./panel.html', import.meta.url));
 const app = express();
@@ -228,9 +228,38 @@ async function manejarMensajePropio(msg, sesionId = null) {
   if (yaExisteWa(tel, waId)) return;
   let cliente = null;
   try { cliente = await getCliente(tel); } catch {}
-  const nombre = cliente?.nombre || '';
+  const nombre = msg._data?.notifyName || cliente?.nombre || '';
   registrar({ telefono: tel, texto, direccion: 'saliente', nombre, clienteId: cliente?.id, origen: 'panel', waId });
   try { await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'saliente', texto, origen: 'panel' }); } catch {}
+}
+
+/** Texto legible del estado de entrega/lectura de WhatsApp (palomitas). */
+const TEXTO_ACK = { 0: 'pendiente ⏳', 1: 'enviado ✓', 2: 'entregado ✓✓', 3: 'leído ✓✓', 4: 'reproducido ✓✓' };
+
+/**
+ * Estado de entrega/lectura de un mensaje saliente. WhatsApp lo emite por el
+ * evento `message_ack`; aquí se refleja en la conversación para mostrar las
+ * palomitas en el panel y dejar constancia en el registro.
+ */
+async function manejarAck(msg, ack, sesionId = null) {
+  try {
+    if (!msg || !msg.fromMe) return;
+    const dest = String(msg.to || '');
+    if (!dest || dest.endsWith('@g.us') || dest === 'status@broadcast') return;
+    let tel = normalizar(dest.split('@')[0]);
+    if (!dest.endsWith('@c.us')) {
+      const real = await resolverTelefonoWa(dest, sesionId);
+      if (real) tel = real;
+    }
+    if (!/^\d{8,15}$/.test(tel)) return;
+    const waId = idMensaje(msg);
+    if (!waId) return;
+    if (actualizarAck(tel, waId, ack)) {
+      log(`Mensaje a +${tel} ${TEXTO_ACK[Number(ack)] || ('estado ' + ack)}.`);
+    }
+  } catch (e) {
+    log('Error al registrar el estado del mensaje: ' + e.message);
+  }
 }
 
 async function notificarDueno(texto, sesionId = null) {
@@ -278,21 +307,27 @@ async function manejarMensaje(msg, sesionId = null) {
     log(`Mensaje vacío de +${tel} (sin texto ni multimedia).`);
     return;
   }
-  let esTextoReal = !/^\[/.test(texto); // los marcadores [imagen]/[video]/… no son texto real
+  let esTextoReal = !/^\[/.test(texto);
+  // Texto que se envía a la IA: sin el prefijo de las notas de voz, para que las
+  // reglas (saludos, precios, etc.) funcionen igual que con texto normal.
+  let textoIA = texto; // los marcadores [imagen]/[video]/… no son texto real
 
   // Notas de voz: se transcriben con IA para poder responderlas como texto.
   if (!esTextoReal && /^(ptt|audio)$/.test(String(msg.type || ''))) {
     try {
-      const media = await msg.downloadMedia();
+      const media = await descargarMediaWa(msg, sesionId);
       if (media && media.data) {
         const tr = await transcribirAudio({ base64: media.data, mimeType: media.mimetype || 'audio/ogg' });
         if (tr) {
           texto = '🎤 ' + tr;
+          textoIA = tr;
           esTextoReal = true;
           log(`Nota de voz de +${tel} transcrita: ${tr.slice(0, 90)}`);
         } else {
           log(`Nota de voz de +${tel} sin transcripción (audio no entendible).`);
         }
+      } else {
+        log(`No se pudo obtener el audio de +${tel}: ${(media && media.error) || 'sin datos de descarga'}.`);
       }
     } catch (e) {
       log(`No se pudo transcribir la nota de voz de +${tel}: ${e.message}`);
@@ -301,7 +336,7 @@ async function manejarMensaje(msg, sesionId = null) {
 
   const cliente = await getCliente(tel);
   const hist = await historial(tel, 8);
-  const nombreChat = cliente?.nombre || msg._data?.notifyName || `+${tel}`;
+  const nombreChat = msg._data?.notifyName || cliente?.nombre || `+${tel}`;
   await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'entrante', texto, origen: 'cliente' });
   registrar({ telefono: tel, texto, direccion: 'entrante', nombre: nombreChat, clienteId: cliente?.id, origen: 'cliente', waId });
 
@@ -342,8 +377,20 @@ async function manejarMensaje(msg, sesionId = null) {
   cooldown.set(tel, Date.now());
 
   try {
-    const ai = await redactarRespuesta({ mensaje: texto, historial: hist, cliente, contexto: promptIA() });
+    log(`Pensando respuesta para +${tel}...`);
+    const ai = await redactarRespuesta({ mensaje: textoIA, historial: hist, cliente, contexto: promptIA() });
     if (ai.derivar) {
+      // Con números de prueba (o el del dueño) nunca se pausa ni se avisa: se
+      // responde algo útil para poder seguir probando el flujo con IA.
+      if (esPrueba) {
+        const ayuda = '¡Gracias por tu mensaje! Cuéntame qué fragancia buscas o qué notas te gustan (por ejemplo, amaderado, dulce, fresco) y te ayudo a elegir 😊';
+        log(`Enviando respuesta a +${tel}...`);
+        const envP = await enviar(tel, ayuda, sesionId);
+        await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'saliente', texto: ayuda, origen: 'ia' });
+        registrar({ telefono: tel, texto: ayuda, direccion: 'saliente', nombre: nombreChat, clienteId: cliente?.id, origen: 'ia', waId: envP?.waId || '' });
+        log(`Derivación evitada (número de prueba) con +${tel}: ${ai.motivo}`);
+        return;
+      }
       pausarIA(tel, true, ai.motivo, nombreChat);
       await notificarDueno(`⚠️ ${cliente?.nombre || '+' + tel} necesita atención.\nMotivo: ${ai.motivo}\nMensaje: ${texto.slice(0, 300)}`, sesionId);
       const aviso = 'Gracias por escribir. Ya aviso al encargado para que te atienda personalmente 🙌';
@@ -353,10 +400,15 @@ async function manejarMensaje(msg, sesionId = null) {
       log(`Conversación derivada al dueño y pausada: +${tel} (${ai.motivo}).`);
       return;
     }
+    log(`Enviando respuesta a +${tel}...`);
     const env = await enviar(tel, ai.texto, sesionId);
     await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'saliente', texto: ai.texto, origen: 'ia' });
     registrar({ telefono: tel, texto: ai.texto, direccion: 'saliente', nombre: nombreChat, clienteId: cliente?.id, origen: 'ia', waId: env?.waId || '' });
-    log(`Respuesta IA a +${tel}: ${ai.texto.slice(0, 90)}${ai.texto.length > 90 ? '…' : ''}`);
+    if (ai.respaldo) {
+      log(`Respuesta de respaldo a +${tel}${ai.motivoFallo ? ' (falló la IA: ' + ai.motivoFallo + ')' : ''}: ${ai.texto.slice(0, 90)}`);
+    } else {
+      log(`Respuesta IA a +${tel}: ${ai.texto.slice(0, 90)}${ai.texto.length > 90 ? '…' : ''}`);
+    }
   } catch (e) {
     log('Error al responder con IA: ' + e.message);
   }
@@ -534,6 +586,9 @@ app.post('/api/sincronizar', auth, async (req, res) => {
         salida.detalle = lista.map(c => ({
           telefono: c.telefono,
           nombre: c.nombre,
+          nombreWa: c.nombreWa || '',
+          esEmpresa: !!c.esEmpresa,
+          tipo: c.tipo || '',
           ultimoEn: c.ultimoEn,
           pin: !!c.pin,
           real: c.real !== false,
@@ -548,6 +603,11 @@ app.post('/api/sincronizar', auth, async (req, res) => {
         registrarCabecera({
           telefono: c.telefono,
           nombre: c.nombre,
+          nombreWa: c.nombreWa || c.nombre,
+          nombreGuardado: c.nombreGuardado || '',
+          pushname: c.pushname || '',
+          verifiedName: c.verifiedName || '',
+          esEmpresa: c.esEmpresa === true,
           ultimoTexto: c.ultimoTexto,
           ultimoEn: c.ultimoEn,
           noLeidos: c.noLeidos,
@@ -737,7 +797,7 @@ app.listen(config.port, () => {
   if (config.autoRespuesta) log(`Auto-respuesta ${config.geminiKey || config.anthropicKey ? 'con IA' : 'sin IA (respuestas básicas)'}.`);
 });
 
-iniciarWhatsApp({ onMensaje: manejarMensaje, onMensajePropio: manejarMensajePropio, log, sesionIds: config.sesiones }).catch(e => log('No se pudo iniciar WhatsApp: ' + e.message));
+iniciarWhatsApp({ onMensaje: manejarMensaje, onMensajePropio: manejarMensajePropio, onAck: manejarAck, log, sesionIds: config.sesiones }).catch(e => log('No se pudo iniciar WhatsApp: ' + e.message));
 
 setInterval(() => revisarProgramadas(false), 60 * 1000);
 setTimeout(() => revisarProgramadas(false), 8000);

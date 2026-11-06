@@ -27,7 +27,7 @@ function crearEstado(id) {
   };
 }
 
-export async function iniciarWhatsApp({ onMensaje, onMensajePropio, log, sesionIds = ['1'] }) {
+export async function iniciarWhatsApp({ onMensaje, onMensajePropio, onAck, log, sesionIds = ['1'] }) {
   logFn = log || console.log;
 
   if (config.modoPrueba) {
@@ -48,7 +48,7 @@ export async function iniciarWhatsApp({ onMensaje, onMensajePropio, log, sesionI
     const espera = retraso;
     retraso += 12000;
     setTimeout(() => {
-      crearSesion(key, { onMensaje, onMensajePropio, log }).catch(e => {
+      crearSesion(key, { onMensaje, onMensajePropio, onAck, log }).catch(e => {
         const s = sesiones.get(key);
         if (s) { s.estado = 'desconectado'; s.error = e.message; }
         log(`No se pudo iniciar la sesión ${key}: ${e.message}`);
@@ -57,7 +57,7 @@ export async function iniciarWhatsApp({ onMensaje, onMensajePropio, log, sesionI
   }
 }
 
-async function crearSesion(id, { onMensaje, onMensajePropio, log }) {
+async function crearSesion(id, { onMensaje, onMensajePropio, onAck, log }) {
   const s = sesiones.get(id);
   const opciones = {
     authStrategy: new LocalAuth({ clientId: `sesion-${id}`, dataPath: config.sessionPath }),
@@ -73,6 +73,8 @@ async function crearSesion(id, { onMensaje, onMensajePropio, log }) {
   s.client = client;
   s.estado = 'iniciando';
   s.onMensaje = onMensaje;
+  s.onMensajePropio = onMensajePropio;
+  s.onAck = onAck;
 
   client.on('qr', async qr => {
     s.estado = 'qr';
@@ -136,6 +138,13 @@ async function crearSesion(id, { onMensaje, onMensajePropio, log }) {
       if (wid && enviadosPorBot.has(wid)) { enviadosPorBot.delete(wid); return; }
       if (onMensajePropio) await onMensajePropio(msg, id);
     } catch (e) { log(`[${id}] Error al procesar mensaje propio: ${e.message}`); }
+  });
+
+  // Estado de entrega/lectura (palomitas) de los mensajes salientes:
+  // 0 pendiente · 1 enviado ✓ · 2 entregado ✓✓ · 3 leído ✓✓ azul.
+  client.on('message_ack', async (msg, ack) => {
+    try { if (onAck) await onAck(msg, ack, id); }
+    catch (e) { log(`[${id}] Error al leer el estado del mensaje: ${e.message}`); }
   });
 
   // Arranca también un vigilante por si 'authenticated' nunca llega.
@@ -269,6 +278,25 @@ export async function resolverTelefonoWa(widSerializado, sesionId = null) {
   }
 }
 
+/** ¿El texto es solo un número de teléfono (con +, espacios, guiones)? */
+const pareceTelefonoWa = s => /^[+\d\s().-]+$/.test(String(s || '').trim());
+
+/**
+ * Nombre que conviene mostrar para un chat de WhatsApp:
+ * - Empresa: su nombre verificado (aunque el título sea el teléfono).
+ * - Persona: el título del chat (pushname, p. ej. "@Jvampi"), salvo que sea solo un teléfono.
+ */
+function nombreMostradoWa({ titulo = '', pushname = '', verifiedName = '', nombreGuardado = '', esEmpresa = false }) {
+  const t = String(titulo || '').trim();
+  const p = String(pushname || '').trim();
+  const v = String(verifiedName || '').trim();
+  const g = String(nombreGuardado || '').trim();
+  if (esEmpresa && v) return v;
+  if (t && !pareceTelefonoWa(t)) return t;
+  if (p && !pareceTelefonoWa(p)) return p;
+  return v || g || t || p || '';
+}
+
 /** Todos los chats del WhatsApp vinculado (no solo los que vio el bot). */
 export async function listarChatsWa(sesionId = null) {
   const s = sesionParaEnviar(sesionId);
@@ -278,18 +306,30 @@ export async function listarChatsWa(sesionId = null) {
   try {
     // Vía normal: el wrapper de whatsapp-web.js.
     const chats = await s.client.getChats();
-    crudos = chats.map(c => ({
-      tel: c.id?.server === 'c.us' ? c.id?.user : (c.contact?.number || ''),
-      esGrupo: !!c.isGroup,
-      nombre: c.name || c.contact?.name || c.contact?.pushname || '',
-      ultimoTexto: c.lastMessage?.body || '',
-      ts: c.timestamp || c.lastMessage?.timestamp || c.lastMessage?.t || 0,
-      tsReal: 0,
-      pin: !!c.pinned,
-      archived: !!c.archived,
-      real: true,
-      noLeidos: c.unreadCount || 0
-    }));
+    crudos = chats.map(c => {
+      const esEmpresa = !!(c.contact?.isBusiness || c.contact?.isEnterprise || c.contact?.businessProfile);
+      const nombreGuardado = c.contact?.name || '';
+      const pushname = c.contact?.pushname || '';
+      const verifiedName = c.contact?.verifiedName || c.contact?.businessProfile?.name || '';
+      const nombreWa = nombreMostradoWa({ titulo: c.formattedTitle || c.name || '', pushname, verifiedName, nombreGuardado, esEmpresa });
+      return {
+        tel: c.id?.server === 'c.us' ? c.id?.user : (c.contact?.number || ''),
+        esGrupo: !!c.isGroup,
+        nombre: nombreWa,
+        nombreWa,
+        nombreGuardado,
+        pushname,
+        verifiedName,
+        esEmpresa,
+        ultimoTexto: c.lastMessage?.body || '',
+        ts: c.timestamp || c.lastMessage?.timestamp || c.lastMessage?.t || 0,
+        tsReal: 0,
+        pin: !!c.pinned,
+        archived: !!c.archived,
+        real: true,
+        noLeidos: c.unreadCount || 0
+      };
+    });
   } catch {
     // Respaldo: `client.getChats()` falla en algunas versiones de WhatsApp Web
     // cuando un solo chat no se puede serializar. Leemos la colección directo,
@@ -309,7 +349,17 @@ export async function listarChatsWa(sesionId = null) {
             const server = c.id && c.id.server;
             const esGrupo = server === 'g.us' || !!c.groupMetadata;
             let nombre = '';
-            try { nombre = c.formattedTitle || c.name || (c.contact && (c.contact.name || c.contact.pushname)) || ''; } catch (e) {}
+            let nombreGuardado = '';
+            let pushname = '';
+            let verifiedName = '';
+            let esEmpresa = false;
+            try {
+              nombre = c.formattedTitle || c.name || (c.contact && (c.contact.pushname || c.contact.name)) || '';
+              nombreGuardado = (c.contact && (c.contact.name || c.contact.shortName)) || '';
+              pushname = (c.contact && c.contact.pushname) || '';
+              verifiedName = (c.contact && (c.contact.verifiedName || (c.contact.businessProfile && c.contact.businessProfile.name))) || '';
+              esEmpresa = !!(c.contact && (c.contact.isBusiness || c.contact.isEnterprise || c.contact.businessProfile));
+            } catch (e) {}
             let ultimoTexto = '';
             let ts = 0;
             let tsReal = 0;
@@ -394,6 +444,11 @@ export async function listarChatsWa(sesionId = null) {
               tel,
               esGrupo,
               nombre: String(nombre || ''),
+              nombreWa: String(nombre || ''),
+              nombreGuardado: String(nombreGuardado || ''),
+              pushname: String(pushname || ''),
+              verifiedName: String(verifiedName || ''),
+              esEmpresa,
               ultimoTexto: String(ultimoTexto || ''),
               ts,
               tsReal,
@@ -415,10 +470,23 @@ export async function listarChatsWa(sesionId = null) {
       // Si lo último es solo una reacción (sin mensaje real), no le damos fecha:
       // así cae al fondo y no desplaza a las conversaciones reales.
       const t = c.real === false ? 0 : (c.tsReal || c.ts);
+      const nombreWa = nombreMostradoWa({
+        titulo: c.nombre || '',
+        pushname: c.pushname || '',
+        verifiedName: c.verifiedName || '',
+        nombreGuardado: c.nombreGuardado || '',
+        esEmpresa: !!c.esEmpresa
+      });
       return {
         telefono: telDe({ isGroup: c.esGrupo, number: c.tel }),
         esGrupo: !!c.esGrupo,
-        nombre: String(c.nombre || '').trim(),
+        nombre: nombreWa,
+        nombreWa,
+        nombreGuardado: String(c.nombreGuardado || '').trim(),
+        pushname: String(c.pushname || '').trim(),
+        verifiedName: String(c.verifiedName || '').trim(),
+        esEmpresa: !!c.esEmpresa,
+        tipo: c.esEmpresa ? 'empresa' : 'persona',
         ultimoTexto: String(c.ultimoTexto || '').slice(0, 300),
         ultimoEn: t ? new Date(t * 1000).toISOString() : null,
         noLeidos: c.noLeidos || 0,
@@ -496,11 +564,13 @@ export async function historialWa(telefono, limite = 50, sesionId = null) {
         const waId = idObj.id || idObj._serialized || (m.key && m.key.id) || '';
         if (!texto) return null;
         if (waId) { if (vistos.has(waId)) return null; vistos.add(waId); }
+        const saliente = !!(m.id && m.id.fromMe);
         return {
           waId,
-          direccion: m.id && m.id.fromMe ? 'saliente' : 'entrante',
+          direccion: saliente ? 'saliente' : 'entrante',
           texto: texto.slice(0, 4000),
-          en: m.t ? new Date(m.t * 1000).toISOString() : new Date().toISOString()
+          en: m.t ? new Date(m.t * 1000).toISOString() : new Date().toISOString(),
+          ...(saliente ? { ack: Number.isFinite(Number(m.ack)) ? Number(m.ack) : 0 } : {})
         };
       })
       .filter(Boolean);
@@ -549,7 +619,7 @@ export async function reiniciarSesion(sesionId = null) {
     s.autenticado = false;
     s.reintentos = 0;
     logFn(`[${id}] Reiniciando sesión de WhatsApp...`);
-    crearSesion(id, { onMensaje: s.onMensaje, log: logFn }).catch(e => {
+    crearSesion(id, { onMensaje: s.onMensaje, onMensajePropio: s.onMensajePropio, onAck: s.onAck, log: logFn }).catch(e => {
       const st = sesiones.get(id);
       if (st) { st.estado = 'desconectado'; st.error = e.message; }
       logFn(`No se pudo reiniciar la sesión ${id}: ${e.message}`);
@@ -582,4 +652,92 @@ export function sesionDisponible(id) {
     return !!s && s.estado === 'conectado';
   }
   return hayConexion();
+}
+
+/**
+ * Descarga la multimedia de un mensaje (audio, imagen, etc.) directamente de la
+ * página. `msg.downloadMedia()` de whatsapp-web.js falla aquí ("r") porque usa el
+ * id serializado, que en esta versión de WhatsApp Web viene vacío para los envíos
+ * en vivo; por eso leemos los datos de descarga del propio mensaje.
+ */
+export async function descargarMediaWa(msg, sesionId = null) {
+  const s = sesionParaEnviar(sesionId);
+  if (!s) throw new Error('Ningún WhatsApp está conectado');
+  const d = (msg && msg._data) || {};
+  const idRaw = (d.id && d.id.id) || (msg && msg.id && msg.id.id) || '';
+  const remote = (d.id && d.id.remote) || (msg && msg.id && msg.id.remote) || '';
+  const fromMe = (d.id && typeof d.id.fromMe === 'boolean') ? d.id.fromMe : !!(msg && msg.fromMe);
+  const id = (d.id && d.id._serialized) || (msg && msg.id && msg.id._serialized) ||
+    (remote ? `${fromMe ? 'true' : 'false'}_${remote}_${idRaw}` : '');
+  const chatId = remote || (msg && msg.from) || '';
+  const ts = d.t || (msg && msg.timestamp) || 0;
+  const datos = {
+    directPath: d.directPath || '',
+    encFilehash: d.encFilehash || '',
+    filehash: d.filehash || '',
+    mediaKey: d.mediaKey || '',
+    mediaKeyTimestamp: d.mediaKeyTimestamp || 0,
+    type: d.type || '',
+    mimetype: d.mimetype || ''
+  };
+  return await s.client.pupPage.evaluate(async ({ id: msgId, chatId, idRaw, ts, datos }) => {
+    const W = window;
+    try {
+      const col = W.require('WAWebCollections');
+      let m = null;
+      try { if (msgId) m = col.Msg.get(msgId); } catch (e) {}
+      if (!m && msgId) {
+        try {
+          const r = await col.Msg.getMessagesById([msgId]);
+          m = (r && r.messages && r.messages[0]) || null;
+        } catch (e) {}
+      }
+      // Respaldo: buscar el mensaje dentro del chat (por id crudo o por hora).
+      if (!m && chatId) {
+        try {
+          const chat = await W.WWebJS.getChat(chatId, { getAsModel: false });
+          const lista = (chat && chat.msgs && chat.msgs.getModelsArray && chat.msgs.getModelsArray()) || [];
+          for (let i = lista.length - 1; i >= 0; i--) {
+            const cand = lista[i];
+            if (!cand || !cand.directPath) continue;
+            if ((idRaw && cand.id && cand.id.id === idRaw) || (ts && Math.abs((cand.t || 0) - ts) <= 2)) { m = cand; break; }
+          }
+        } catch (e) {}
+      }
+      if (m) {
+        try {
+          const etapa = m.mediaData && m.mediaData.mediaStage;
+          if (etapa && etapa !== 'RESOLVED' && etapa !== 'REUPLOADING') {
+            await m.downloadMedia({ downloadEvenIfExpensive: true, rmrReason: 1 });
+          }
+        } catch (e) {}
+        datos.directPath = m.directPath || datos.directPath;
+        datos.encFilehash = m.encFilehash || datos.encFilehash;
+        datos.filehash = m.filehash || datos.filehash;
+        datos.mediaKey = m.mediaKey || datos.mediaKey;
+        datos.mediaKeyTimestamp = m.mediaKeyTimestamp || datos.mediaKeyTimestamp;
+        datos.type = m.type || datos.type;
+        datos.mimetype = m.mimetype || datos.mimetype;
+      }
+      if (!datos.directPath || !datos.mediaKey) {
+        return { error: 'sin datos de descarga', tipo: datos.type, hallado: !!m };
+      }
+      const mockQpl = { addAnnotations() { return this; }, addPoint() { return this; } };
+      const decrypted = await W.require('WAWebDownloadManager').downloadManager.downloadAndMaybeDecrypt({
+        directPath: datos.directPath,
+        encFilehash: datos.encFilehash,
+        filehash: datos.filehash,
+        mediaKey: datos.mediaKey,
+        mediaKeyTimestamp: datos.mediaKeyTimestamp,
+        type: datos.type,
+        mimetype: datos.mimetype,
+        signal: new AbortController().signal,
+        downloadQpl: mockQpl
+      });
+      const data = await W.WWebJS.arrayBufferToBase64Async(decrypted);
+      return { data, mimetype: datos.mimetype };
+    } catch (e) {
+      return { error: (e && (e.message || String(e))) || 'error al descargar', tipo: datos.type, hallado: false };
+    }
+  }, { id, chatId, idRaw, ts, datos });
 }

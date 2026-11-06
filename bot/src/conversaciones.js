@@ -42,7 +42,7 @@ const tiempo = c => {
   return Number.isFinite(t) ? t : 0;
 };
 
-export function registrar({ telefono, texto, direccion = 'entrante', nombre = '', clienteId = null, origen = '', estado = 'ok', waId = '', en = null }) {
+export function registrar({ telefono, texto, direccion = 'entrante', nombre = '', clienteId = null, origen = '', estado = 'ok', waId = '', en = null, ack = null }) {
   const tel = limpiarTel(telefono);
   if (!tel) return null;
   // Nunca guardamos mensajes sin contenido (reacciones, avisos de sistema, etc.):
@@ -69,7 +69,10 @@ export function registrar({ telefono, texto, direccion = 'entrante', nombre = ''
     texto: String(texto || '').slice(0, 4000),
     origen: origen || (direccion === 'entrante' ? 'cliente' : 'bot'),
     estado,
-    en: en || ahora()
+    en: en || ahora(),
+    // Estado de entrega/lectura de WhatsApp (solo mensajes salientes):
+    // 0 pendiente, 1 enviado, 2 entregado, 3 leído. Lo actualiza manejarAck().
+    ...(direccion === 'saliente' ? { ack: Number.isFinite(Number(ack)) ? Number(ack) : 0 } : {})
   };
   chat.mensajes.push(mensaje);
   if (chat.mensajes.length > MAX_MENSAJES) chat.mensajes = chat.mensajes.slice(-MAX_MENSAJES);
@@ -83,6 +86,23 @@ export function registrar({ telefono, texto, direccion = 'entrante', nombre = ''
   return mensaje;
 }
 
+/**
+ * Actualiza el estado de entrega/lectura (ack) de un mensaje saliente ya guardado.
+ * ack: 0 pendiente, 1 enviado, 2 entregado, 3 leído. Devuelve true si cambió.
+ */
+export function actualizarAck(telefono, waId, ack) {
+  const tel = limpiarTel(telefono);
+  const n = Number(ack);
+  if (!tel || !waId || !Number.isFinite(n)) return false;
+  const chat = chats[tel];
+  if (!chat || !Array.isArray(chat.mensajes)) return false;
+  const m = chat.mensajes.find(x => x.waId === waId || x.id === waId);
+  if (!m || m.ack === n) return false;
+  m.ack = n;
+  guardar();
+  return true;
+}
+
 function recortar() {
   const claves = Object.keys(chats);
   if (claves.length <= MAX_CHATS) return;
@@ -93,7 +113,7 @@ function recortar() {
 }
 
 /** Crea/actualiza un chat solo con su cabecera (sincronización desde WhatsApp). */
-export function registrarCabecera({ telefono, nombre = '', ultimoTexto = '', ultimoEn = null, noLeidos = 0, pin = false, real = true }) {
+export function registrarCabecera({ telefono, nombre = '', nombreWa = '', nombreGuardado = '', pushname = '', verifiedName = '', esEmpresa = null, ultimoTexto = '', ultimoEn = null, noLeidos = 0, pin = false, real = true }) {
   const tel = limpiarTel(telefono);
   if (!tel) return null;
   const chat = chats[tel] || {
@@ -106,6 +126,16 @@ export function registrarCabecera({ telefono, nombre = '', ultimoTexto = '', ult
     mensajes: []
   };
   if (nombre && (!chat.nombre || chat.nombre === `+${tel}`)) chat.nombre = String(nombre).slice(0, 120);
+  // Nombre real que muestra WhatsApp y tipo de contacto (persona o empresa).
+  const waName = String(nombreWa || nombre || '').trim();
+  if (waName) chat.nombreWa = waName.slice(0, 120);
+  if (nombreGuardado) chat.nombreGuardado = String(nombreGuardado).slice(0, 120);
+  if (pushname) chat.pushname = String(pushname).slice(0, 120);
+  if (verifiedName) chat.verifiedName = String(verifiedName).slice(0, 120);
+  if (esEmpresa === true || esEmpresa === false) {
+    chat.esEmpresa = esEmpresa;
+    chat.tipo = esEmpresa ? 'empresa' : 'persona';
+  }
   // La cabecera viene del listado real de WhatsApp: si trae fecha, es la buena.
   if (real === false) {
     // Lo último es solo una reacción/aviso (sin mensaje real): usamos la fecha
@@ -156,7 +186,8 @@ export function importarMensajes(telefono, mensajes = []) {
       texto: String(m.texto || '').slice(0, 4000),
       origen: m.direccion === 'saliente' ? 'bot' : 'cliente',
       estado: 'ok',
-      en: m.en || ahora()
+      en: m.en || ahora(),
+      ...(m.direccion === 'saliente' ? { ack: Number.isFinite(Number(m.ack)) ? Number(m.ack) : 0 } : {})
     };
     vistos.add(k);
     chat.mensajes.push(item);
@@ -188,6 +219,10 @@ export function listar(limite = 40) {
     .map(c => ({
       telefono: c.telefono,
       nombre: c.nombre,
+      nombreWa: c.nombreWa || '',
+      nombreGuardado: c.nombreGuardado || '',
+      esEmpresa: c.esEmpresa === true,
+      tipo: c.tipo || '',
       clienteId: c.clienteId,
       noLeidos: c.noLeidos || 0,
       ultimoTexto: c.ultimoTexto,
@@ -204,6 +239,10 @@ export function obtener(telefono) {
   return {
     telefono: c.telefono,
     nombre: c.nombre,
+    nombreWa: c.nombreWa || '',
+    nombreGuardado: c.nombreGuardado || '',
+    esEmpresa: c.esEmpresa === true,
+    tipo: c.tipo || '',
     clienteId: c.clienteId,
     noLeidos: c.noLeidos || 0,
     ultimoTexto: c.ultimoTexto,

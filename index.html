@@ -295,6 +295,11 @@ code{background:var(--s2);padding:.05rem .35rem;border-radius:5px;font-size:.85e
 .msg time{display:block;font-size:.62rem;opacity:.65;text-align:right;margin-top:.25rem}
 .msg.in{align-self:flex-start;background:var(--s2);border:1px solid var(--line);border-bottom-left-radius:3px}
 .msg.out{align-self:flex-end;background:#005C4B;border-bottom-right-radius:3px;color:#eafff6}
+.msg .tick{font-size:.72rem;margin-left:.35rem;opacity:.9;letter-spacing:-1px;white-space:nowrap}
+.msg .tick.read{color:#53bdeb}
+.tipo{font-size:.6rem;font-weight:700;padding:.03rem .34rem;border-radius:99px;margin-left:.35rem;vertical-align:middle;text-transform:uppercase;letter-spacing:.03em}
+.tipo.emp{background:rgba(106,166,255,.16);color:var(--info)}
+.tipo.per{background:rgba(61,214,140,.14);color:var(--success)}
 .msg.sys{align-self:center;background:transparent;border:1px dashed var(--line2);color:var(--mute);font-size:.76rem;max-width:90%;text-align:center}
 .msg .who{display:block;font-size:.66rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--mute);margin-bottom:.2rem}
 .in-form{display:flex;gap:.6rem;align-items:flex-end;padding:.7rem .9rem;border-top:1px solid var(--line);background:var(--s1)}
@@ -485,8 +490,8 @@ dialog::backdrop{background:rgba(3,4,8,.66);backdrop-filter:blur(8px)}
         <div class="card">
           <div class="card-h"><b>Opciones</b></div>
           <div style="padding:1rem">
-            <label for="ia-max">Máximo de respuestas automáticas por conversación</label>
-            <input id="ia-max" type="number" min="1" max="99" step="1">
+            <label for="ia-max">Máximo de respuestas automáticas por conversación (0 = sin límite)</label>
+            <input id="ia-max" type="number" min="0" max="99" step="1" placeholder="0 = sin límite">
             <label for="ia-prompt">Indicaciones para la IA (tono, promos vigentes, qué evitar)</label>
             <textarea id="ia-prompt" rows="4" maxlength="1200" placeholder="Ej. Tono cercano y peruano. Somos equivalentes, nunca digas que es original. Envío a todo el Perú."></textarea>
             <div class="acts"><button class="ghost" id="ia-reload" type="button">Descartar cambios</button><button id="ia-save" type="button">Guardar</button></div>
@@ -1112,7 +1117,7 @@ async function renderInicio(){
   $('#i-camp').innerHTML=recientes.map(k=>{const cls=k.estado==='enviada'?'ok':k.estado==='programada'?'warn':'';return`<div class="lrow"><div class="lt"><b>${esc(k.titulo)}</b><small>${esc((k.creado_en||'').slice(0,10))}${k.fecha_programada?' · '+esc(fmtFechaHora(k.fecha_programada)):''}</small></div><i class="tag ${cls}">${esc(k.estado)}</i></div>`}).join('')||'<p class="empty">Todavía no hay campañas.</p>';
   const act=[];
   campanas.slice(0,4).forEach(k=>act.push({t:`Campaña "${k.titulo}"`,s:k.estado,en:k.creado_en}));
-  (cvs?.conversaciones||[]).slice(0,4).forEach(c=>act.push({t:`WhatsApp de ${c.nombre||('+'+c.telefono)}`,s:c.ultimoTexto||'',en:c.ultimoEn}));
+  (cvs?.conversaciones||[]).slice(0,4).forEach(c=>act.push({t:`WhatsApp de ${c.nombreWa||c.nombre||('+'+c.telefono)}`,s:c.ultimoTexto||'',en:c.ultimoEn}));
   act.sort((a,b)=>String(b.en||'').localeCompare(String(a.en||'')));
   $('#i-act').innerHTML=act.slice(0,6).map(a=>`<div class="lrow"><div class="lt"><b>${esc(a.t)}</b><small>${esc((a.s||'').slice(0,42))}${a.en?' · '+esc(fmtFechaHora(a.en)):''}</small></div></div>`).join('')||'<p class="empty">Sin movimientos recientes.</p>';
 }
@@ -1131,7 +1136,7 @@ function pintarChart(dias,totIn,totOut){
 function pintarCola(lista){
   const cont=$('#i-queue');if(!cont)return;
   const orden=lista.slice().sort((a,b)=>(b.noLeidos||0)-(a.noLeidos||0)||String(b.ultimoEn||'').localeCompare(String(a.ultimoEn||''))).slice(0,5);
-  cont.innerHTML=orden.length?orden.map(c=>`<div class="lrow" data-chat="${esc(c.telefono)}" style="cursor:pointer"><div class="lt"><b>${esc(c.nombre||('+'+c.telefono))}</b><small>${esc((c.ultimoTexto||'').slice(0,40)||'—')}</small></div>${c.noLeidos?`<span class="tag warn">${c.noLeidos}</span>`:`<span class="le">${esc(hace(c.ultimoEn))}</span>`}</div>`).join(''):'<p class="empty" style="padding:1rem">Sin conversaciones recientes.</p>';
+  cont.innerHTML=orden.length?orden.map(c=>`<div class="lrow" data-chat="${esc(c.telefono)}" style="cursor:pointer"><div class="lt"><b>${esc(c.nombreWa||c.nombre||('+'+c.telefono))}</b><small>${esc((c.ultimoTexto||'').slice(0,40)||'—')}</small></div>${c.noLeidos?`<span class="tag warn">${c.noLeidos}</span>`:`<span class="le">${esc(hace(c.ultimoEn))}</span>`}</div>`).join(''):'<p class="empty" style="padding:1rem">Sin conversaciones recientes.</p>';
 }
 $('#i-refresh')?.addEventListener('click',()=>renderInicio());
 $('#i-range')?.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;$('#i-range').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));diasRango=Number(b.dataset.r)||7;renderInicio()});
@@ -1370,10 +1375,12 @@ async function cargarBandeja(){
 }
 function pintarLista(){
   const q=($('#in-q')?.value||'').toLowerCase().trim();
-  const l=inChats.filter(c=>!q||[c.nombre,c.telefono,c.ultimoTexto].join(' ').toLowerCase().includes(q));
+  const l=inChats.filter(c=>!q||[c.nombreWa,c.nombre,c.telefono,c.ultimoTexto].join(' ').toLowerCase().includes(q));
   fantasma($('#in-list'),l.map(c=>{
     const on=c.telefono===inTel?' on':'';
-    return `<div class="in-item${on}" data-tel="${esc(c.telefono)}"><div class="ava">${esc(iniciales(c.nombre))}</div><div class="ib"><b>${esc(c.nombre||('+'+c.telefono))}</b><small>${esc((c.ultimoTexto||'').slice(0,44)||'—')}</small></div><div class="imeta"><time>${esc(horaWa(c.ultimoEn))}</time>${inPausados.has(c.telefono)?'<span class="paused">IA off</span>':''}${c.noLeidos?`<span class="unread">${c.noLeidos}</span>`:''}</div></div>`;
+    const nom=c.nombreWa||c.nombre||('+'+c.telefono);
+    const tipo=c.tipo==='empresa'?'<span class="tipo emp">Empresa</span>':c.tipo==='persona'?'<span class="tipo per">Persona</span>':'';
+    return `<div class="in-item${on}" data-tel="${esc(c.telefono)}"><div class="ava">${esc(iniciales(nom))}</div><div class="ib"><b>${esc(nom)}${tipo}</b><small>${esc((c.ultimoTexto||'').slice(0,44)||'—')}</small></div><div class="imeta"><time>${esc(horaWa(c.ultimoEn))}</time>${inPausados.has(c.telefono)?'<span class="paused">IA off</span>':''}${c.noLeidos?`<span class="unread">${c.noLeidos}</span>`:''}</div></div>`;
   }).join('')||'<p class="empty" style="padding:1rem">Sin conversaciones todavía.</p>');
 }
 async function importarHilo(tel){
@@ -1388,9 +1395,11 @@ async function abrirChat(tel){
   inTel=tel;
   const item=inChats.find(c=>c.telefono===tel);
   $('#in-empty').hidden=true;$('#in-thread').hidden=false;
-  $('#in-name').textContent=item?.nombre||('+'+tel);
-  $('#in-tel').textContent='+'+tel;
-  $('#in-ava').textContent=iniciales(item?.nombre);
+  const nom=item?.nombreWa||item?.nombre||('+'+tel);
+  $('#in-name').textContent=nom;
+  const tipo=item?.tipo==='empresa'?' · Empresa':item?.tipo==='persona'?' · Persona':'';
+  $('#in-tel').textContent='+'+tel+tipo;
+  $('#in-ava').textContent=iniciales(nom);
   $('#in-msgs').innerHTML='<p class="empty">Cargando mensajes…</p>';
   arrancarRefrescoHilo();
   try{
@@ -1409,13 +1418,22 @@ function arrancarRefrescoHilo(){pararRefrescoHilo();inHiloTimer=setInterval(()=>
 function pararRefrescoHilo(){if(inHiloTimer){clearInterval(inHiloTimer);inHiloTimer=null}}
 let inListTimer=null;
 function pararBandeja(){if(inListTimer){clearInterval(inListTimer);inListTimer=null}pararRefrescoHilo()}
+function marcaEntrega(a){
+  if(a===null||a===undefined||a==='')return '';
+  const n=Number(a);if(!Number.isFinite(n))return '';
+  if(n>=3)return '<span class="tick read" title="Leído">✓✓</span>';
+  if(n===2)return '<span class="tick" title="Entregado">✓✓</span>';
+  if(n===1)return '<span class="tick" title="Enviado">✓</span>';
+  return '<span class="tick" title="Enviando">⏳</span>';
+}
 function pintarHilo(msgs){
   const c=$('#in-msgs');
   c.innerHTML=msgs.map(m=>{
     const out=m.direccion!=='entrante';
     const cls=m.origen==='sistema'?'sys':out?'out':'in';
     const who=cls==='in'?'':(m.origen==='ia'?'IA':m.origen==='bot'?'Bot':m.origen==='panel'?'Tú':'');
-    return `<div class="msg ${cls}">${who?`<span class="who">${who}</span>`:''}${esc(m.texto)}<time>${esc(new Date(m.en).toLocaleString('es-PE',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}))}</time></div>`;
+    const marca=out&&cls!=='sys'?marcaEntrega(m.ack):'';
+    return `<div class="msg ${cls}">${who?`<span class="who">${who}</span>`:''}${esc(m.texto)}${marca}<time>${esc(new Date(m.en).toLocaleString('es-PE',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}))}</time></div>`;
   }).join('')||'<p class="empty">Sin mensajes.</p>';
   c.scrollTop=c.scrollHeight;
 }
@@ -1462,13 +1480,13 @@ async function cargarIA(){
     const j=await botFetch('/api/ia');
     if($('#ia-activa'))$('#ia-activa').checked=!!j.activa;
     if($('#ia-auto'))$('#ia-auto').checked=!!j.autoRespuesta;
-    if($('#ia-max'))$('#ia-max').value=j.maxPorConversacion||3;
+    if($('#ia-max'))$('#ia-max').value=(j.maxPorConversacion??0);
     if($('#ia-prompt'))$('#ia-prompt').value=j.prompt||'';
     actualizarOrbe();
     const c=await botFetch('/api/conversaciones?limite=30');
     const pausados=new Set((j.pausados||[]).map(p=>p.telefono));
     fantasmaValor($('#ia-pausadas-count'),(j.pausados?.length||0)+' pausadas');
-    fantasma($('#ia-chats'),(c.conversaciones||[]).map(x=>`<div class="lrow"><div class="lt"><b>${esc(x.nombre||('+'+x.telefono))}</b><small>+${esc(x.telefono)} · ${esc(hace(x.ultimoEn))}</small></div><span class="tag ${pausados.has(x.telefono)?'warn':'ok'}">${pausados.has(x.telefono)?'Pausada':'En vivo'}</span><button class="ghost" data-ia-tel="${esc(x.telefono)}" data-p="${pausados.has(x.telefono)?'0':'1'}" type="button">${pausados.has(x.telefono)?'Reanudar':'Pausar'}</button></div>`).join('')||'<p class="empty">Sin conversaciones.</p>');
+    fantasma($('#ia-chats'),(c.conversaciones||[]).map(x=>`<div class="lrow"><div class="lt"><b>${esc(x.nombreWa||x.nombre||('+'+x.telefono))}</b><small>+${esc(x.telefono)} · ${esc(hace(x.ultimoEn))}</small></div><span class="tag ${pausados.has(x.telefono)?'warn':'ok'}">${pausados.has(x.telefono)?'Pausada':'En vivo'}</span><button class="ghost" data-ia-tel="${esc(x.telefono)}" data-p="${pausados.has(x.telefono)?'0':'1'}" type="button">${pausados.has(x.telefono)?'Reanudar':'Pausar'}</button></div>`).join('')||'<p class="empty">Sin conversaciones.</p>');
   }catch(e){
     if($('#ia-conn'))$('#ia-conn').innerHTML='<p class="empty">Bot apagado o sin conexión. Enciéndelo para controlar la IA.</p>';
     ['ia-activa','ia-auto','ia-max','ia-prompt','ia-save'].forEach(id=>{const el=$('#'+id);if(el)el.disabled=true});
@@ -1489,7 +1507,7 @@ function pintarConexion(st){
   $('#ia-logs').onclick=()=>irTab('bot');
 }
 function guardarIA(){
-  return botFetch('/api/ia',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({activa:$('#ia-activa').checked,autoRespuesta:$('#ia-auto').checked,maxPorConversacion:Number($('#ia-max').value)||3,prompt:$('#ia-prompt').value})});
+  return botFetch('/api/ia',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({activa:$('#ia-activa').checked,autoRespuesta:$('#ia-auto').checked,maxPorConversacion:($('#ia-max').value===''?0:Math.max(0,Math.round(Number($('#ia-max').value))||0)),prompt:$('#ia-prompt').value})});
 }
 $('#ia-save')?.addEventListener('click',async()=>{try{await guardarIA();actualizarOrbe();toast('Asistente actualizado')}catch(e){toast('Error: '+e.message)}});
 $('#ia-reload')?.addEventListener('click',cargarIA);

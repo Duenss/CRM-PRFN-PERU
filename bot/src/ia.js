@@ -9,7 +9,8 @@ const archivo = path.join(dataDir, 'ia.json');
 const base = () => ({
   activa: true,
   autoRespuesta: config.autoRespuesta,
-  maxPorConversacion: 3,
+  // 0 = sin límite de respuestas automáticas por conversación.
+  maxPorConversacion: 0,
   prompt: '',
   pausados: {},
   actualizado: new Date().toISOString()
@@ -41,7 +42,7 @@ export function estadoIA() {
   return {
     activa: !!estado.activa,
     autoRespuesta: !!estado.autoRespuesta,
-    maxPorConversacion: Number(estado.maxPorConversacion) || 3,
+    maxPorConversacion: Number.isFinite(Number(estado.maxPorConversacion)) ? Number(estado.maxPorConversacion) : 0,
     prompt: String(estado.prompt || ''),
     pausados: Object.entries(estado.pausados).map(([telefono, v]) => ({
       telefono,
@@ -58,7 +59,7 @@ export function actualizarIA(cambios = {}) {
   if (typeof cambios.autoRespuesta === 'boolean') estado.autoRespuesta = cambios.autoRespuesta;
   if (cambios.maxPorConversacion !== undefined) {
     const n = Number(cambios.maxPorConversacion);
-    if (Number.isFinite(n)) estado.maxPorConversacion = Math.min(99, Math.max(1, Math.round(n)));
+    if (Number.isFinite(n)) estado.maxPorConversacion = Math.min(99, Math.max(0, Math.round(n)));
   }
   if (typeof cambios.prompt === 'string') estado.prompt = cambios.prompt.slice(0, 2000);
   estado.actualizado = new Date().toISOString();
@@ -99,7 +100,7 @@ export function resumenIA() {
   return {
     activa: !!estado.activa,
     autoRespuesta: !!estado.autoRespuesta,
-    maxPorConversacion: Number(estado.maxPorConversacion) || 3,
+    maxPorConversacion: Number.isFinite(Number(estado.maxPorConversacion)) ? Number(estado.maxPorConversacion) : 0,
     pausadas: Object.keys(estado.pausados).length
   };
 }

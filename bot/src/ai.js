@@ -125,7 +125,9 @@ async function contextoCliente(texto) {
 }
 
 function fallback(texto) {
-  const t = String(texto || '').toLowerCase();
+  // Quita emojis/símbolos iniciales (p. ej. el prefijo de una nota de voz) para
+  // que las reglas por palabra clave sigan funcionando.
+  const t = String(texto || '').toLowerCase().replace(/^[^a-z0-9áéíóúñü]+/, '');
   if (/^(hola|buenas|buenos d|hey|qué tal|que tal)/.test(t)) {
     return { responder: true, texto: 'Hola 👋 Gracias por escribir a Perfumería Fina Perú. ¿Qué fragancia estás buscando?' };
   }
@@ -138,11 +140,14 @@ function fallback(texto) {
   if (/pago|yape|oy|efectivo/.test(t)) {
     return { responder: true, texto: 'Puedes pagar con Yape, OY! o efectivo. ¿Te ayudo a elegir una fragancia? 💛' };
   }
-  return { derivar: true, motivo: 'Consulta que necesita revisión del encargado' };
+  // Si la IA no está disponible, es mejor responder algo útil que derivar y
+  // pausar la conversación ante cualquier mensaje. El dueño puede tomar el control
+  // desde la bandeja cuando quiera.
+  return { responder: true, texto: '¡Gracias por escribir a Perfumería Fina Perú! Cuéntame qué fragancia buscas o qué notas te gustan y te ayudo a elegir 😊' };
 }
 
 export async function redactarRespuesta({ mensaje, historial = [], cliente, contexto = '' }) {
-  if (!config.geminiKey && !config.anthropicKey) return fallback(mensaje);
+  if (!config.geminiKey && !config.anthropicKey) return { ...fallback(mensaje), respaldo: true };
 
   const { tienda, lista } = await contextoCliente(mensaje);
   const prev = historial.map(h =>
@@ -166,46 +171,59 @@ Responde ahora.`;
   try {
     const raw = config.geminiKey ? await gemini(prompt) : await anthropic(prompt);
     const j = limpiarJSON(raw);
-    if (!j) return fallback(mensaje);
+    if (!j) return { ...fallback(mensaje), respaldo: true };
     if (j.derivar) return { derivar: true, motivo: String(j.motivo || 'Revisión manual').slice(0, 160) };
     const texto = String(j.texto || '').trim().slice(0, 900);
-    if (!texto) return fallback(mensaje);
+    if (!texto) return { ...fallback(mensaje), respaldo: true };
     return { responder: true, texto };
   } catch (e) {
     console.warn('[ia] error:', e.message);
-    return fallback(mensaje);
+    return { ...fallback(mensaje), respaldo: true, motivoFallo: e.message };
   }
 }
 
 async function gemini(prompt) {
-  const preferido = config.aiModel || 'gemini-3-flash-preview';
-  const modelos = [...new Set([preferido, 'gemini-flash-latest', 'gemini-3.8-flash', 'gemini-3-flash-preview'])];
-  const timeout = (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') ? () => AbortSignal.timeout(60000) : () => undefined;
+  const preferido = config.aiModel || 'gemini-3.6-flash';
+  // Orden probado con la clave actual: 3.6 responde rápido; el resto son
+  // alternativas si hay alta demanda (503) o cuota agotada (429).
+  const modelos = [...new Set([preferido, 'gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-3.5-flash', 'gemini-3-flash-preview'])];
+  const timeout = (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') ? () => AbortSignal.timeout(20000) : () => undefined;
   let ultimo;
   for (const model of modelos) {
     // Gemini 3 gasta tokens "pensando" y corta el JSON; se desactiva el razonamiento.
     for (const conThinking of [true, false]) {
       const generationConfig = { temperature: 0.6, maxOutputTokens: 800, responseMimeType: 'application/json' };
       if (conThinking) generationConfig.thinkingConfig = { thinkingBudget: 0 };
-      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(config.geminiKey)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: SYS }] },
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig
-        }),
-        signal: timeout()
-      });
-      if (r.ok) {
-        const j = await r.json();
-        return j.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || '';
+      let r;
+      try {
+        r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(config.geminiKey)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: SYS }] },
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            generationConfig
+          }),
+          signal: timeout()
+        });
+      } catch (e) {
+        ultimo = e;
+        break; // timeout o error de red: pasa al siguiente modelo
       }
-      const detalle = (await r.text()).slice(0, 200);
+      if (r.ok) {
+        const j = await r.json().catch(() => null);
+        const finish = j?.candidates?.[0]?.finishReason;
+        const texto = (j?.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('').trim();
+        if (texto) return texto;
+        // Respuesta vacía (p. ej. gastó los tokens pensando): reintenta sin thinking.
+        ultimo = new Error(`Gemini ${model} devolvió vacío (${finish || 'sin finish'})`);
+        continue;
+      }
+      const detalle = (await r.text().catch(() => '')).slice(0, 200);
       ultimo = new Error(`Gemini ${r.status}: ${detalle}`);
       // 400 = el modelo no acepta thinkingConfig: reintenta sin él.
       if (r.status === 400 && conThinking) continue;
-      // 404 = modelo retirado: pasa al siguiente de la lista.
+      // 429/503/404 = cuota, alta demanda o modelo retirado: siguiente modelo.
       break;
     }
   }
@@ -238,8 +256,8 @@ async function anthropic(prompt) {  const r = await fetch('https://api.anthropic
  */
 export async function transcribirAudio({ base64, mimeType = 'audio/ogg' }) {
   if (!config.geminiKey || !base64) return '';
-  const modelos = [...new Set([config.aiModel || 'gemini-3-flash-preview', 'gemini-flash-latest', 'gemini-3-flash-preview'])];
-  const timeout = (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') ? () => AbortSignal.timeout(60000) : () => undefined;
+  const modelos = [...new Set([config.aiModel || 'gemini-3.6-flash', 'gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-3.5-flash'])];
+  const timeout = (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') ? () => AbortSignal.timeout(30000) : () => undefined;
   const orden = 'Transcribe literalmente este audio en el idioma en que esté (normalmente español de Perú). Devuelve SOLO la transcripción, sin comillas, sin comentarios y sin formato. Si no se entiende nada, devuelve una cadena vacía.';
   for (const model of modelos) {
     try {

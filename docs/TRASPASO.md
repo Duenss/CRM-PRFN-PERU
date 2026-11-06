@@ -28,9 +28,26 @@
     WhatsApp Web: se leen chats y mensajes directo de la página, tolerando errores por chat.
 - **QR sin caché**: `/api/estado` responde `Cache-Control: no-store` y el panel lo pide con
   cache-buster y refresca cada 2.5 s, para no mostrar un QR caducado ("no se puede conectar al dispositivo").
-- **Modelo de IA**: `gemini-3-flash-preview` (el más rápido medido, ~1.2 s) con cadena de respaldo
-  `gemini-flash-latest` → `gemini-3.8-flash`; `thinkingConfig:{thinkingBudget:0}` porque Gemini 3
-  gasta tokens "pensando" y corta el JSON; timeout de 60 s por intento.
+- **Modelo de IA**: `gemini-3.6-flash` (respuesta real medida en ~3 s) con respaldo
+  `gemini-3.7-flash` → `gemini-3.5-flash` → `gemini-3-flash-preview`; timeout de **20 s** por intento;
+  `thinkingConfig:{thinkingBudget:0}` porque Gemini 3 gasta tokens "pensando" y corta el JSON.
+  `gemini()` descarta respuestas vacías (reintenta sin `thinkingConfig` en HTTP 400) y sigue con el
+  siguiente modelo ante 429/503/404/timeout, así nunca se queda 60 s colgado ni devuelve texto vacío.
+  > La cuota gratuita de `gemini-3-flash` es de **20 peticiones/día** por modelo; si se agota (HTTP 429)
+  > la IA cae al respaldo (`respaldo:true`). Para producción conviene activar facturación o usar otra clave.
+- **Notas de voz**: se descargan (`descargarMediaWa`, pasando `mimetype` a `downloadAndMaybeDecrypt`) y se
+  transcriben con Gemini (`transcribirAudio`); la IA responde como texto. En pantalla/disco el mensaje
+  queda con prefijo `🎤 `, pero a la IA se le pasa el texto limpio (`textoIA`).
+- **Palomitas (acuses de recibo)**: `message_ack` de whatsapp-web.js se propaga (`iniciarWhatsApp` →
+  `crearSesion` → `reiniciarSesion` → `onAck` → `manejarAck`) y `actualizarAck` lo guarda por mensaje.
+  El panel muestra `✓` enviado, `✓✓` entregado, `✓✓` azul (`.tick.read`) leído y `⏳` enviando.
+- **Reconocimiento de nombre y tipo**: `listarChatsWa` extrae `nombreWa`, `nombreGuardado`, `pushname`,
+  `verifiedName` y `esEmpresa` (`isBusiness`/`isEnterprise`/`businessProfile`); el helper
+  `nombreMostradoWa()` prefiere el nombre verificado para empresas y el título del chat (pushname,
+  p. ej. `@Jvampi`) para personas, ignorando títulos que son solo un teléfono. El panel rotula
+  **Empresa** / **Persona** y prioriza `nombreWa` sobre `notifyName`.
+- **Sin límite de respuestas**: `maxPorConversacion = 0` significa **sin tope** (0 = ilimitado), en
+  `bot/src/ia.js`, `bot/data/ia.json` y el campo `#ia-max` del panel (`min=0`).
 - **Conexión del bot dentro del dashboard**: chip de estado en la barra superior + tarjeta en IA/Ajustes.
 - **Un solo dashboard**: el QR, el envío de prueba y el registro del bot viven en **Ajustes**;
   ya no se abre el panel externo del bot (`bot/src/panel.html` queda solo como respaldo de la API).
@@ -302,6 +319,11 @@ curl -X POST http://localhost:3000/api/ia/pausar -H "Content-Type: application/j
 | Un archivo/imagen se veía como base64 | `m.body` de multimedia trae el thumbnail | Para tipos no-texto se usa `m.caption` o marcadores `[imagen]/[video]/[documento] nombre` |
 | Mensajes vacíos (reacciones/avisos) contaminaban fechas | `registrar` aceptaba texto vacío | `registrar` ignora texto vacío; `manejarMensaje`/`manejarMensajePropio` ignoran `type:'reaction'` e `isNotification` |
 | Respuestas IA tardaban ~90 s | Cooldown largo | `COOLDOWN_SEGUNDOS` (por defecto 10 s) + dedupe por id de mensaje; número de prueba y dueño lo saltan |
+| La IA respondía siempre el texto genérico de respaldo | Cuota gratuita de `gemini-3-flash-preview` agotada (HTTP 429, 20 req/día) y `gemini()` aceptaba respuestas vacías/tardaba 60 s | Cambiar a `gemini-3.6-flash`; `gemini()` rechaza texto vacío, timeout 20 s por intento y sigue con el siguiente modelo |
+| Nota de voz fallaba con `Unexpected mimetype application/octet-stream for media type ptt` | `downloadAndMaybeDecrypt` recibía el mimetype incorrecto | `descargarMediaWa` pasa el `mimetype` real (`audio/ogg; codecs=opus`) |
+| `+51 910 418 951` (negocio) salía como teléfono en vez de "Perfumería Fina" | `formattedTitle` del negocio era el número | `nombreMostradoWa()` usa `verifiedName`/`businessProfile.name` para empresas y descarta títulos que son solo un teléfono |
+| El panel mostraba "Juan Dueñas" en vez de `@Jvampi` | Se prefería `msg._data.notifyName` | El panel prioriza `nombreWa` (pushname real) que guarda la sincronización |
+| Una conversación de prueba se pausaba por `derivar` (p. ej. "tienes promociones?") | La regla 4 de SYS deriva consultas de precios/promos | Números de prueba y dueño nunca derivan ni se pausan; reciben respuesta genérica útil. Solo clientes reales derivan |
 
 ## 10. Prompt para la siguiente IA
 
