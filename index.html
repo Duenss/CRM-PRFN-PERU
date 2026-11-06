@@ -395,7 +395,8 @@ dialog::backdrop{background:rgba(3,4,8,.66);backdrop-filter:blur(8px)}
     <nav id="tabs" aria-label="Secciones">
       <p class="navgroup">Principal</p>
       <button data-tab="inicio" class="on"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span class="nl">Inicio</span></button>
-      <button data-tab="bandeja"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span class="nl">Bandeja</span><i class="nbadge" id="unread-badge" hidden>0</i></button>
+      <button data-tab="bandeja"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span class="nl">Bandeja</span><i class="nbadge" id="unread-badge" hidden>0</i><i class="nbadge" id="alert-badge" hidden>!</i></button>
+      <button data-tab="pedidos"><svg viewBox="0 0 24 24"><path d="M6 2h9l4 4v16H6z"/><path d="M9 8h6M9 12h6M9 16h4"/></svg><span class="nl">Pedidos</span><i class="nbadge" id="pedidos-badge" hidden>0</i></button>
       <button data-tab="campanas"><svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg><span class="nl">Campañas</span></button>
       <button data-tab="clientes"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6M17 4a4 4 0 0 1 0 8M22 21c0-3-2-5-5-5.7"/></svg><span class="nl">Clientes</span></button>
       <button data-tab="catalogo"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span class="nl">Catálogo</span></button>
@@ -457,7 +458,7 @@ dialog::backdrop{background:rgba(3,4,8,.66);backdrop-filter:blur(8px)}
     <section class="tab" id="t-bandeja" hidden>
       <div class="pagehead">
         <div><h1>Bandeja de entrada</h1><p class="muted" id="in-sub">Conversaciones de WhatsApp en vivo.</p></div>
-        <div class="bar" style="margin:0"><input id="in-q" type="search" placeholder="Buscar por nombre o número"><button class="ghost" id="in-sync" type="button">Sincronizar WhatsApp</button><button class="ghost" id="in-refresh" type="button">Actualizar</button><button class="ghost" id="in-pause" type="button" title="Pausar la IA en todos los chats">Pausar IA</button></div>
+        <div class="bar" style="margin:0"><input id="in-q" type="search" placeholder="Buscar por nombre o número"><button class="ghost" id="in-notify" type="button" title="Activar sonido y notificaciones de derivaciones">Activar avisos</button><button class="ghost" id="in-sync" type="button">Sincronizar WhatsApp</button><button class="ghost" id="in-refresh" type="button">Actualizar</button><button class="ghost" id="in-pause" type="button" title="Pausar la IA en todos los chats">Pausar IA</button></div>
       </div>
       <div class="inbox">
         <div class="in-list" id="in-list"><p class="empty" style="padding:1rem">Cargando…</p></div>
@@ -466,12 +467,78 @@ dialog::backdrop{background:rgba(3,4,8,.66);backdrop-filter:blur(8px)}
           <div class="in-thread" id="in-thread" hidden>
             <div class="in-head">
               <div class="in-id"><div class="ava" id="in-ava">?</div><div><b id="in-name">—</b><small id="in-tel"></small></div></div>
+              <div class="in-head-act">
+                <button class="ghost" id="in-seg" type="button" title="Activar o desactivar el seguimiento post-venta de este chat">Seguimiento: off</button>
+                <button class="ghost" id="in-neworder" type="button" title="Crear un pedido para este cliente">+ Pedido</button>
+              </div>
             </div>
             <div class="in-msgs" id="in-msgs"></div>
             <form class="in-form" id="in-form">
               <textarea id="in-text" placeholder="Escribe una respuesta… (Enter para enviar)" rows="1"></textarea>
               <button id="in-send" type="submit">Enviar</button>
             </form>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="tab" id="t-pedidos" hidden>
+      <div class="pagehead">
+        <div><h1>Pedidos y pagos</h1><p class="muted" id="pe-sub">Control de ventas, comprobantes y entregas.</p></div>
+        <div class="bar" style="margin:0"><button class="ghost" id="pe-refresh" type="button">Actualizar</button><button id="pe-new" type="button">Nuevo pedido</button></div>
+      </div>
+      <div class="card" id="pe-form" hidden>
+        <div class="card-h"><b>Nuevo pedido</b><button class="ghost" id="pe-close" type="button" style="min-height:30px;padding:.2rem .6rem">Cerrar</button></div>
+        <div style="padding:1rem">
+          <div class="grid2">
+            <div><label for="pe-tel">WhatsApp del cliente</label><input id="pe-tel" placeholder="9 dígitos o 51XXXXXXXXX"></div>
+            <div><label for="pe-nombre">Nombre</label><input id="pe-nombre" maxlength="120"></div>
+          </div>
+          <div class="grid2">
+            <div><label for="pe-prod">Perfume</label><select id="pe-prod"></select></div>
+            <div><label for="pe-ml">Tamaño</label><select id="pe-ml"><option value="50">50 ml</option><option value="100">100 ml</option></select></div>
+          </div>
+          <div class="grid2">
+            <div><label for="pe-cant">Cantidad</label><input id="pe-cant" type="number" min="1" max="9" value="1"></div>
+            <div><label for="pe-precio">Precio unitario (S/)</label><input id="pe-precio" type="number" min="0" step="0.5" value="0"></div>
+          </div>
+          <div class="grid2">
+            <div><label for="pe-metodo">Método de pago</label><select id="pe-metodo">
+              <option value="">Por definir</option>
+              <option value="yape">Yape</option>
+              <option value="plin">Plin</option>
+              <option value="transferencia">Transferencia</option>
+              <option value="efectivo">Efectivo (cobrar al entregar)</option>
+              <option value="otro">Otro</option>
+            </select></div>
+            <div><label for="pe-adelanto">Adelanto (S/)</label><input id="pe-adelanto" type="number" min="0" step="0.5" value="0"></div>
+          </div>
+          <label for="pe-notas">Notas</label><input id="pe-notas" maxlength="300" placeholder="Dirección, referencia, horario de entrega...">
+          <p class="muted" id="pe-total">—</p>
+          <div class="acts"><button class="ghost" id="pe-cancel" type="button">Cancelar</button><button id="pe-save" type="button">Guardar pedido</button></div>
+        </div>
+      </div>
+      <div class="two">
+        <div class="card">
+          <div class="card-h"><b>Pedidos</b><span class="muted" id="pe-count">—</span></div>
+          <div id="pe-list" style="padding:.4rem 1rem 1rem"><p class="empty">Cargando...</p></div>
+        </div>
+        <div class="card">
+          <div class="card-h"><b>Plantillas de pago</b><span class="muted">solo imágenes oficiales</span></div>
+          <div style="padding:1rem">
+            <p class="muted" style="margin-top:0;font-size:.8rem">Sube la captura oficial de tu Yape/Plin. El bot solo reenvía esa imagen; nunca inventa números ni datos de pago.</p>
+            <div id="pa-list"></div>
+            <div class="grid2">
+              <div><label for="pa-nombre">Nombre</label><input id="pa-nombre" maxlength="40" placeholder="Yape"></div>
+              <div><label for="pa-titular">Titular</label><input id="pa-titular" maxlength="80"></div>
+            </div>
+            <div class="grid2">
+              <div><label for="pa-numero">Número</label><input id="pa-numero" maxlength="20" placeholder="+51..."></div>
+              <div><label for="pa-nota">Nota</label><input id="pa-nota" maxlength="120" placeholder="Ej. solo Yape"></div>
+            </div>
+            <input type="file" id="pa-file" accept="image/*" hidden>
+            <div class="acts"><button class="ghost" id="pa-pick" type="button">Elegir imagen</button><button id="pa-save" type="button">Subir plantilla</button></div>
+            <p class="muted" id="pa-file-name"></p>
           </div>
         </div>
       </div>
@@ -808,7 +875,7 @@ async function load(){
 }
 
 /* ---------- pestañas ---------- */
-const CRUMBS={inicio:['Inicio','Resumen'],bandeja:['Bandeja','WhatsApp'],campanas:['Campañas','Envíos'],clientes:['Clientes','Base de datos'],catalogo:['Catálogo','Perfumes'],calendario:['Calendario','Agenda'],ia:['Asistente IA','Automático'],bot:['Ajustes','Conexión']};
+const CRUMBS={inicio:['Inicio','Resumen'],bandeja:['Bandeja','WhatsApp'],pedidos:['Pedidos','Ventas y pagos'],campanas:['Campañas','Envíos'],clientes:['Clientes','Base de datos'],catalogo:['Catálogo','Perfumes'],calendario:['Calendario','Agenda'],ia:['Asistente IA','Automático'],bot:['Ajustes','Conexión']};
 function irTab(name){
   document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x.dataset.tab===name));
   document.querySelectorAll('.tab').forEach(x=>x.hidden=x.id!=='t-'+name);
@@ -816,7 +883,8 @@ function irTab(name){
   if($('#crumb'))$('#crumb').textContent=c[0];
   if($('#crumb-sub'))$('#crumb-sub').textContent=c[1];
   pararQr();pararLogs();pararBandeja();
-  if(name==='bandeja'){cargarBandeja();inListTimer=setInterval(()=>{if(!document.hidden)cargarBandeja()},12000);}
+  if(name==='bandeja'){cargarBandeja();inListTimer=setInterval(()=>{if(!document.hidden)cargarBandeja()},12000);alertasNuevas=0;actualizarAlertBadge();}
+  else if(name==='pedidos')cargarPedidos();
   else if(name==='ia')cargarIA();
   else if(name==='inicio')renderInicio();
   else if(name==='bot'){arrancarQr();arrancarLogs();}
@@ -1382,7 +1450,7 @@ function pintarLista(){
     const on=c.telefono===inTel?' on':'';
     const nom=c.nombreWa||c.nombre||('+'+c.telefono);
     const tipo=c.tipo==='empresa'?'<span class="tipo emp">Empresa</span>':c.tipo==='persona'?'<span class="tipo per">Persona</span>':'';
-    return `<div class="in-item${on}" data-tel="${esc(c.telefono)}"><div class="ava">${esc(iniciales(nom))}</div><div class="ib"><b>${esc(nom)}${tipo}</b><small>${esc((c.ultimoTexto||'').slice(0,44)||'—')}</small></div><div class="imeta"><time>${esc(horaWa(c.ultimoEn))}</time>${inPausados.has(c.telefono)?'<span class="paused">IA off</span>':''}${c.noLeidos?`<span class="unread">${c.noLeidos}</span>`:''}</div></div>`;
+    return `<div class="in-item${on}" data-tel="${esc(c.telefono)}"><div class="ava">${esc(iniciales(nom))}</div><div class="ib"><b>${esc(nom)}${tipo}</b><small>${esc((c.ultimoTexto||'').slice(0,44)||'—')}</small></div><div class="imeta"><time>${esc(horaWa(c.ultimoEn))}</time>${inPausados.has(c.telefono)?'<span class="paused">IA off</span>':''}${c.seguimiento?'<span class="paused" style="color:var(--success);border-color:rgba(61,214,140,.5)">Seg</span>':''}${c.noLeidos?`<span class="unread">${c.noLeidos}</span>`:''}</div></div>`;
   }).join('')||'<p class="empty" style="padding:1rem">Sin conversaciones todavía.</p>');
 }
 async function importarHilo(tel){
@@ -1407,6 +1475,7 @@ async function abrirChat(tel){
   try{
     const c=await botFetch('/api/conversaciones/'+tel);
     if(c.pausado)inPausados.add(tel);else inPausados.delete(tel);
+    inSegActivo=!!c.seguimiento?.activo;actualizarBotonSeg();
     pintarHilo(c.mensajes||[]);actualizarPausa();
     botFetch('/api/conversaciones/'+tel+'/leido',{method:'POST'}).catch(()=>{});
     const i=inChats.find(x=>x.telefono===tel);if(i)i.noLeidos=0;
@@ -1480,6 +1549,245 @@ $('#in-form')?.addEventListener('submit',async e=>{
 });
 $('#in-text')?.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('#in-form').requestSubmit()}});
 $('#in-text')?.addEventListener('input',e=>{e.target.style.height='auto';e.target.style.height=Math.min(130,e.target.scrollHeight)+'px'});
+
+/* ---------- pedidos, plantillas de pago y seguimiento ---------- */
+let pedidosCache=[],pagosCache=[],inSegActivo=false,paImagen='',alertasNuevas=0,evUltimo=null;
+const ESTADO_TXT={borrador:'Borrador',esperando_pago:'Esperando pago',comprobante_recibido:'Comprobante recibido',por_entregar:'Por entregar',entregado:'Entregado',cancelado:'Cancelado'};
+const ESTADO_TAG={borrador:'',esperando_pago:'warn',comprobante_recibido:'warn',por_entregar:'ok',entregado:'ok',cancelado:'bad'};
+const metodoTxt=m=>({yape:'Yape',plin:'Plin',transferencia:'Transferencia',efectivo:'Efectivo',otro:'Otro'})[m]||'Por definir';
+function setNavBadge(sel,n){const b=$(sel);if(!b)return;b.hidden=!n;b.textContent=n>9?'9+':n}
+function actualizarAlertBadge(){setNavBadge('#alert-badge',alertasNuevas);}
+function actualizarBadgePedidos(){const n=pedidosCache.filter(p=>['esperando_pago','comprobante_recibido'].includes(p.estado)).length;setNavBadge('#pedidos-badge',n);}
+
+async function cargarPedidos(){
+  try{
+    const j=await botFetch('/api/pedidos?limite=200');
+    pedidosCache=j.pedidos||[];renderPedidos(j);actualizarBadgePedidos();
+  }catch(e){if($('#pe-list'))$('#pe-list').innerHTML='<p class="empty">No se pudo cargar. Revisa que el bot esté encendido.</p>'}
+}
+function renderPedidos(j){
+  const ps=pedidosCache;
+  if($('#pe-count'))$('#pe-count').textContent=`${ps.length} pedidos · ${j?.resumen?.abiertos||0} abiertos`;
+  if($('#pe-sub'))$('#pe-sub').textContent=`${j?.resumen?.abiertos||0} pedidos abiertos · S/ ${j?.resumen?.ventasEntregadas||0} entregados en total.`;
+  const estados=j?.estados||Object.keys(ESTADO_TXT);
+  $('#pe-list').innerHTML=ps.map(p=>{
+    const comp=(p.comprobantes||[]).slice(-1)[0];
+    const items=(p.items||[]).map(i=>`${i.cantidad}× ${esc(i.nombre)} ${i.ml} ml`).join(', ');
+    return `<div class="lrow">
+      <div class="lt">
+        <b>${esc(p.id)} · ${esc(p.nombre||('+'+p.telefono))} <i class="tag ${ESTADO_TAG[p.estado]||''}">${esc(ESTADO_TXT[p.estado]||p.estado)}</i></b>
+        <small>+${esc(p.telefono)} · ${esc(items||'Sin productos')}</small>
+        <small>Total S/ ${p.total}${p.adelanto?` · Adelanto S/ ${p.adelanto}`:''} · Saldo S/ ${p.saldo} · ${metodoTxt(p.metodo)}</small>
+        <small>${esc(fmtFechaHora(p.actualizado))}${p.notas?' · '+esc(p.notas):''}</small>
+      </div>
+      <div class="acts" style="justify-content:flex-end;flex-wrap:wrap">
+        <button class="ghost" data-ver-chat="${esc(p.telefono)}" type="button">Chat</button>
+        ${comp?`<button class="ghost" data-comp="${esc(p.id)}" type="button">Comprobante</button>`:''}
+        <select data-estado="${esc(p.id)}" style="min-height:34px;min-width:150px">${estados.map(e=>`<option value="${esc(e)}"${e===p.estado?' selected':''}>${esc(ESTADO_TXT[e]||e)}</option>`).join('')}</select>
+      </div>
+    </div>`;
+  }).join('')||'<p class="empty">Aún no hay pedidos. Crea uno con "Nuevo pedido" o espera a que la IA detecte una compra.</p>';
+}
+function llenarProductosPedido(){
+  const sel=$('#pe-prod');if(!sel)return;
+  sel.innerHTML=productos.map(p=>`<option value="${esc(p.id)}">${esc(p.nombre)} (${esc(p.casa_inspirada||'')})</option>`).join('')||'<option value="">Sin catálogo</option>';
+}
+function precioPedidoActual(){
+  const p=productos.find(x=>x.id===$('#pe-prod').value);
+  return Number($('#pe-ml').value==='100'?p?.precio_100ml:p?.precio_50ml)||0;
+}
+function refrescarTotalPedido(){
+  const cant=Math.max(1,Number($('#pe-cant').value)||1);
+  const precio=Number($('#pe-precio').value)||0;
+  const total=cant*precio;
+  const adel=Math.max(0,Number($('#pe-adelanto').value)||0);
+  if($('#pe-total'))$('#pe-total').textContent=`Total: S/ ${total.toFixed(2)} · Saldo: S/ ${Math.max(0,total-adel).toFixed(2)}${$('#pe-metodo').value==='efectivo'?' · Se cobra al entregar':''}`;
+}
+function abrirFormPedido(tel='',nombre=''){
+  llenarProductosPedido();
+  $('#pe-form').hidden=false;
+  $('#pe-tel').value=tel||'';$('#pe-nombre').value=nombre||'';
+  $('#pe-cant').value=1;$('#pe-adelanto').value=0;$('#pe-metodo').value='';$('#pe-notas').value='';
+  $('#pe-ml').value='100';$('#pe-precio').value=precioPedidoActual();
+  refrescarTotalPedido();
+  $('#pe-form').scrollIntoView({block:'center',behavior:'smooth'});
+}
+async function guardarPedido(){
+  const tel=norm($('#pe-tel').value);
+  if(!/^\d{8,15}$/.test(tel))return toast('Escribe un WhatsApp válido.', 'error');
+  const prod=productos.find(x=>x.id===$('#pe-prod').value);
+  if(!prod)return toast('Elige un perfume del catálogo.', 'error');
+  const ml=Number($('#pe-ml').value)===100?100:50;
+  const precio=Number($('#pe-precio').value)||0;
+  if(precio<=0)return toast('Escribe el precio unitario.', 'error');
+  const b=$('#pe-save');b.disabled=true;
+  try{
+    await botFetch('/api/pedidos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      telefono:tel,
+      nombre:$('#pe-nombre').value.trim()||prod.nombre,
+      metodo:$('#pe-metodo').value,
+      adelanto:Number($('#pe-adelanto').value)||0,
+      notas:$('#pe-notas').value.trim(),
+      items:[{productoId:prod.id,nombre:prod.nombre,ml,cantidad:Math.max(1,Number($('#pe-cant').value)||1),precio}]
+    })});
+    $('#pe-form').hidden=true;
+    toast('Pedido guardado');
+    await cargarPedidos();
+  }catch(e){toast('No se guardó: '+e.message,'error')}
+  b.disabled=false;
+}
+function cargarPagos(){
+  return botFetch('/api/pagos').then(j=>{pagosCache=j.plantillas||[];renderPagos()}).catch(()=>{});
+}
+function renderPagos(){
+  const cont=$('#pa-list');if(!cont)return;
+  cont.innerHTML=pagosCache.map(p=>`<div class="lrow">
+      <div class="lt"><b>${esc(p.nombre)}</b><small>${esc(p.numero||'Sin número')}${p.titular?' · '+esc(p.titular):''}${p.nota?' · '+esc(p.nota):''}</small></div>
+      ${p.imagen?`<img src="${p.imagen}" alt="${esc(p.nombre)}" style="height:48px;width:auto;border-radius:6px;border:1px solid var(--line)">`:''}
+      <button class="ghost" data-pa-del="${esc(p.id)}" type="button">Quitar</button>
+    </div>`).join('')||'<p class="empty">Aún no hay plantillas. Sube la de Yape o Plin.</p>';
+}
+function actualizarBotonSeg(){
+  const b=$('#in-seg');if(!b)return;
+  b.textContent='Seguimiento: '+(inSegActivo?'on':'off');
+  b.className=inSegActivo?'':'ghost';
+  b.title=inSegActivo?'El seguimiento post-venta está activo en este chat.':'Activar seguimiento post-venta solo en este chat.';
+}
+async function toggleSeguimiento(){
+  if(!inTel)return toast('Elige un chat primero.','error');
+  const b=$('#in-seg');b.disabled=true;
+  const activo=!inSegActivo;
+  try{
+    const j=await botFetch('/api/seguimiento/'+inTel,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({activo,nombre:$('#in-name').textContent})});
+    inSegActivo=!!j.activo;actualizarBotonSeg();toast(activo?'Seguimiento activado en este chat':'Seguimiento desactivado');cargarBandeja();
+  }catch(e){toast('No se pudo cambiar: '+e.message,'error')}
+  b.disabled=false;
+}
+function tonoAviso(freq,delay,dur,vol){
+  if(!audioCtx)return;
+  try{
+    const osc=audioCtx.createOscillator(),gain=audioCtx.createGain();
+    const t=audioCtx.currentTime+delay;
+    osc.type='triangle';osc.frequency.value=freq;
+    gain.gain.setValueAtTime(0.0001,t);
+    gain.gain.linearRampToValueAtTime(vol||0.06,t+0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    osc.connect(gain);gain.connect(audioCtx.destination);
+    osc.start(t);osc.stop(t+dur+0.03);
+  }catch(e){}
+}
+function alertaSonido(){
+  asegurarAudio();
+  tonoAviso(880,0,0.14,0.07);
+  tonoAviso(1180,0.16,0.16,0.06);
+  tonoAviso(1480,0.34,0.22,0.05);
+}
+function notificar(titulo,cuerpo,tel){
+  try{
+    if(!('Notification' in window)||Notification.permission!=='granted')return;
+    const n=new Notification(titulo,{body:String(cuerpo||'').slice(0,300),tag:'pf-'+(tel||Date.now()),silent:true});
+    n.onclick=()=>{try{window.focus();irTab('bandeja');if(tel)setTimeout(()=>abrirChat(tel),250);}catch(e){}n.close();};
+  }catch(e){}
+}
+function actualizarBotonAvisos(){
+  const b=$('#in-notify');if(!b)return;
+  const ok=('Notification' in window)&&Notification.permission==='granted';
+  b.textContent=ok?'Avisos activos':'Activar avisos';
+  b.className=ok?'':'ghost';
+}
+async function activarAvisos(){
+  asegurarAudio();
+  let ok=false;
+  try{
+    if('Notification' in window){
+      ok=Notification.permission==='granted';
+      if(!ok&&Notification.permission!=='denied')ok=(await Notification.requestPermission())==='granted';
+    }
+  }catch(e){}
+  localStorage.setItem('avisos','1');
+  actualizarBotonAvisos();alertaSonido();
+  toast(ok?'Avisos activos: sonido y notificación':'Sonido activo. El navegador no permite notificaciones.',ok?'ok':'error');
+}
+function manejarEvento(ev){
+  if(!ev)return;
+  if(ev.tipo==='derivacion'){
+    alertasNuevas++;actualizarAlertBadge();alertaSonido();
+    notificar('Necesita atención: '+(ev.nombre||('+'+ev.telefono)),(ev.motivo||'')+'\n'+(ev.mensaje||''),ev.telefono);
+    toast('⚠️ '+(ev.nombre||('+'+ev.telefono))+' necesita atención');
+  }else if(ev.tipo==='comprobante'){
+    alertasNuevas++;actualizarAlertBadge();alertaSonido();
+    notificar('Comprobante recibido: '+(ev.nombre||('+'+ev.telefono)),(ev.detalle||'')+'\nVerifícalo antes de confirmar.',ev.telefono);
+    toast('🧾 Comprobante de '+(ev.nombre||('+'+ev.telefono)));
+    if($('#t-pedidos')&&!$('#t-pedidos').hidden)cargarPedidos();
+  }else if(ev.tipo==='pedido'){
+    notificar('Nuevo pedido',ev.detalle||'',ev.telefono);
+  }
+}
+async function pollEventos(){
+  try{
+    const j=await botFetch('/api/eventos?desde='+(evUltimo??0));
+    if(evUltimo===null){evUltimo=j.ultimo;return;}
+    if(j.eventos?.length){evUltimo=j.ultimo;for(const ev of j.eventos)manejarEvento(ev);}
+    else evUltimo=j.ultimo;
+  }catch(e){}
+}
+function iniciarEventos(){
+  if(window.__pfEventos)return;window.__pfEventos=true;
+  setInterval(pollEventos,8000);
+  setTimeout(pollEventos,2000);
+}
+document.addEventListener('pointerdown',()=>asegurarAudio(),{once:true});
+$('#in-notify')?.addEventListener('click',activarAvisos);
+$('#in-seg')?.addEventListener('click',toggleSeguimiento);
+$('#in-neworder')?.addEventListener('click',()=>{if(!inTel)return toast('Elige un chat primero.','error');irTab('pedidos');setTimeout(()=>abrirFormPedido(inTel,$('#in-name').textContent),180)});
+$('#pe-refresh')?.addEventListener('click',cargarPedidos);
+$('#pe-new')?.addEventListener('click',()=>abrirFormPedido());
+$('#pe-close')?.addEventListener('click',()=>{$('#pe-form').hidden=true});
+$('#pe-cancel')?.addEventListener('click',()=>{$('#pe-form').hidden=true});
+$('#pe-save')?.addEventListener('click',guardarPedido);
+$('#pe-prod')?.addEventListener('change',()=>{$('#pe-precio').value=precioPedidoActual();refrescarTotalPedido()});
+$('#pe-ml')?.addEventListener('change',()=>{$('#pe-precio').value=precioPedidoActual();refrescarTotalPedido()});
+['#pe-cant','#pe-precio','#pe-adelanto','#pe-metodo'].forEach(s=>$(s)?.addEventListener('input',refrescarTotalPedido));
+$('#pe-list')?.addEventListener('click',e=>{
+  const b=e.target.closest('[data-ver-chat]');
+  if(b){irTab('bandeja');setTimeout(()=>abrirChat(b.dataset.verChat),200);return;}
+  const c=e.target.closest('[data-comp]');
+  if(c){const p=pedidosCache.find(x=>x.id===c.dataset.comp);const comp=(p?.comprobantes||[]).slice(-1)[0];if(comp)window.open(botURL+'/media/comprobantes/'+encodeURIComponent(comp.archivo),'_blank');else toast('Este pedido no tiene comprobante.','error');}
+});
+$('#pe-list')?.addEventListener('change',async e=>{
+  const s=e.target.closest('[data-estado]');if(!s)return;
+  s.disabled=true;
+  try{await botFetch('/api/pedidos/'+s.dataset.estado,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({estado:s.value})});toast('Pedido actualizado');await cargarPedidos();}
+  catch(err){toast('No se actualizó: '+err.message,'error')}
+  s.disabled=false;
+});
+$('#pa-pick')?.addEventListener('click',()=>$('#pa-file').click());
+$('#pa-file')?.addEventListener('change',e=>{
+  const f=e.target.files?.[0];if(!f)return;
+  if(f.size>6*1024*1024)return toast('La imagen supera 6 MB.','error');
+  const r=new FileReader();
+  r.onload=()=>{paImagen=String(r.result||'');$('#pa-file-name').textContent='Imagen lista: '+f.name;};
+  r.readAsDataURL(f);
+});
+$('#pa-save')?.addEventListener('click',async()=>{
+  const nombre=$('#pa-nombre').value.trim();
+  if(!nombre)return toast('Ponle nombre (Yape, Plin...).','error');
+  if(!paImagen)return toast('Elige la imagen oficial.','error');
+  const b=$('#pa-save');b.disabled=true;
+  try{
+    await botFetch('/api/pagos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre,titular:$('#pa-titular').value.trim(),numero:$('#pa-numero').value.trim(),nota:$('#pa-nota').value.trim(),imagen:paImagen})});
+    paImagen='';$('#pa-file').value='';$('#pa-file-name').textContent='';$('#pa-nombre').value='';$('#pa-titular').value='';$('#pa-numero').value='';$('#pa-nota').value='';
+    toast('Plantilla guardada');await cargarPagos();
+  }catch(e){toast('No se guardó: '+e.message,'error')}
+  b.disabled=false;
+});
+$('#pa-list')?.addEventListener('click',async e=>{
+  const b=e.target.closest('[data-pa-del]');if(!b)return;
+  b.disabled=true;
+  try{await botFetch('/api/pagos/'+b.dataset.paDel,{method:'DELETE'});toast('Plantilla eliminada');await cargarPagos();}
+  catch(err){toast('No se eliminó: '+err.message,'error');b.disabled=false}
+});
+setTimeout(()=>{cargarPedidos();cargarPagos();actualizarBotonAvisos();iniciarEventos();},2600);
 
 /* ---------- asistente IA ---------- */
 async function cargarIA(){

@@ -13,6 +13,18 @@ async function catalogo() {
   return cache.productos;
 }
 
+/** Producto del catálogo por id (para foto/precio al responder). */
+export async function productoPorId(id) {
+  const clave = String(id || '').trim();
+  if (!clave) return null;
+  const ps = await catalogo();
+  const c = sinAcentos(clave);
+  return ps.find(p => sinAcentos(p.id) === c)
+    || ps.find(p => sinAcentos(p.nombre) === c)
+    || ps.find(p => sinAcentos(p.nombre).includes(c) && c.length > 3)
+    || null;
+}
+
 const SYS = `Eres el asistente de WhatsApp de Perfumería Fina Perú, una tienda de perfumes en Perú.
 Respondes mensajes de clientes por WhatsApp. El dueño revisa la conversación después.
 
@@ -30,10 +42,14 @@ REGLAS OBLIGATORIAS:
 11. Corrige los nombres mal escritos que escriba el cliente y responde por la fragancia real del catálogo (por ejemplo, "Kharmash" se refiere a "Khamrah"; "Dior Sovaje" es "Sauvage"). Si el cliente describe una familia olfativa o notas (por ejemplo, "algo amaderado", "algo dulce"), ofrece las fragancias de esa familia/notas que aparezcan en el catálogo relevante.
 12. Nunca digas que no tienes la fragancia si en el catálogo relevante aparece algo equivalente o parecido: ofrécelo por su nombre correcto.
 
-Devuelve SOLO JSON válido, sin markdown:
-{"responder":true,"texto":"respuesta para el cliente"}
-o
-{"derivar":true,"motivo":"motivo corto para el dueño"}`;
+13. Cuando recomiendes una fragancia concreta del catálogo, agrega su id exacto en "productoId" (el id va entre corchetes en la lista: [id: khamrah]). Sirve para enviarle la foto.
+14. Si el cliente confirma que quiere comprar (dice qué fragancia y qué tamaño), agrega "pedido" con productoId, ml (50 o 100), cantidad y método de pago si lo mencionó ("yape", "plin", "transferencia", "efectivo"). Si no mencionó método, deja "metodo":"".
+15. Nunca confirmes un pago, un comprobante ni una entrega: eso lo revisa el encargado.
+16. Devuelve SOLO JSON válido, sin markdown. Ejemplos:
+{"responder":true,"texto":"respuesta para el cliente","productoId":"khamrah"}
+{"responder":true,"texto":"respuesta","productoId":"yara","pedido":{"productoId":"yara","ml":100,"cantidad":1,"metodo":"yape"}}
+{"derivar":true,"motivo":"motivo corto para el dueño"}
+17. Cuando recomiendes una fragancia, incluye en el texto su nombre y el precio real del catálogo para 50 ml y 100 ml (por ejemplo: "S/ 58 en 50 ml y S/ 82 en 100 ml"). La foto se envía aparte.`;
 
 function limpiarJSON(txt) {
   const clean = String(txt || '').replace(/```json/gi, '').replace(/```/g, '').trim();
@@ -115,10 +131,10 @@ async function contextoCliente(texto) {
   let lista;
   if (rel.length) {
     lista = rel.map(p =>
-      `- ${p.nombre} | inspirado en: ${p.casa_inspirada || '—'} | ${p.categoria || ''}/${p.genero || ''} | familia: ${p.familia_olfativa || '—'} | notas: ${p.notas || '—'} | 50 ml S/ ${p.precio_50ml ?? '—'} · 100 ml S/ ${p.precio_100ml ?? '—'} | ${p.descripcion || ''}`
+      `- [id: ${p.id}] ${p.nombre} | inspirado en: ${p.casa_inspirada || '—'} | ${p.categoria || ''}/${p.genero || ''} | familia: ${p.familia_olfativa || '—'} | notas: ${p.notas || '—'} | 50 ml S/ ${p.precio_50ml ?? '—'} · 100 ml S/ ${p.precio_100ml ?? '—'} | ${p.descripcion || ''}`
     ).join('\n');
   } else {
-    const muestra = productos.slice(0, 60).map(p => `${p.nombre} (${p.casa_inspirada || '—'})`).join('; ');
+    const muestra = productos.slice(0, 60).map(p => `[id: ${p.id}] ${p.nombre} (${p.casa_inspirada || '—'})`).join('; ');
     lista = `El catálogo tiene ${productos.length} fragancias. Algunas: ${muestra}. Precios: 50 ml S/ 58 y 100 ml S/ 82.`;
   }
   return { tienda, lista };
@@ -175,7 +191,16 @@ Responde ahora.`;
     if (j.derivar) return { derivar: true, motivo: String(j.motivo || 'Revisión manual').slice(0, 160) };
     const texto = String(j.texto || '').trim().slice(0, 900);
     if (!texto) return { ...fallback(mensaje), respaldo: true };
-    return { responder: true, texto };
+    const pedido = j.pedido && typeof j.pedido === 'object'
+      ? {
+          productoId: String(j.pedido.productoId || j.productoId || '').trim(),
+          ml: Number(j.pedido.ml) === 100 ? 100 : 50,
+          cantidad: Math.max(1, Math.min(9, Math.round(Number(j.pedido.cantidad) || 1))),
+          metodo: String(j.pedido.metodo || '').toLowerCase().trim()
+        }
+      : null;
+    const productoId = String(j.productoId || pedido?.productoId || '').trim();
+    return { responder: true, texto, productoId, pedido };
   } catch (e) {
     console.warn('[ia] error:', e.message);
     return { ...fallback(mensaje), respaldo: true, motivoFallo: e.message };

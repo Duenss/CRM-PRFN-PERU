@@ -27,7 +27,7 @@ export async function getClientes() {
 
 export async function getProductos() {
   if (!sb) return [];
-  const { data } = await sb.from('productos').select('id,nombre,casa_inspirada,categoria,genero,familia_olfativa,notas,descripcion,precio_50ml,precio_100ml,activo');
+  const { data } = await sb.from('productos').select('id,nombre,casa_inspirada,categoria,genero,familia_olfativa,notas,descripcion,precio_50ml,precio_100ml,imagen_ruta,url_producto,activo');
   return (data || []).filter(p => p.activo !== false);
 }
 

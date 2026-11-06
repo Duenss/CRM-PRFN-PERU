@@ -1,16 +1,22 @@
 import express from 'express';
+import fs from 'node:fs';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config, validarConfig, esNumeroPeru, normalizar } from './config.js';
 import { sb, getCliente, getClientes, logMensaje, historial, marcarBaja, importarClientes } from './supabase.js';
-import { iniciarWhatsApp, enviar, estadoWa, cerrarSesion, reiniciarSesion, hayConexion, sesionDisponible, listarChatsWa, listarContactosWa, historialWa, resolverTelefonoWa, idMensaje, descargarMediaWa } from './whatsapp.js';
-import { redactarRespuesta, transcribirAudio, redactarBorradores } from './ai.js';
+import { iniciarWhatsApp, enviar, enviarImagen, estadoWa, cerrarSesion, reiniciarSesion, hayConexion, sesionDisponible, listarChatsWa, listarContactosWa, historialWa, resolverTelefonoWa, idMensaje, descargarMediaWa } from './whatsapp.js';
+import { redactarRespuesta, transcribirAudio, redactarBorradores, productoPorId } from './ai.js';
 import { Cola, dormir, esperaEntreEnvios } from './queue.js';
 import { estadoIA, actualizarIA, pausarIA, estaPausado, promptIA, resumenIA } from './ia.js';
 import { registrar, listar, obtener, marcarLeido, respuestasIA, porDia, resumen as resumenChats, registrarCabecera, importarMensajes, yaExisteWa, actualizarAck } from './conversaciones.js';
+import * as pedidos from './pedidos.js';
+import * as pagos from './pagos.js';
+import * as seguimiento from './seguimiento.js';
+import { emitir, desde as eventosDesde, ultimoId as ultimoEventoId } from './eventos.js';
 
 const panelPath = fileURLToPath(new URL('./panel.html', import.meta.url));
 const app = express();
-app.use(express.json({ limit: '64kb' }));
+app.use(express.json({ limit: '12mb' }));
 // Evita que el navegador cachee respuestas de la API (el QR rota cada pocos segundos).
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/')) res.set('Cache-Control', 'no-store');
@@ -71,6 +77,132 @@ function limiteAlcanzado() {
 }
 const primerNombre = n => String(n || '').trim().split(/\s+/)[0] || 'cliente';
 const puede = c => c && c.activo !== false && !!c.consentimiento && !c.baja;
+
+/* ---------------- pedidos, pagos y seguimiento ---------------- */
+const botDataDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data');
+const comprobantesDir = path.join(botDataDir, 'comprobantes');
+const raizProyecto = path.join(botDataDir, '..', '..');
+
+/** Guarda la imagen de un comprobante y devuelve su nombre de archivo. */
+function guardarComprobante(pedidoId, media = {}) {
+  const mime = String(media.mimetype || 'image/jpeg').toLowerCase();
+  const ext = mime.includes('png') ? 'png'
+    : mime.includes('webp') ? 'webp'
+    : mime.includes('pdf') ? 'pdf'
+    : (mime.includes('jpeg') || mime.includes('jpg')) ? 'jpg'
+    : 'bin';
+  const nombre = `${String(pedidoId || 'pedido')}-${Date.now()}.${ext}`;
+  fs.mkdirSync(comprobantesDir, { recursive: true });
+  fs.writeFileSync(path.join(comprobantesDir, nombre), Buffer.from(String(media.data || ''), 'base64'));
+  return nombre;
+}
+
+/** Ruta local o URL pública de la foto de un producto. */
+function mediaProducto(p) {
+  const ruta = String(p?.imagen_ruta || '').trim();
+  if (!ruta) return null;
+  if (/^https?:\/\//i.test(ruta)) return { url: ruta };
+  const local = path.join(raizProyecto, ruta);
+  if (fs.existsSync(local)) return { archivo: local };
+  if (!config.panelUrl) return null;
+  return { url: `${config.panelUrl}/${ruta.replace(/^\.?\//, '')}` };
+}
+
+function normalizarMetodo(m) {
+  const t = String(m || '').toLowerCase();
+  if (/yape/.test(t)) return 'yape';
+  if (/plin/.test(t)) return 'plin';
+  if (/transfer|banco|bcp|interbank|bbva/.test(t)) return 'transferencia';
+  if (/efectivo|contra entrega|al entregar/.test(t)) return 'efectivo';
+  return '';
+}
+
+const ESTADOS_PAGO = ['esperando_pago', 'comprobante_recibido', 'por_entregar'];
+
+/** Texto con el resumen del pedido (panel y avisos). */
+function resumenPedido(p) {
+  const items = (p.items || []).map(i => `${i.cantidad} × ${i.nombre} ${i.ml} ml`).join(' · ');
+  return `${p.id} · ${p.nombre || '+' + p.telefono}\n${items}\nTotal: S/ ${p.total}${p.adelanto ? ` · Adelanto: S/ ${p.adelanto}` : ''} · Saldo: S/ ${p.saldo}\nPago: ${p.metodo || 'por definir'} · Estado: ${p.estado}`;
+}
+
+/**
+ * Crea o actualiza el pedido que la IA detectó. Nunca confirma pagos:
+ * solo deja el pedido listo para que el dueño lo revise.
+ */
+async function procesarPedidoIA({ tel, nombre, clienteId, pedidoIA }) {
+  if (!pedidoIA || !pedidoIA.productoId) return null;
+  const prod = await productoPorId(pedidoIA.productoId);
+  if (!prod) return null;
+  const ml = Number(pedidoIA.ml) === 100 ? 100 : 50;
+  const precio = Number(ml === 100 ? prod.precio_100ml : prod.precio_50ml) || 0;
+  if (!precio) return null;
+  const metodo = normalizarMetodo(pedidoIA.metodo);
+  const item = {
+    productoId: prod.id,
+    nombre: prod.nombre,
+    ml,
+    cantidad: Math.max(1, Math.min(9, Number(pedidoIA.cantidad) || 1)),
+    precio
+  };
+
+  let p = pedidos.pedidoAbierto(tel);
+  let nuevo = false;
+  if (p && ['borrador', 'esperando_pago'].includes(p.estado)) {
+    p = pedidos.ponerItem(p.id, item);
+    const cambios = {};
+    if (metodo && !p.metodo) cambios.metodo = metodo;
+    if (metodo === 'efectivo') cambios.estado = 'por_entregar';
+    else if (metodo && p.estado === 'borrador') cambios.estado = 'esperando_pago';
+    p = pedidos.actualizar(p.id, cambios);
+  } else if (!p || p.estado === 'entregado' || p.estado === 'cancelado') {
+    const estado = metodo === 'efectivo' ? 'por_entregar' : metodo ? 'esperando_pago' : 'borrador';
+    p = pedidos.crear({ telefono: tel, nombre, clienteId, items: [item], metodo, estado });
+    nuevo = true;
+  }
+
+  if (nuevo) {
+    emitir('pedido', {
+      telefono: tel,
+      nombre,
+      pedidoId: p.id,
+      estado: p.estado,
+      total: p.total,
+      producto: prod.nombre,
+      detalle: resumenPedido(p)
+    });
+    log(`Pedido ${p.id} creado para +${tel}: ${prod.nombre} ${ml} ml · S/ ${p.total} (${p.estado}).`);
+  }
+  return { pedido: p, producto: prod, nuevo };
+}
+
+/** Reenvía la plantilla de pago oficial subida por el dueño. */
+async function enviarPlantillaPago({ tel, pedido, nombre, clienteId, sesionId }) {
+  if (!pedido || !pedido.metodo || !ESTADOS_PAGO.includes(pedido.estado)) return false;
+  const plantilla = pagos.paraMetodo(pedido.metodo);
+  if (!plantilla) {
+    log(`Pedido ${pedido.id}: no hay plantilla de pago cargada para "${pedido.metodo}".`);
+    return false;
+  }
+  const caption = `Pago con ${plantilla.nombre}${plantilla.numero ? `\nNúmero: ${plantilla.numero}` : ''}${plantilla.titular ? `\nTitular: ${plantilla.titular}` : ''}${plantilla.nota ? `\n${plantilla.nota}` : ''}\n\nCuando lo hagas, envía tu comprobante por aquí. El encargado lo verificará y te confirma.`;
+  try {
+    let env;
+    if (plantilla.imagen) {
+      const partes = pagos.partesImagen(plantilla.imagen);
+      if (!partes) throw new Error('La plantilla de pago no tiene una imagen válida.');
+      env = await enviarImagen(tel, partes, caption, sesionId);
+    } else {
+      env = await enviar(tel, caption, sesionId);
+    }
+    await logMensaje({ clienteId, telefono: tel, direccion: 'saliente', texto: '💳 ' + caption, origen: 'bot' });
+    registrar({ telefono: tel, texto: '💳 ' + caption, direccion: 'saliente', nombre, clienteId, origen: 'bot', waId: env?.waId || '' });
+    pedidos.marcarPagoEnviado(pedido.id);
+    log(`Plantilla de pago "${plantilla.nombre}" enviada a +${tel} (pedido ${pedido.id}).`);
+    return true;
+  } catch (e) {
+    log('No se pudo enviar la plantilla de pago: ' + e.message);
+    return false;
+  }
+}
 
 /* ---------------- cola ---------------- */
 const cola = new Cola(log);
@@ -355,8 +487,47 @@ async function manejarMensaje(msg, sesionId = null) {
     return;
   }
 
-  // Multimedia sin texto: se guarda en la bandeja pero no se responde con IA.
-  if (!esTextoReal) { log(`Multimedia de +${tel} guardada (${texto}).`); return; }
+  // Multimedia sin texto: si es un comprobante y hay un pedido abierto, se
+  // guarda en el módulo de pedidos. El bot NO confirma el pago: solo avisa.
+  if (!esTextoReal) {
+    const abierto = pedidos.pedidoAbierto(tel);
+    const tipo = String(msg.type || '');
+    if (abierto && /^(image|document)$/.test(tipo)) {
+      try {
+        const media = await descargarMediaWa(msg, sesionId);
+        if (media && media.data) {
+          const archivo = guardarComprobante(abierto.id, media);
+          const actualizado = pedidos.agregarComprobante(abierto.id, {
+            archivo,
+            mimetype: media.mimetype,
+            nota: 'Enviado por WhatsApp'
+          });
+          const textoComp = '🧾 [comprobante de pago]';
+          await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'entrante', texto: textoComp, origen: 'cliente' });
+          registrar({ telefono: tel, texto: textoComp, direccion: 'entrante', nombre: nombreChat, clienteId: cliente?.id, origen: 'cliente', waId });
+          emitir('comprobante', {
+            telefono: tel,
+            nombre: nombreChat,
+            pedidoId: actualizado.id,
+            total: actualizado.total,
+            archivo,
+            detalle: resumenPedido(actualizado)
+          });
+          const aviso = 'Recibí tu comprobante ✅ Queda en revisión del encargado. En cuanto lo verifique te confirmo por aquí.';
+          const env = await enviar(tel, aviso, sesionId);
+          await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'saliente', texto: aviso, origen: 'bot' });
+          registrar({ telefono: tel, texto: aviso, direccion: 'saliente', nombre: nombreChat, clienteId: cliente?.id, origen: 'bot', waId: env?.waId || '' });
+          log(`Comprobante del pedido ${actualizado.id} recibido de +${tel} (${archivo}). Sin confirmar pago.`);
+          return;
+        }
+        log(`No se pudo descargar el comprobante de +${tel}: ${media?.error || 'sin datos'}.`);
+      } catch (e) {
+        log('No se pudo guardar el comprobante de +' + tel + ': ' + e.message);
+      }
+    }
+    log(`Multimedia de +${tel} guardada (${texto}).`);
+    return;
+  }
 
   const ia = estadoIA();
   if (!ia.activa) { log(`Asistente IA apagado; no se responde a +${tel}.`); return; }
@@ -393,6 +564,12 @@ async function manejarMensaje(msg, sesionId = null) {
       }
       pausarIA(tel, true, ai.motivo, nombreChat);
       await notificarDueno(`⚠️ ${cliente?.nombre || '+' + tel} necesita atención.\nMotivo: ${ai.motivo}\nMensaje: ${texto.slice(0, 300)}`, sesionId);
+      emitir('derivacion', {
+        telefono: tel,
+        nombre: nombreChat,
+        motivo: ai.motivo,
+        mensaje: String(texto).slice(0, 300)
+      });
       const aviso = 'Gracias por escribir. Ya aviso al encargado para que te atienda personalmente 🙌';
       const env2 = await enviar(tel, aviso, sesionId);
       await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'saliente', texto: aviso, origen: 'bot', estado: 'derivado' });
@@ -401,13 +578,67 @@ async function manejarMensaje(msg, sesionId = null) {
       return;
     }
     log(`Enviando respuesta a +${tel}...`);
-    const env = await enviar(tel, ai.texto, sesionId);
-    await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'saliente', texto: ai.texto, origen: 'ia' });
-    registrar({ telefono: tel, texto: ai.texto, direccion: 'saliente', nombre: nombreChat, clienteId: cliente?.id, origen: 'ia', waId: env?.waId || '' });
+    // Si la IA detectó una compra, el pedido queda registrado en el módulo.
+    // Nunca se confirma el pago: solo se prepara para que el dueño lo revise.
+    let pedidoIA = null;
+    if (ai.pedido?.productoId) {
+      pedidoIA = await procesarPedidoIA({
+        tel,
+        nombre: nombreChat,
+        clienteId: cliente?.id,
+        pedidoIA: ai.pedido
+      });
+    }
+    const pagoPendiente = !!(
+      pedidoIA &&
+      pedidoIA.pedido.estado === 'esperando_pago' &&
+      ['yape', 'plin', 'transferencia'].includes(pedidoIA.pedido.metodo) &&
+      !pedidoIA.pedido.pagoEnviadoEn
+    );
+
+    // Foto del perfume recomendado + precio. Si hay que enviar la plantilla de
+    // pago, se prioriza el texto y luego la plantilla (no dos imágenes seguidas).
+    const prod = ai.productoId ? await productoPorId(ai.productoId) : null;
+    const media = prod ? mediaProducto(prod) : null;
+    let enviado = false;
+    if (media && !pagoPendiente) {
+      try {
+        const envFoto = await enviarImagen(tel, media, ai.texto, sesionId);
+        const textoReg = '📷 ' + ai.texto;
+        await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'saliente', texto: textoReg, origen: 'ia' });
+        registrar({ telefono: tel, texto: textoReg, direccion: 'saliente', nombre: nombreChat, clienteId: cliente?.id, origen: 'ia', waId: envFoto?.waId || '' });
+        enviado = true;
+        log(`Respuesta IA con foto de ${prod.nombre} a +${tel}.`);
+      } catch (e) {
+        log(`No se pudo enviar la foto de ${prod?.nombre || 'producto'} a +${tel}: ${e.message}`);
+      }
+    }
+    if (!enviado) {
+      const env = await enviar(tel, ai.texto, sesionId);
+      await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'saliente', texto: ai.texto, origen: 'ia' });
+      registrar({ telefono: tel, texto: ai.texto, direccion: 'saliente', nombre: nombreChat, clienteId: cliente?.id, origen: 'ia', waId: env?.waId || '' });
+    }
+
+    if (pagoPendiente) {
+      const okPlantilla = await enviarPlantillaPago({
+        tel,
+        pedido: pedidoIA.pedido,
+        nombre: nombreChat,
+        clienteId: cliente?.id,
+        sesionId
+      });
+      if (!okPlantilla) {
+        const nota = 'El encargado te comparte en un momento los datos para el pago. Cuando lo hagas, envía tu comprobante por aquí 🙌';
+        const envN = await enviar(tel, nota, sesionId);
+        await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'saliente', texto: nota, origen: 'bot' });
+        registrar({ telefono: tel, texto: nota, direccion: 'saliente', nombre: nombreChat, clienteId: cliente?.id, origen: 'bot', waId: envN?.waId || '' });
+      }
+    }
+
     if (ai.respaldo) {
       log(`Respuesta de respaldo a +${tel}${ai.motivoFallo ? ' (falló la IA: ' + ai.motivoFallo + ')' : ''}: ${ai.texto.slice(0, 90)}`);
     } else {
-      log(`Respuesta IA a +${tel}: ${ai.texto.slice(0, 90)}${ai.texto.length > 90 ? '…' : ''}`);
+      log(`Respuesta IA a +${tel}: ${ai.texto.slice(0, 90)}${ai.texto.length > 90 ? '...' : ''}`);
     }
   } catch (e) {
     log('Error al responder con IA: ' + e.message);
@@ -425,13 +656,15 @@ function auth(req, res, next) {
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-bot-token');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
 });
 
 app.get('/', (_req, res) => res.redirect('/panel'));
 app.get('/panel', (_req, res) => res.sendFile(panelPath));
+app.use('/media/comprobantes', express.static(comprobantesDir, { fallthrough: true, maxAge: '1h' }));
+app.use('/media/productos', express.static(path.join(raizProyecto, 'assets', 'img', 'products'), { fallthrough: true, maxAge: '1d' }));
 
 // Página mínima: solo el QR, grande y autorefrescante.
 app.get('/qr', (_req, res) => {
@@ -544,6 +777,138 @@ app.post('/api/borradores', auth, async (req, res) => {
     log('Error al generar borradores: ' + e.message);
     res.status(502).json({ error: String(e.message || e).slice(0, 300) });
   }
+});
+
+/* ---------------- Pedidos y pagos ---------------- */
+app.get('/api/pedidos', auth, (req, res) => {
+  res.json({
+    pedidos: pedidos.listar({
+      estado: req.query.estado || '',
+      telefono: req.query.telefono || '',
+      limite: req.query.limite
+    }),
+    resumen: pedidos.resumen(),
+    estados: pedidos.ESTADOS,
+    metodos: pedidos.METODOS
+  });
+});
+
+app.get('/api/pedidos/:id', auth, (req, res) => {
+  const p = pedidos.obtener(req.params.id);
+  if (!p) return res.status(404).json({ error: 'Pedido no encontrado.' });
+  res.json({ pedido: p });
+});
+
+app.post('/api/pedidos', auth, (req, res) => {
+  try {
+    const p = pedidos.crear(req.body || {});
+    emitir('pedido', {
+      telefono: p.telefono,
+      nombre: p.nombre,
+      pedidoId: p.id,
+      estado: p.estado,
+      total: p.total,
+      detalle: resumenPedido(p)
+    });
+    log(`Pedido ${p.id} creado desde el panel para +${p.telefono} (S/ ${p.total}, ${p.estado}).`);
+    res.json({ ok: true, pedido: p });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+app.patch('/api/pedidos/:id', auth, (req, res) => {
+  try {
+    const p = pedidos.actualizar(req.params.id, req.body || {});
+    if (p.estado === 'entregado') {
+      const nuevas = seguimiento.programarPedido(p);
+      if (nuevas) log(`Pedido ${p.id} entregado: ${nuevas} seguimiento(s) programado(s) para +${p.telefono}.`);
+    }
+    if (p.estado === 'cancelado') {
+      const n = seguimiento.cancelarPedido(p.id);
+      if (n) log(`Pedido ${p.id} cancelado: ${n} seguimiento(s) anulado(s).`);
+    }
+    log(`Pedido ${p.id} actualizado: ${p.estado}${p.metodo ? ' · ' + p.metodo : ''} · S/ ${p.total}.`);
+    res.json({ ok: true, pedido: p });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+/** Adjunta un comprobante subido desde el panel (dataURL). */
+app.post('/api/pedidos/:id/comprobante', auth, (req, res) => {
+  try {
+    const p = pedidos.obtener(req.params.id);
+    if (!p) return res.status(404).json({ error: 'Pedido no encontrado.' });
+    const m = String(req.body?.imagen || '').match(/^data:([^;]+);base64,([\s\S]+)$/);
+    if (!m) return res.status(400).json({ error: 'Sube una imagen válida (JPG, PNG o WEBP).' });
+    const archivo = guardarComprobante(p.id, { mimetype: m[1], data: m[2] });
+    const actualizado = pedidos.agregarComprobante(p.id, { archivo, mimetype: m[1], nota: 'Subido desde el panel' });
+    emitir('comprobante', {
+      telefono: actualizado.telefono,
+      nombre: actualizado.nombre,
+      pedidoId: actualizado.id,
+      total: actualizado.total,
+      archivo,
+      detalle: resumenPedido(actualizado)
+    });
+    res.json({ ok: true, pedido: actualizado });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+/* ---------------- Plantillas de pago ---------------- */
+app.get('/api/pagos', auth, (_req, res) => res.json({ plantillas: pagos.listar() }));
+
+app.post('/api/pagos', auth, (req, res) => {
+  try {
+    const p = pagos.crear(req.body || {});
+    log(`Plantilla de pago creada: ${p.nombre}.`);
+    res.json({ ok: true, plantilla: p });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+app.patch('/api/pagos/:id', auth, (req, res) => {
+  try {
+    res.json({ ok: true, plantilla: pagos.actualizar(req.params.id, req.body || {}) });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+app.delete('/api/pagos/:id', auth, (req, res) => {
+  const ok = pagos.eliminar(req.params.id);
+  if (!ok) return res.status(404).json({ error: 'Plantilla no encontrada.' });
+  res.json({ ok: true });
+});
+
+/* ---------------- Seguimiento post-venta por chat ---------------- */
+app.get('/api/seguimiento', auth, (_req, res) => res.json(seguimiento.resumen()));
+
+app.get('/api/seguimiento/:telefono', auth, (req, res) => {
+  res.json(seguimiento.listar(req.params.telefono));
+});
+
+app.post('/api/seguimiento/:telefono', auth, (req, res) => {
+  try {
+    const tel = normalizar(req.params.telefono);
+    if (!/^\d{8,15}$/.test(tel)) return res.status(400).json({ error: 'Teléfono inválido.' });
+    const activo = req.body?.activo !== false;
+    const estado = seguimiento.activar(tel, activo, req.body?.nombre || '');
+    log(`Seguimiento post-venta ${activo ? 'activado' : 'desactivado'} para +${tel}.`);
+    res.json({ ok: true, ...estado });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+/* ---------------- Eventos para el panel (sonido/notificación) ---------------- */
+app.get('/api/eventos', auth, (req, res) => {
+  const desdeId = Number(req.query.desde) || 0;
+  res.json({ eventos: eventosDesde(desdeId), ultimo: ultimoEventoId() });
 });
 
 /* ---------------- Asistente IA ---------------- */
@@ -691,7 +1056,7 @@ app.get('/api/conversaciones', auth, (req, res) => {
   const ia = estadoIA();
   const pausados = new Set(ia.pausados.map(p => p.telefono));
   res.json({
-    conversaciones: listar(limite).map(c => ({ ...c, pausado: pausados.has(c.telefono) })),
+    conversaciones: listar(limite).map(c => ({ ...c, pausado: pausados.has(c.telefono), seguimiento: seguimiento.estaActivo(c.telefono) })),
     resumen: resumenChats(),
     ia: { activa: ia.activa, autoRespuesta: ia.autoRespuesta, pausadas: ia.pausados }
   });
@@ -702,7 +1067,12 @@ app.get('/api/conversaciones/:telefono', auth, (req, res) => {
   const c = obtener(tel);
   if (!c) return res.status(404).json({ error: 'Conversación no encontrada' });
   const ia = estadoIA();
-  res.json({ ...c, pausado: ia.pausados.some(p => p.telefono === tel) });
+  res.json({
+    ...c,
+    pausado: ia.pausados.some(p => p.telefono === tel),
+    seguimiento: seguimiento.listar(tel),
+    pedidos: pedidos.listar({ telefono: tel, limite: 20 })
+  });
 });
 
 app.post('/api/conversaciones/:telefono/leido', auth, (req, res) => {
@@ -819,6 +1189,43 @@ iniciarWhatsApp({ onMensaje: manejarMensaje, onMensajePropio: manejarMensajeProp
 
 setInterval(() => revisarProgramadas(false), 60 * 1000);
 setTimeout(() => revisarProgramadas(false), 8000);
+
+/* ---------------- seguimiento post-venta ---------------- */
+let revisandoSeg = false;
+async function revisarSeguimientos() {
+  if (revisandoSeg || !hayConexion() || !dentroHorario() || limiteAlcanzado()) return;
+  revisandoSeg = true;
+  try {
+    for (const t of seguimiento.pendientes()) {
+      if (limiteAlcanzado()) break;
+      const p = pedidos.obtener(t.pedidoId);
+      if (!p || p.estado === 'cancelado') {
+        seguimiento.omitir(t.id, 'Pedido cancelado');
+        continue;
+      }
+      // Interruptor individual del chat: si está apagado, no se envía.
+      if (!seguimiento.estaActivo(t.telefono)) continue;
+      const texto = seguimiento.plantilla(t.tipo, p);
+      try {
+        const env = await enviar(t.telefono, texto);
+        await logMensaje({ clienteId: p.clienteId, telefono: t.telefono, direccion: 'saliente', texto, origen: 'seguimiento' });
+        registrar({ telefono: t.telefono, texto, direccion: 'saliente', nombre: p.nombre, clienteId: p.clienteId, origen: 'seguimiento', waId: env?.waId || '' });
+        seguimiento.marcarEnviada(t.id);
+        contarEnvio();
+        emitir('seguimiento', { telefono: t.telefono, nombre: p.nombre, tipo: t.tipo, pedidoId: p.id });
+        log(`Seguimiento ${t.tipo} enviado a +${t.telefono} (pedido ${p.id}).`);
+      } catch (e) {
+        log(`No se pudo enviar el seguimiento a +${t.telefono}: ${e.message}`);
+        break;
+      }
+      await dormir(esperaEntreEnvios(config.delayMin, config.delayMax));
+    }
+  } finally {
+    revisandoSeg = false;
+  }
+}
+setInterval(revisarSeguimientos, 60 * 1000);
+setTimeout(revisarSeguimientos, 15000);
 
 process.on('SIGINT', async () => {
   log('Cerrando bot…');

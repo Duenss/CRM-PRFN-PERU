@@ -2,7 +2,7 @@ import pkg from 'whatsapp-web.js';
 import QRCode from 'qrcode';
 import { config, normalizar } from './config.js';
 
-const { Client, LocalAuth } = pkg;
+const { Client, LocalAuth, MessageMedia } = pkg;
 
 /** id -> { id, estado, conectado, qr, qrDataUrl, numero, error, client, reintentos } */
 export const sesiones = new Map();
@@ -223,6 +223,42 @@ export async function enviar(telefono, texto, sesionId = null) {
   const id = await s.client.getNumberId(limpio);
   if (!id) throw new Error(`El número +${limpio} no tiene WhatsApp`);
   const enviado = await s.client.sendMessage(id._serialized, texto);
+  const waId = idMensaje(enviado);
+  if (waId) {
+    enviadosPorBot.add(waId);
+    if (enviadosPorBot.size > 800) enviadosPorBot.delete(enviadosPorBot.values().next().value);
+  }
+  return { ok: true, sesion: s.id, waId };
+}
+
+/**
+ * Envía una imagen por WhatsApp (foto de producto o plantilla de pago).
+ * `media` acepta { url }, { archivo } o { base64, mimetype }.
+ */
+export async function enviarImagen(telefono, media = {}, caption = '', sesionId = null) {
+  const limpio = String(telefono || '').replace(/\D/g, '');
+  if (!media || (!media.url && !media.archivo && !media.base64)) {
+    throw new Error('No hay imagen para enviar.');
+  }
+  if (config.modoPrueba) {
+    logFn(`[PRUEBA${sesionId ? ' ' + sesionId : ''}] Imagen para +${limpio}: ${String(caption || '').slice(0, 120)}`);
+    return { simulado: true };
+  }
+  const s = sesionParaEnviar(sesionId);
+  if (!s) throw new Error(sesionId ? `La sesión ${sesionId} no está conectada` : 'Ningún WhatsApp está conectado');
+
+  const id = await s.client.getNumberId(limpio);
+  if (!id) throw new Error(`El número +${limpio} no tiene WhatsApp`);
+
+  let mm;
+  if (media.base64) {
+    mm = new MessageMedia(media.mimetype || 'image/jpeg', media.base64, media.filename || 'imagen');
+  } else if (media.archivo) {
+    mm = MessageMedia.fromFilePath(media.archivo);
+  } else {
+    mm = await MessageMedia.fromUrl(media.url, { unsafeMime: true });
+  }
+  const enviado = await s.client.sendMessage(id._serialized, mm, caption ? { caption: String(caption).slice(0, 1000) } : {});
   const waId = idMensaje(enviado);
   if (waId) {
     enviadosPorBot.add(waId);

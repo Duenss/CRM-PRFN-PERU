@@ -45,6 +45,10 @@ export const config = {
   anthropicKey: String(process.env.ANTHROPIC_API_KEY || '').trim(),
   aiModel: String(process.env.AI_MODEL || '').trim(),
 
+  // URL pública desde donde el bot arma los enlaces de las fotos de producto.
+  // Por defecto usa la web de la tienda; puede ser también el panel en Cloudflare.
+  panelUrl: String(process.env.PANEL_URL || process.env.SITIO_URL || 'https://perfumeriafinaperu.com').replace(/\/+$/, ''),
+
   sessionPath: process.env.SESSION_PATH || '.wwebjs_auth',
   chromePath: process.env.CHROME_PATH || '',
   headless: bool(process.env.HEADLESS, true),

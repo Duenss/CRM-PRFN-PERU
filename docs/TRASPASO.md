@@ -70,6 +70,40 @@
 - Repo git inicializado con commit inicial; `.env`, `node_modules`, `wwebjs_auth` y `bot/data` ignorados.
 - Probado end-to-end (sesión previa): entrante → respuesta IA; maestro off y pausa por chat cortan las respuestas.
 
+### Módulos nuevos (mejoras 1–5, 2026-11-06)
+1. **Foto + precio del perfume en las respuestas IA**: el prompt pide `productoId` (ids en el
+   catálogo) y regla 17 obliga a citar el precio real de 50 y 100 ml. Si hay `productoId`, el bot
+   envía la imagen (`enviarImagen()`) con el texto como caption; si falla, cae al mensaje de texto.
+   La foto sale de `mediaProducto()`: `imagen_ruta` local en `assets/img/products/` o, si no existe,
+   `${PANEL_URL}/assets/img/products/<id>.jpg`. `productoPorId()` (`ai.js`) resuelve por id o nombre.
+2. **Pedidos y pagos** (`bot/src/pedidos.js`, `bot/src/pagos.js`): pestaña **Pedidos** en el panel.
+   Estados: `borrador`, `esperando_pago`, `comprobante_recibido`, `por_entregar`, `entregado`,
+   `cancelado`. Métodos: `yape`, `plin`, `transferencia`, `efectivo`, `otro`. La IA puede crear/
+   actualizar un pedido cuando detecta una compra (`pedido` en el JSON de respuesta).
+   Las **plantillas de pago** son imágenes oficiales que sube el dueño; el bot solo reenvía esa
+   imagen (`pagos.paraMetodo` + `partesImagen`). **El bot nunca confirma un pago ni cierra ventas
+   con billetera digital**: al recibir un comprobante lo guarda (`bot/data/comprobantes/`), pasa el
+   pedido a `comprobante_recibido`, avisa al cliente que está "en revisión" y emite un evento al
+   panel. El efectivo puede quedar `por_entregar` (se cobra al entregar). El dueño verifica y cierra.
+3. **Seguimiento post-venta por chat** (`bot/src/seguimiento.js`): interruptor individual por
+   conversación (botón **Seguimiento: on/off** en la cabecera del chat y POST
+   `/api/seguimiento/:telefono`). Al marcar un pedido `entregado` se programan dos tareas
+   (`SEGUIMIENTO_DIAS_1=3` y `SEGUIMIENTO_DIAS_2=180`). El planificador (`revisarSeguimientos`,
+   cada 60 s) solo envía si el chat tiene el seguimiento activo, hay conexión, es horario de
+   atención y no se superó el límite diario; si no, la tarea queda pendiente. Cancelar el pedido
+   anula sus tareas.
+4. **Aviso al web en derivaciones** (`bot/src/eventos.js`): cuando la IA deriva un chat, el bot
+   hace `POST` interno de evento `derivacion` (también `comprobante`, `pedido`, `seguimiento`).
+   El panel consulta `GET /api/eventos?desde=<id>` cada 8 s, muestra **badge** en la navegación,
+   reproduce un **sonido** (Web Audio) y lanza una **notificación** del navegador; al hacer clic
+   abre la Bandeja en ese chat. Botón **Activar avisos** en la Bandeja para pedir el permiso.
+5. **Recomendaciones extra** (ver §9 de este documento y siguiente IA): fotos y precios en el
+   catálogo, comprobantes adjuntos también desde el panel (`POST /api/pedidos/:id/comprobante`),
+   y rutas estáticas `/media/comprobantes` y `/media/productos`.
+
+Variables nuevas en `bot/.env`: `PANEL_URL` (base de las fotos), `SEGUIMIENTO_DIAS_1`,
+`SEGUIMIENTO_DIAS_2`. CORS del bot ahora admite `PATCH` y `DELETE` (pedidos/plantillas).
+
 ### Correcciones de sincronización y bandeja
 - **Entrantes de cualquier país**: `manejarMensaje` ya no descarta números que no son de Perú
   (antes `esNumeroPeru` bloqueaba, p. ej., el propio número del bot +56). Se valida solo que sea
