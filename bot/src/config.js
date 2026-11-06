@@ -1,0 +1,63 @@
+import 'dotenv/config';
+
+const num = (v, d) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : d;
+};
+const bool = (v, d = false) => {
+  if (v === undefined || v === '') return d;
+  return /^(1|true|si|sí|yes|on)$/i.test(String(v));
+};
+const limpiar = n => String(n || '').replace(/\D/g, '');
+function normalizar(n) {
+  let d = limpiar(n);
+  if (d.startsWith('00')) d = d.slice(2);
+  if (d.length === 11 && d.startsWith('51')) return d;
+  if (d.length === 9 && d[0] === '9') return '51' + d;
+  return d;
+}
+
+export const config = {
+  port: num(process.env.PORT, 3000),
+  botToken: String(process.env.BOT_TOKEN || '').trim(),
+
+  supabaseUrl: process.env.SUPABASE_URL || 'https://pcesvmsewfpvmqmfmswn.supabase.co',
+  supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+
+  ownerNumber: normalizar(process.env.OWNER_NUMBER),
+  autoRespuesta: bool(process.env.AUTO_RESPUESTA, true),
+  responderDesconocidos: bool(process.env.RESPONDER_DESCONOCIDOS, true),
+
+  modoPrueba: bool(process.env.MODO_PRUEBA, false) || process.argv.includes('--mock') || bool(process.env.MOCK, false),
+  numerosPrueba: String(process.env.NUMEROS_PRUEBA || '').split(',').map(normalizar).filter(Boolean),
+
+  delayMin: Math.max(5, num(process.env.DELAY_MIN, 25)),
+  delayMax: Math.max(5, num(process.env.DELAY_MAX, 40)),
+  maxPorDia: Math.max(1, num(process.env.MAX_POR_DIA, 80)),
+  horaInicio: Math.min(23, Math.max(0, num(process.env.HORA_INICIO, 9))),
+  horaFin: Math.min(24, Math.max(1, num(process.env.HORA_FIN, 20))),
+  lunesASabado: bool(process.env.LUNES_A_SABADO, true),
+  zona: process.env.ZONA_HORARIA || 'America/Lima',
+
+  geminiKey: String(process.env.GEMINI_API_KEY || '').trim(),
+  anthropicKey: String(process.env.ANTHROPIC_API_KEY || '').trim(),
+  aiModel: String(process.env.AI_MODEL || '').trim(),
+
+  sessionPath: process.env.SESSION_PATH || '.wwebjs_auth',
+  chromePath: process.env.CHROME_PATH || '',
+  headless: bool(process.env.HEADLESS, true),
+  sesiones: String(process.env.SESIONES || '1,2')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+    .slice(0, 3)
+};
+
+export function validarConfig() {
+  const faltan = [];
+  if (!config.supabaseKey) faltan.push('SUPABASE_SERVICE_ROLE_KEY');
+  return faltan;
+}
+
+export { normalizar };
+export const esNumeroPeru = n => /^51\d{9}$/.test(normalizar(n));

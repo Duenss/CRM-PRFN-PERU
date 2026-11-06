@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Bot WhatsApp · Perfumería Fina Perú</title>
+<style>
+:root{color-scheme:dark;--bg:#07080C;--s1:#0E1118;--s2:#151A24;--line:#232A3A;--ink:#E8ECF4;--mute:#8B94A8;--gold:#E0B85A;--cy:#3DD9FF;--wa:#25D366;--bad:#FF5C6C;--warn:#F0B14A}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;color:var(--ink);font:15px/1.5 Inter,system-ui,sans-serif;background:radial-gradient(800px 500px at 90% -10%,rgba(61,217,255,.08),transparent 60%),var(--bg)}
+header{position:sticky;top:0;z-index:5;display:flex;gap:1rem;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:.9rem 1.2rem;background:rgba(14,17,24,.8);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+h1{font:600 1.05rem/1.3 "Space Grotesk",Inter,sans-serif;margin:0}
+h1 small{display:block;font:400 .75rem Inter,sans-serif;color:var(--mute)}
+h2{font:600 .95rem/1.3 "Space Grotesk",Inter,sans-serif;margin:0 0 .6rem}
+main{max-width:1100px;margin:0 auto;padding:1.2rem}
+.box{background:var(--s1);border:1px solid var(--line);border-radius:14px;padding:1rem;margin-bottom:1rem}
+.pills{display:flex;gap:.5rem;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:.4rem;font-size:.8rem;padding:.25rem .65rem;border:1px solid var(--line);border-radius:99px;background:var(--s2)}
+.dot{width:8px;height:8px;border-radius:99px;background:var(--mute)}
+.dot.on{background:var(--wa);box-shadow:0 0 10px var(--wa)}.dot.off{background:var(--bad);box-shadow:0 0 10px var(--bad)}.dot.qr{background:var(--gold);box-shadow:0 0 10px var(--gold)}
+.sessions{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1rem;margin-bottom:1rem}
+.session{background:var(--s1);border:1px solid var(--line);border-radius:14px;padding:1rem;display:flex;gap:1rem;align-items:center}
+.session .info{flex:1;min-width:0}
+.session .info b{display:block}
+.session .info small{color:var(--mute);display:block;margin-top:.15rem}
+.session img{width:260px;height:260px;image-rendering:pixelated;border-radius:10px;background:#fff;padding:6px;cursor:zoom-in;flex:0 0 auto}
+.session img:hover{outline:2px solid var(--gold)}
+#qrzoom{position:fixed;inset:0;z-index:30;display:flex;flex-direction:column;gap:.8rem;align-items:center;justify-content:center;background:rgba(3,4,7,.94);padding:1rem}
+#qrzoom[hidden]{display:none}
+#qrzoom img{width:min(80vmin,540px);height:auto;image-rendering:pixelated;border-radius:14px;background:#fff;padding:12px}
+#qrzoom small{color:var(--mute)}
+button{cursor:pointer;border:0;border-radius:10px;padding:.55rem .95rem;min-height:42px;background:var(--gold);color:#0B0A06;font:600 .9rem Inter,sans-serif}
+button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+button.wa{background:var(--wa);color:#04210F}
+button.danger{background:transparent;color:var(--bad);border:1px solid var(--bad)}
+button:disabled{opacity:.5;cursor:not-allowed}
+label{display:block;font-size:.8rem;color:var(--mute);margin:.6rem 0 .3rem}
+input,textarea,select{width:100%;padding:.6rem .75rem;border:1px solid var(--line);border-radius:10px;background:var(--s2);color:var(--ink);font:inherit}
+textarea{min-height:90px;resize:vertical}
+.row{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
+.row>*{flex:1 1 160px}
+.row button{flex:0 0 auto}
+.list .item{display:flex;justify-content:space-between;gap:.7rem;align-items:center;padding:.6rem .7rem;border:1px solid var(--line);border-radius:10px;margin-bottom:.4rem}
+.item b{display:block;font-size:.9rem}.item small{display:block;color:var(--mute)}
+.tag{font-size:.72rem;border:1px solid var(--line);border-radius:99px;padding:.05rem .5rem;color:var(--cy)}
+pre{background:#05060A;border:1px solid var(--line);border-radius:10px;padding:.8rem;max-height:340px;overflow:auto;font-size:.76rem;line-height:1.5;white-space:pre-wrap;word-break:break-word;color:#A8B3C7}
+.muted{color:var(--mute);font-size:.85rem}
+#toast{position:fixed;left:50%;bottom:1.2rem;transform:translateX(-50%);background:var(--s2);border:1px solid var(--gold);padding:.55rem 1rem;border-radius:10px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20}
+#toast.on{opacity:1}
+@media(max-width:600px){.session{flex-direction:column;align-items:flex-start}.session img{width:100%;max-width:300px;height:auto;align-self:center}}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Bot de WhatsApp <small>Perfumería Fina Perú</small></h1>
+  <div class="pills" id="pills"></div>
+</header>
+
+<main>
+  <div id="gate" class="box" hidden>
+    <h2>Acceso al bot</h2>
+    <p class="muted">Escribe el token configurado en <code>BOT_TOKEN</code>. Si no configuraste uno, deja el campo vacío.</p>
+    <label for="tok">Token</label><input id="tok" type="password" autocomplete="off">
+    <div class="row" style="margin-top:.7rem"><button id="tok-go">Entrar</button></div>
+  </div>
+
+  <div id="app">
+    <section class="sessions" id="sessions"></section>
+
+    <section class="box">
+      <h2>Acciones</h2>
+      <div class="row">
+        <button id="revisar">Revisar campañas programadas</button>
+        <button class="ghost" id="refresh">Actualizar ahora</button>
+      </div>
+      <p class="muted" id="resumen" style="margin:.7rem 0 0"></p>
+    </section>
+
+    <section class="box">
+      <h2>Enviar mensaje de prueba</h2>
+      <div class="row">
+        <div><label for="t-ses">Desde</label><select id="t-ses"></select></div>
+        <div><label for="t-tel">Teléfono</label><input id="t-tel" placeholder="910418951" inputmode="tel"></div>
+      </div>
+      <label for="t-txt">Mensaje</label><textarea id="t-txt" placeholder="Hola, este es un mensaje de prueba."></textarea>
+      <div class="row" style="margin-top:.6rem"><button class="wa" id="t-go">Enviar prueba</button></div>
+      <p class="muted">En modo real solo se permite enviar a <code>OWNER_NUMBER</code> o <code>NUMEROS_PRUEBA</code>.</p>
+    </section>
+
+    <section class="box">
+      <h2>Campañas</h2>
+      <div class="list" id="campanas"></div>
+    </section>
+
+    <section class="box">
+      <h2>Registro</h2>
+      <pre id="logs">Cargando…</pre>
+    </section>
+  </div>
+</main>
+
+<div id="qrzoom" hidden><img id="qrbig" alt="QR ampliado"><small>Cierra tocando fuera del QR</small></div>
+<div id="toast" role="status"></div>
+
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+let token=location.hash.slice(1)?decodeURIComponent(location.hash.slice(1)):(sessionStorage.getItem('bot_token')||'');
+if(location.hash)sessionStorage.setItem('bot_token',token);
+let sesiones=[];
+let cargando=false;
+let zoomSesion=null;
+const toast=m=>{const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('on'),2400)};
+
+async function api(path,opts={}){
+  const r=await fetch(path,{...opts,headers:{...(opts.headers||{}),'x-bot-token':token}});
+  if(r.status===401){$('#gate').hidden=false;throw new Error('token')}
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
+  return j;
+}
+
+function pill(texto,clase=''){return `<span class="pill"><span class="dot ${clase}"></span>${esc(texto)}</span>`}
+function estadoClase(e){return e==='conectado'?'on':e==='qr'?'qr':e==='mock'?'qr':'off'}
+
+async function cargar(){
+  if(cargando)return;cargando=true;
+  try{
+    const j=await api('/api/estado');
+    sesiones=j.sesiones||[];
+    $('#app').hidden=false;
+    $('#pills').innerHTML=[
+      pill(j.modoPrueba?'Modo prueba':(j.conectado?'Conectado':'Sin conexión'),j.modoPrueba?'qr':(j.conectado?'on':'off')),
+      pill(`${j.enviadosHoy}/${j.maxPorDia} hoy`),
+      pill(`${j.cola} en cola`),
+      pill(`${j.programadas} campañas programadas`),
+      pill(j.autoRespuesta?'Auto-respuesta activa':'Auto-respuesta apagada')
+    ].join('');
+    $('#resumen').textContent=`Horario de envío: ${j.dentroHorario?'permitido ahora':'fuera de horario'} · Retraso entre mensajes configurado en 25-40 s.`;
+    $('#sessions').innerHTML=sesiones.map(s=>`
+      <div class="session">
+        <div class="info">
+          <b>${esc(s.etiqueta)}</b>
+          <small>${s.conectado?'+'+esc(s.numero||''):s.estado==='qr'?'Escanea el QR con el WhatsApp de este número (toca el QR para ampliarlo)':s.estado==='mock'?'Modo prueba':esc(s.estado)}</small>
+          ${s.error?`<small style="color:var(--bad)">${esc(s.error)}</small>`:''}
+          <div class="row" style="margin-top:.6rem">
+            ${s.estado==='conectado'?`<button class="danger" data-out="${esc(s.id)}">Cerrar sesión</button>`:''}
+          </div>
+        </div>
+        ${s.qr?`<img src="${s.qr}" data-ses="${esc(s.id)}" alt="QR para ${esc(s.etiqueta)}">`:''}
+      </div>`).join('');
+    if(zoomSesion){
+      const z=sesiones.find(s=>String(s.id)===String(zoomSesion));
+      if(z&&z.qr){$('#qrbig').src=z.qr}
+      else{$('#qrzoom').hidden=true;zoomSesion=null}
+    }
+    $('#t-ses').innerHTML=sesiones.map(s=>`<option value="${esc(s.id)}">${esc(s.etiqueta)}${s.numero?' (+'+esc(s.numero)+')':''}</option>`).join('')||'<option value="">Sin sesiones</option>';
+    const c=await api('/api/campanas');
+    $('#campanas').innerHTML=(c.campanas||[]).filter(x=>x.estado==='programada'||x.estado==='aprobada').map(x=>`
+      <div class="item"><div><b>${esc(x.titulo)}</b><small>${x.fecha_programada?new Date(x.fecha_programada).toLocaleString('es-PE'):'Sin fecha'} · ${esc(x.estado)}</small></div>
+      <div class="row" style="flex:0 0 auto">${x.estado==='programada'?`<button class="wa" data-send="${esc(x.id)}">Enviar ahora</button>`:'<span class="muted">Manual</span>'}</div></div>`).join('')||'<p class="muted">No hay campañas programadas.</p>';
+    const l=await api('/api/logs');
+    $('#logs').textContent=(l.logs||[]).join('\n')||'Sin actividad todavía.';
+  }catch(e){
+    if(e.message!=='token')toast('Error: '+e.message);
+  }finally{cargando=false}
+}
+
+$('#tok-go').onclick=()=>{token=$('#tok').value;sessionStorage.setItem('bot_token',token);$('#gate').hidden=true;cargar()};
+$('#refresh').onclick=()=>cargar();
+$('#revisar').onclick=async()=>{try{const r=await api('/api/revisar',{method:'POST'});toast(`Revisado. ${r.cola} en cola.`);await cargar()}catch(e){toast(e.message)}};
+$('#sessions').onclick=async e=>{
+  const b=e.target.closest('[data-out]');if(!b)return;
+  if(!confirm('¿Cerrar la sesión de WhatsApp de este número? Tendrás que escanear el QR otra vez.'))return;
+  try{await api('/api/logout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sesion:b.dataset.out})});toast('Sesión cerrada');await cargar()}catch(err){toast(err.message)}
+};
+$('#campanas').onclick=async e=>{
+  const b=e.target.closest('[data-send]');if(!b)return;
+  b.disabled=true;
+  try{const r=await api('/api/enviar/'+encodeURIComponent(b.dataset.send),{method:'POST'});toast(r.ok?'Campaña en cola':'Ya estaba en cola')}catch(err){toast(err.message)}
+  finally{b.disabled=false}
+};
+$('#sessions').addEventListener('click',e=>{
+  const img=e.target.closest('img[data-ses]');
+  if(!img)return;
+  $('#qrbig').src=img.src;
+  zoomSesion=img.dataset.ses;
+  $('#qrzoom').hidden=false;
+});
+$('#qrzoom').onclick=e=>{
+  if(e.target.id==='qrzoom'){$('#qrzoom').hidden=true;zoomSesion=null}
+};
+$('#t-go').onclick=async()=>{
+  const btn=$('#t-go');btn.disabled=true;
+  try{
+    const r=await api('/api/prueba',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sesion:$('#t-ses').value,telefono:$('#t-tel').value,texto:$('#t-txt').value})});
+    toast(r.ok?'Mensaje de prueba enviado':'No se pudo enviar');await cargar();
+  }catch(e){toast(e.message)}finally{btn.disabled=false}
+};
+
+cargar();
+setInterval(cargar,3500);
+</script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+# Dependencias
+node_modules/
+
+# Secretos y estado local del bot
+bot/.env
+bot/.wwebjs_auth/
+bot/.wwebjs_cache/
+bot/data/
+
+# Cloudflare / wrangler
+.dev.vars
+.wrangler/
+
+# Temporales
+tmp-*.mjs
+*.log
+
+# Sistema
+.DS_Store
+Thumbs.db
