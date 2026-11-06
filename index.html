@@ -973,21 +973,22 @@ function infoDest(){$('#k-info').textContent=`Se enviará a ${destinos().length}
 $('#k-seg').oninput=infoDest;
 
 $('#k-ai').onclick=async()=>{
-  const btn=$('#k-ai');btn.disabled=true;btn.textContent='Generando…';$('#k-drafts').innerHTML='';
+  const btn=$('#k-ai');btn.disabled=true;btn.textContent='Generando...';
+  $('#k-drafts').innerHTML='<p class="muted">Consultando el catálogo y redactando 3 versiones...</p>';
+  let timer=null;
   try{
-    const{data:{session}}=await sb.auth.getSession();
-    if(!session)throw new Error('Tu sesión venció. Vuelve a entrar.');
-    const r=await fetch('/api/borradores',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token},body:JSON.stringify({
+    const ctl=new AbortController();
+    timer=setTimeout(()=>ctl.abort(),60000);
+    const j=await botFetch('/api/borradores',{method:'POST',headers:{'Content-Type':'application/json'},signal:ctl.signal,body:JSON.stringify({
       objetivo:$('#k-obj').value,condiciones:$('#k-cond').value,segmento:tagsOf($('#k-seg').value),productos:prodsIA
     })});
-    if(r.status===404)throw new Error('La IA no está disponible en este entorno. Debes abrir el panel desde Cloudflare Pages o con "wrangler pages dev".');
-    const j=await r.json().catch(()=>({error:'Respuesta inválida del servidor'}));
-    if(!r.ok)throw new Error(j.error||'No se pudo generar.');
+    if(!j.borradores?.length)throw new Error('La IA no devolvió borradores. Intenta de nuevo.');
     $('#k-drafts').innerHTML=j.borradores.map((t,i)=>`<div class="draft"><p>${esc(t)}</p><div class="acts"><button type="button" class="ai" data-use="${i}">Usar este texto</button></div></div>`).join('');
     $('#k-drafts').querySelectorAll('[data-use]').forEach(b=>b.onclick=()=>{$('#k-msg').value=j.borradores[+b.dataset.use];prev();toast('Borrador aplicado. Revísalo antes de enviar.')});
   }catch(e){
-    $('#k-drafts').innerHTML=`<p class="muted" style="color:var(--bad)">${esc(e.message)}</p>`;
-  }finally{btn.disabled=false;btn.textContent='Generar 3 borradores'}
+    const msg=e.name==='AbortError'?'La IA tardó demasiado. Revisa que el bot esté encendido y conectado, e intenta de nuevo.':e.message;
+    $('#k-drafts').innerHTML=`<p class="muted" style="color:var(--bad)">${esc(msg)}</p>`;
+  }finally{clearTimeout(timer);btn.disabled=false;btn.textContent='Generar 3 borradores'}
 };
 
 async function crearCampana(estado){

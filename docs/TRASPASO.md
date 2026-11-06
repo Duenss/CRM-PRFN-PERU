@@ -53,6 +53,10 @@
   **todos** los chats, incluidos los mensajes entrantes nuevos. Aun pausada, la IA sigue guardando
   los entrantes en la bandeja. La pausa **por conversación** sigue disponible en la pestaña
   *Asistente IA* (`POST /api/ia/pausar` con `telefono`).
+- **Borradores de campaña con IA**: el panel los pide al **bot** (`POST /api/borradores`), no a una
+  Pages Function. El bot usa `redactarBorradores()` (`bot/src/ai.js`) con el catálogo real de
+  Supabase y la clave Gemini de `bot/.env`; devuelve 3 textos y **nunca envía**. El panel tiene
+  timeout de 60 s para no quedarse en "Generando...".
 - **Conexión del bot dentro del dashboard**: chip de estado en la barra superior + tarjeta en IA/Ajustes.
 - **Un solo dashboard**: el QR, el envío de prueba y el registro del bot viven en **Ajustes**;
   ya no se abre el panel externo del bot (`bot/src/panel.html` queda solo como respaldo de la API).
@@ -330,6 +334,7 @@ curl -X POST http://localhost:3000/api/ia/pausar -H "Content-Type: application/j
 | El panel mostraba "Juan Dueñas" en vez de `@Jvampi` | Se prefería `msg._data.notifyName` | El panel prioriza `nombreWa` (pushname real) que guarda la sincronización |
 | Palomitas no aparecían en chats antiguos | Los mensajes salientes guardados antes de esta función no tenían `ack`, y la importación los deduplicaba sin rellenarlo | `importarMensajes` refresca el `ack` de los mensajes ya existentes (`ack` sube, nunca baja) al reimportar el historial |
 | Al enviar desde el bot el mensaje se duplicaba | `sendMessage` devolvía el id vacío y `message_create` lo guardaba primero con su `waId` real | `idMensaje()` acepta ids en texto; `registrar()` concilia el envío sin `waId` con el mensaje reciente del mismo texto (±120 s) en ambos órdenes; se limpiaron 21 duplicados históricos |
+| "Generar 3 borradores" se quedaba en "Generando..." para siempre | El panel llamaba a `/api/borradores`, que solo existía como Pages Function; al servir el panel estático esa ruta no existe y el `fetch` sin timeout no resolvía | Se agregó `POST /api/borradores` al bot con `redactarBorradores()`; el panel usa `botFetch` con `AbortController` (60 s) y muestra el error si el bot no responde |
 | Una conversación de prueba se pausaba por `derivar` (p. ej. "tienes promociones?") | La regla 4 de SYS deriva consultas de precios/promos | Números de prueba y dueño nunca derivan ni se pausan; reciben respuesta genérica útil. Solo clientes reales derivan |
 
 ## 10. Prompt para la siguiente IA

@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { config, validarConfig, esNumeroPeru, normalizar } from './config.js';
 import { sb, getCliente, getClientes, logMensaje, historial, marcarBaja, importarClientes } from './supabase.js';
 import { iniciarWhatsApp, enviar, estadoWa, cerrarSesion, reiniciarSesion, hayConexion, sesionDisponible, listarChatsWa, listarContactosWa, historialWa, resolverTelefonoWa, idMensaje, descargarMediaWa } from './whatsapp.js';
-import { redactarRespuesta, transcribirAudio } from './ai.js';
+import { redactarRespuesta, transcribirAudio, redactarBorradores } from './ai.js';
 import { Cola, dormir, esperaEntreEnvios } from './queue.js';
 import { estadoIA, actualizarIA, pausarIA, estaPausado, promptIA, resumenIA } from './ia.js';
 import { registrar, listar, obtener, marcarLeido, respuestasIA, porDia, resumen as resumenChats, registrarCabecera, importarMensajes, yaExisteWa, actualizarAck } from './conversaciones.js';
@@ -527,6 +527,24 @@ app.get('/api/campanas', auth, async (_req, res) => {
 });
 
 app.get('/api/logs', auth, (_req, res) => res.json({ logs: logs.slice(-120) }));
+
+/* ---------------- Borradores de campaña con IA ---------------- */
+app.post('/api/borradores', auth, async (req, res) => {
+  try {
+    const borradores = await redactarBorradores({
+      objetivo: req.body?.objetivo,
+      condiciones: req.body?.condiciones,
+      segmento: req.body?.segmento,
+      productos: req.body?.productos
+    });
+    if (!borradores.length) return res.status(502).json({ error: 'La IA no devolvió borradores. Intenta de nuevo.' });
+    log(`Borradores de campaña generados (${borradores.length}).`);
+    res.json({ borradores });
+  } catch (e) {
+    log('Error al generar borradores: ' + e.message);
+    res.status(502).json({ error: String(e.message || e).slice(0, 300) });
+  }
+});
 
 /* ---------------- Asistente IA ---------------- */
 app.get('/api/ia', auth, (_req, res) => res.json(estadoIA()));

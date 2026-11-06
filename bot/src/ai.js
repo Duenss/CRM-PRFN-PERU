@@ -182,7 +182,10 @@ Responde ahora.`;
   }
 }
 
-async function gemini(prompt) {
+async function gemini(prompt, opts = {}) {
+  const system = opts.system || SYS;
+  const temperature = Number.isFinite(opts.temperature) ? opts.temperature : 0.6;
+  const maxOutputTokens = Number.isFinite(opts.maxOutputTokens) ? opts.maxOutputTokens : 800;
   const preferido = config.aiModel || 'gemini-3.6-flash';
   // Orden probado con la clave actual: 3.6 responde rápido; el resto son
   // alternativas si hay alta demanda (503) o cuota agotada (429).
@@ -192,7 +195,7 @@ async function gemini(prompt) {
   for (const model of modelos) {
     // Gemini 3 gasta tokens "pensando" y corta el JSON; se desactiva el razonamiento.
     for (const conThinking of [true, false]) {
-      const generationConfig = { temperature: 0.6, maxOutputTokens: 800, responseMimeType: 'application/json' };
+      const generationConfig = { temperature, maxOutputTokens, responseMimeType: 'application/json' };
       if (conThinking) generationConfig.thinkingConfig = { thinkingBudget: 0 };
       let r;
       try {
@@ -200,7 +203,7 @@ async function gemini(prompt) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            systemInstruction: { parts: [{ text: SYS }] },
+            systemInstruction: { parts: [{ text: system }] },
             contents: [{ role: 'user', parts: [{ text: prompt }] }],
             generationConfig
           }),
@@ -279,4 +282,83 @@ export async function transcribirAudio({ base64, mimeType = 'audio/ogg' }) {
     }
   }
   return '';
+}
+
+const SYS_BORRADORES = `Eres el asistente de redacción de Perfumería Fina Perú, una tienda de perfumes en Perú.
+Tu única tarea es redactar BORRADORES de mensajes de WhatsApp y textos promocionales para que el dueño los revise.
+
+Reglas:
+1. Habla solo de la tienda y de los productos que aparecen en los datos que te entrego. No inventes perfumes, precios, descuentos, stock, notas olfativas ni promociones.
+2. Si falta un dato, escribe [COMPLETAR] en lugar de inventarlo.
+3. No compares con competidores ni hables de otras marcas o tiendas.
+4. Tono: cercano, amable y respetuoso, en español peruano neutro. Sin presionar al cliente. Trata de "tú".
+5. Mensajes cortos (máximo 60 a 80 palabras), con un llamado a la acción claro y como máximo 2 emojis.
+6. Usa {nombre} donde deba ir el nombre del cliente.
+7. No prometas cosas que no estén en los datos (envíos, garantías, autenticidad) salvo que aparezcan ahí.
+8. Los productos son perfumes EQUIVALENTES (inspirados en marcas conocidas, con 50% de esencia y en su propio envase). Nunca los presentes como el perfume original ni como de la marca. Usa "equivalente" o "inspirado en".
+9. Entrega exactamente 3 versiones distintas.
+10. Si te piden algo ajeno a la tienda, responde: "Solo puedo ayudar con mensajes de la tienda".
+
+Formato de salida: JSON válido, sin markdown, con esta forma:
+{"borradores":["texto 1","texto 2","texto 3"]}`;
+
+/** Separa los borradores aunque el modelo agregue markdown o numeración. */
+function parseBorradores(txt) {
+  const clean = String(txt || '').replace(/```json/gi, '').replace(/```/g, '').trim();
+  try {
+    const j = JSON.parse(clean);
+    if (Array.isArray(j.borradores)) return j.borradores.map(String).map(s => s.trim()).filter(Boolean);
+  } catch {}
+  const m = clean.match(/\{[\s\S]*\}/);
+  if (m) {
+    try {
+      const j = JSON.parse(m[0]);
+      if (Array.isArray(j.borradores)) return j.borradores.map(String).map(s => s.trim()).filter(Boolean);
+    } catch {}
+  }
+  return clean.split(/\n(?=\d[\.\)]\s)/).map(s => s.replace(/^\d[\.\)]\s*/, '').trim()).filter(Boolean);
+}
+
+/**
+ * Redacta 3 borradores de campaña usando el catálogo real de Supabase.
+ * No envía nada: solo devuelve texto para que el dueño lo revise.
+ */
+export async function redactarBorradores({ objetivo = 'promo', condiciones = '', segmento = [], productos = [] } = {}) {
+  if (!config.geminiKey) throw new Error('Falta configurar GEMINI_API_KEY en el bot.');
+  const [cfg, todos] = await Promise.all([getConfiguracion(), getProductos()]);
+  const ids = new Set((Array.isArray(productos) ? productos : []).map(String));
+  const elegidos = ids.size ? todos.filter(p => ids.has(String(p.id))) : todos.slice(0, 40);
+
+  const tienda = [
+    cfg.nombre && `Nombre: ${cfg.nombre}`,
+    cfg.tono_de_voz && `Tono de voz: ${cfg.tono_de_voz}`,
+    cfg.whatsapp && `WhatsApp: +${cfg.whatsapp}`,
+    cfg.horario && `Horario: ${cfg.horario}`,
+    cfg.medios_de_pago && `Pagos: ${cfg.medios_de_pago}`,
+    cfg.envios && `Envíos: ${cfg.envios}`,
+    cfg.enlace_web && `Web: ${cfg.enlace_web}`
+  ].filter(Boolean).join('\n') || 'Perfumería Fina Perú, perfumes equivalentes con 50% de esencia.';
+
+  const lista = elegidos.length
+    ? elegidos.map(p =>
+        `- ${p.nombre} | inspirado en: ${p.casa_inspirada || '[COMPLETAR]'} | ${p.categoria || ''}/${p.genero || ''} | ${p.familia_olfativa || ''} | 50 ml S/ ${p.precio_50ml ?? '[COMPLETAR]'} · 100 ml S/ ${p.precio_100ml ?? '[COMPLETAR]'}`
+      ).join('\n')
+    : 'No se seleccionaron productos. No inventes nombres; pide al dueño que agregue uno.';
+
+  const prompt = `Tipo de campaña: ${String(objetivo || 'promo').slice(0, 40)}
+Datos de la tienda:
+${tienda}
+
+Productos disponibles para esta campaña:
+${lista}
+
+Condiciones de la promoción escritas por el dueño:
+${String(condiciones || '').slice(0, 600) || '[COMPLETAR]'}
+
+Segmento de clientes: ${(Array.isArray(segmento) ? segmento.slice(0, 10).join(', ') : '') || 'todos los clientes con consentimiento'}
+
+Redacta exactamente 3 versiones distintas. Devuelve solo el JSON indicado.`;
+
+  const raw = await gemini(prompt, { system: SYS_BORRADORES, temperature: 0.85, maxOutputTokens: 1600 });
+  return parseBorradores(raw).slice(0, 3);
 }
