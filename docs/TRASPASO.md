@@ -6,6 +6,22 @@
 
 ---
 
+## Estado actual (2026-11-06) — FASES 1, 2, 3 y 4 COMPLETADAS
+
+- Panel rediseñado (wacrm-style, acento dorado) en un solo `index.html`.
+- 8 pestañas: Inicio, Bandeja, Campañas, Clientes, Catálogo, Calendario, Asistente IA, Ajustes.
+- **Bandeja de entrada** en vivo y **Asistente IA** conectados al bot (`/api/ia`, `/api/conversaciones`).
+- **Conexión del bot dentro del dashboard**: chip de estado en la barra superior + tarjeta en IA/Ajustes.
+- Probado end-to-end: entrante → respuesta IA; maestro off y pausa por chat cortan las respuestas.
+- Config final: `HORA_INICIO=9`, `HORA_FIN=20`, `SIMULAR_ENTRANTES=false`, `NUMEROS_PRUEBA` con el número de prueba.
+- Repo git inicializado con commit inicial; `.env`, `node_modules`, `wwebjs_auth` y `bot/data` ignorados.
+
+Pendiente del dueño antes de producción (ver `README.md` → *Puesta en producción*):
+`SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`, ejecutar SQL 01–03, crear usuario dueño,
+y decidir dónde vive el bot 24/7.
+
+---
+
 ## 0. Reglas que NO se negocian
 
 1. El panel sigue siendo **un solo `index.html`** con CSS y JS inline. Sin build, sin React.
@@ -82,7 +98,7 @@ Crm Perfumeriafina/
 | Chromium del bot | `C:\Users\Juan Pablo\.cache\puppeteer\chrome\win64-146.0.7680.31` |
 | Librería | `whatsapp-web.js@1.34.7` |
 | Modo | `MODO_PRUEBA=false` (envíos reales) |
-| Horario | **0–24 temporal** para pruebas (restaurar 9–20 al terminar) |
+| Horario | `9–20`, lunes a sábado (producción) |
 | Supabase | `https://pcesvmsewfpvmqmfmswn.supabase.co` |
 
 ## 4. Datos
