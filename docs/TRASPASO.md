@@ -323,6 +323,8 @@ curl -X POST http://localhost:3000/api/ia/pausar -H "Content-Type: application/j
 | Nota de voz fallaba con `Unexpected mimetype application/octet-stream for media type ptt` | `downloadAndMaybeDecrypt` recibía el mimetype incorrecto | `descargarMediaWa` pasa el `mimetype` real (`audio/ogg; codecs=opus`) |
 | `+51 910 418 951` (negocio) salía como teléfono en vez de "Perfumería Fina" | `formattedTitle` del negocio era el número | `nombreMostradoWa()` usa `verifiedName`/`businessProfile.name` para empresas y descarta títulos que son solo un teléfono |
 | El panel mostraba "Juan Dueñas" en vez de `@Jvampi` | Se prefería `msg._data.notifyName` | El panel prioriza `nombreWa` (pushname real) que guarda la sincronización |
+| Palomitas no aparecían en chats antiguos | Los mensajes salientes guardados antes de esta función no tenían `ack`, y la importación los deduplicaba sin rellenarlo | `importarMensajes` refresca el `ack` de los mensajes ya existentes (`ack` sube, nunca baja) al reimportar el historial |
+| Al enviar desde el bot el mensaje se duplicaba | `sendMessage` devolvía el id vacío y `message_create` lo guardaba primero con su `waId` real | `idMensaje()` acepta ids en texto; `registrar()` concilia el envío sin `waId` con el mensaje reciente del mismo texto (±120 s) en ambos órdenes; se limpiaron 21 duplicados históricos |
 | Una conversación de prueba se pausaba por `derivar` (p. ej. "tienes promociones?") | La regla 4 de SYS deriva consultas de precios/promos | Números de prueba y dueño nunca derivan ni se pausan; reciben respuesta genérica útil. Solo clientes reales derivan |
 
 ## 10. Prompt para la siguiente IA

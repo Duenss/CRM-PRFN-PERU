@@ -295,8 +295,8 @@ code{background:var(--s2);padding:.05rem .35rem;border-radius:5px;font-size:.85e
 .msg time{display:block;font-size:.62rem;opacity:.65;text-align:right;margin-top:.25rem}
 .msg.in{align-self:flex-start;background:var(--s2);border:1px solid var(--line);border-bottom-left-radius:3px}
 .msg.out{align-self:flex-end;background:#005C4B;border-bottom-right-radius:3px;color:#eafff6}
-.msg .tick{font-size:.72rem;margin-left:.35rem;opacity:.9;letter-spacing:-1px;white-space:nowrap}
-.msg .tick.read{color:#53bdeb}
+.msg .tick{font-size:.72rem;margin-left:.35rem;color:#fff;opacity:.85;letter-spacing:-1px;white-space:nowrap;transition:color .15s ease,opacity .15s ease}
+.msg .tick.read{color:#53bdeb;opacity:1}
 .tipo{font-size:.6rem;font-weight:700;padding:.03rem .34rem;border-radius:99px;margin-left:.35rem;vertical-align:middle;text-transform:uppercase;letter-spacing:.03em}
 .tipo.emp{background:rgba(106,166,255,.16);color:var(--info)}
 .tipo.per{background:rgba(61,214,140,.14);color:var(--success)}

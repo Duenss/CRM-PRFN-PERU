@@ -61,6 +61,46 @@ export function registrar({ telefono, texto, direccion = 'entrante', nombre = ''
   if (clienteId) chat.clienteId = clienteId;
   // Dedupe por identificador de WhatsApp (evita duplicar al reimportar historial).
   if (waId && chat.mensajes.some(m => m.waId === waId)) return null;
+  // Conciliación: si el envío no trajo waId y `message_create` lo aporta después,
+  // reutilizamos ese mensaje reciente en vez de crear un duplicado.
+  if (waId && direccion === 'saliente') {
+    const tNuevo = Date.parse(en || ahora()) || 0;
+    const previo = [...chat.mensajes].reverse().find(m =>
+      m.direccion === 'saliente' &&
+      !m.waId &&
+      String(m.texto || '') === String(texto || '').slice(0, 4000) &&
+      Math.abs((Date.parse(m.en) || 0) - tNuevo) <= 120000
+    );
+    if (previo) {
+      previo.waId = waId;
+      previo.id = waId;
+      if (Number.isFinite(Number(ack))) previo.ack = Number(ack);
+      chat.ultimoTexto = previo.texto;
+      chat.ultimoEn = previo.en;
+      chats[tel] = chat;
+      guardar();
+      return previo;
+    }
+  }
+  // Conciliación inversa: el envío puede registrarse DESPUÉS de que
+  // `message_create` ya guardó el mismo mensaje con su waId real. En ese caso
+  // no creamos una segunda copia sin id.
+  if (!waId && direccion === 'saliente') {
+    const tNuevo = Date.parse(en || ahora()) || 0;
+    const existente = [...chat.mensajes].reverse().find(m =>
+      m.direccion === 'saliente' &&
+      m.waId &&
+      String(m.texto || '') === String(texto || '').slice(0, 4000) &&
+      Math.abs((Date.parse(m.en) || 0) - tNuevo) <= 120000
+    );
+    if (existente) {
+      chat.ultimoTexto = existente.texto;
+      chat.ultimoEn = existente.en;
+      chats[tel] = chat;
+      guardar();
+      return existente;
+    }
+  }
 
   const mensaje = {
     id: waId || `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -173,12 +213,25 @@ export function importarMensajes(telefono, mensajes = []) {
     mensajes: []
   };
   const clave = m => m.waId || `${m.en || ''}|${m.direccion || ''}|${String(m.texto || '').slice(0, 120)}`;
+  // Índice por waId para poder refrescar el ack de mensajes ya guardados
+  // (los históricos anteriores a las palomitas no tenían `ack`).
+  const porWa = new Map();
+  for (const m of chat.mensajes) if (m.waId) porWa.set(m.waId, m);
   const vistos = new Set(chat.mensajes.map(clave));
   let nuevos = 0;
+  let actualizados = 0;
   for (const m of mensajes) {
     if (!String(m.texto || '').trim()) continue;
     const k = clave({ ...m, texto: String(m.texto || '') });
-    if (vistos.has(k)) continue;
+    if (vistos.has(k)) {
+      const previo = m.waId && porWa.get(m.waId);
+      if (previo && previo.direccion === 'saliente') {
+        const entrante = Number.isFinite(Number(m.ack)) ? Number(m.ack) : 0;
+        const actual = Number.isFinite(Number(previo.ack)) ? Number(previo.ack) : -1;
+        if (entrante > actual) { previo.ack = entrante; actualizados++; }
+      }
+      continue;
+    }
     const item = {
       id: m.waId || `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       waId: m.waId || '',
@@ -191,9 +244,10 @@ export function importarMensajes(telefono, mensajes = []) {
     };
     vistos.add(k);
     chat.mensajes.push(item);
+    if (m.waId) porWa.set(m.waId, item);
     nuevos++;
   }
-  if (!nuevos) return 0;
+  if (!nuevos && !actualizados) return 0;
   chat.mensajes.sort((a, b) => String(a.en).localeCompare(String(b.en)));
   if (chat.mensajes.length > MAX_MENSAJES) chat.mensajes = chat.mensajes.slice(-MAX_MENSAJES);
   const ult = chat.mensajes[chat.mensajes.length - 1];

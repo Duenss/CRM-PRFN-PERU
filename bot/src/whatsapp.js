@@ -242,8 +242,14 @@ function telDe(item) {
 
 /** Id crudo (clave) de un mensaje, consistente entre historial y eventos en vivo. */
 export function idMensaje(msg) {
-  const id = (msg && msg.id) || {};
-  return id.id || id._serialized || (msg && msg._data && msg._data.id && (msg._data.id.id || msg._data.id._serialized)) || '';
+  if (!msg) return '';
+  const id = msg.id;
+  // Algunos envíos devuelven `id` como texto plano (no como MessageId).
+  if (typeof id === 'string') return id;
+  if (id && (id.id || id._serialized)) return id.id || id._serialized;
+  const d = msg._data && msg._data.id;
+  if (typeof d === 'string') return d;
+  return (d && (d.id || d._serialized)) || '';
 }
 
 /** Dado el id de un chat (@lid o @c.us), devuelve el teléfono real (solo dígitos) o ''. */
