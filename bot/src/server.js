@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { config, validarConfig, esNumeroPeru, normalizar } from './config.js';
 import { sb, getCliente, getClientes, logMensaje, historial, marcarBaja, importarClientes } from './supabase.js';
 import { iniciarWhatsApp, enviar, estadoWa, cerrarSesion, reiniciarSesion, hayConexion, sesionDisponible, listarChatsWa, listarContactosWa, historialWa, resolverTelefonoWa, idMensaje } from './whatsapp.js';
-import { redactarRespuesta } from './ai.js';
+import { redactarRespuesta, transcribirAudio } from './ai.js';
 import { Cola, dormir, esperaEntreEnvios } from './queue.js';
 import { estadoIA, actualizarIA, pausarIA, estaPausado, promptIA, resumenIA } from './ia.js';
 import { registrar, listar, obtener, marcarLeido, respuestasIA, porDia, resumen as resumenChats, registrarCabecera, importarMensajes, yaExisteWa } from './conversaciones.js';
@@ -273,12 +273,31 @@ async function manejarMensaje(msg, sesionId = null) {
     if (yaRespondidos.size > 1200) yaRespondidos.delete(yaRespondidos.values().next().value);
   }
 
-  const texto = textoDe(msg);
+  let texto = textoDe(msg);
   if (!texto) {
     log(`Mensaje vacío de +${tel} (sin texto ni multimedia).`);
     return;
   }
-  const esTextoReal = !/^\[/.test(texto); // los marcadores [imagen]/[video]/… no son texto real
+  let esTextoReal = !/^\[/.test(texto); // los marcadores [imagen]/[video]/… no son texto real
+
+  // Notas de voz: se transcriben con IA para poder responderlas como texto.
+  if (!esTextoReal && /^(ptt|audio)$/.test(String(msg.type || ''))) {
+    try {
+      const media = await msg.downloadMedia();
+      if (media && media.data) {
+        const tr = await transcribirAudio({ base64: media.data, mimeType: media.mimetype || 'audio/ogg' });
+        if (tr) {
+          texto = '🎤 ' + tr;
+          esTextoReal = true;
+          log(`Nota de voz de +${tel} transcrita: ${tr.slice(0, 90)}`);
+        } else {
+          log(`Nota de voz de +${tel} sin transcripción (audio no entendible).`);
+        }
+      }
+    } catch (e) {
+      log(`No se pudo transcribir la nota de voz de +${tel}: ${e.message}`);
+    }
+  }
 
   const cliente = await getCliente(tel);
   const hist = await historial(tel, 8);

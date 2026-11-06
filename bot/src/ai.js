@@ -212,8 +212,7 @@ async function gemini(prompt) {
   throw ultimo || new Error('Gemini sin respuesta');
 }
 
-async function anthropic(prompt) {
-  const r = await fetch('https://api.anthropic.com/v1/messages', {
+async function anthropic(prompt) {  const r = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -231,4 +230,35 @@ async function anthropic(prompt) {
   if (!r.ok) throw new Error(`Anthropic ${r.status}: ${(await r.text()).slice(0, 180)}`);
   const j = await r.json();
   return (j.content || []).map(c => c.text || '').join('');
+}
+
+/**
+ * Transcribe una nota de voz (audio) usando Gemini. Devuelve el texto hablado
+ * o cadena vacía si no se pudo. La entrada es base64 (sin prefijo data:).
+ */
+export async function transcribirAudio({ base64, mimeType = 'audio/ogg' }) {
+  if (!config.geminiKey || !base64) return '';
+  const modelos = [...new Set([config.aiModel || 'gemini-3-flash-preview', 'gemini-flash-latest', 'gemini-3-flash-preview'])];
+  const timeout = (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') ? () => AbortSignal.timeout(60000) : () => undefined;
+  const orden = 'Transcribe literalmente este audio en el idioma en que esté (normalmente español de Perú). Devuelve SOLO la transcripción, sin comillas, sin comentarios y sin formato. Si no se entiende nada, devuelve una cadena vacía.';
+  for (const model of modelos) {
+    try {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(config.geminiKey)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: orden }, { inlineData: { mimeType, data: base64 } }] }],
+          generationConfig: { temperature: 0.2, maxOutputTokens: 400 }
+        }),
+        signal: timeout()
+      });
+      if (!r.ok) continue;
+      const j = await r.json();
+      const t = (j.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('').trim();
+      if (t) return t.slice(0, 800);
+    } catch (e) {
+      console.warn('[ia] transcripción con ' + model + ': ' + e.message);
+    }
+  }
+  return '';
 }
