@@ -10,6 +10,28 @@ export const sesiones = new Map();
 /** Ids de mensajes que envió el propio bot (para no duplicarlos en 'message_create'). */
 const enviadosPorBot = new Set();
 
+/**
+ * Mensajes salientes recién enviados por el bot, por texto. Cubre la carrera en
+ * la que `message_create` llega ANTES de que `sendMessage` devuelva el id.
+ */
+const enviosRecientes = [];
+
+function recordarEnvio(texto) {
+  const t = String(texto || '').trim().slice(0, 1000);
+  if (!t) return;
+  enviosRecientes.push({ t, at: Date.now() });
+  if (enviosRecientes.length > 120) enviosRecientes.shift();
+}
+
+function esEnvioPropioReciente(texto) {
+  const t = String(texto || '').trim().slice(0, 1000);
+  if (!t) return false;
+  const i = enviosRecientes.findIndex(x => x.t === t && Date.now() - x.at < 90000);
+  if (i < 0) return false;
+  enviosRecientes.splice(i, 1);
+  return true;
+}
+
 let logFn = console.log;
 
 function crearEstado(id) {
@@ -23,7 +45,8 @@ function crearEstado(id) {
     numero: null,
     error: null,
     client: null,
-    reintentos: 0
+    reintentos: 0,
+    msgKeyParche: false
   };
 }
 
@@ -57,6 +80,63 @@ export async function iniciarWhatsApp({ onMensaje, onMensajePropio, onAck, log, 
   }
 }
 
+/**
+ * WhatsApp Web cambió `MsgKey`: la propiedad `_serialized` ya no existe y ahora
+ * la clave se obtiene con `toString()`. La librería whatsapp-web.js la usa para
+ * cerrar el envío de multimedia y falla con
+ * "Data passed to getter must include an id property".
+ * Este parche restaura `_serialized` en el prototipo de `WAWebMsgKey`.
+ */
+async function parcharMsgKey(client, s) {
+  if (!client?.pupPage) return false;
+  try {
+    const ok = await client.pupPage.evaluate(() => {
+      try {
+        const WK = window.require('WAWebMsgKey');
+        if (WK && WK.prototype && !Object.getOwnPropertyDescriptor(WK.prototype, '_serialized')) {
+          Object.defineProperty(WK.prototype, '_serialized', {
+            configurable: true,
+            get() { return this.toString(); }
+          });
+        }
+        // El modelo de media actual trae campos internos (`__x_*`, `parent`,
+        // `collection`) que, al mezclarse en el mensaje, rompen
+        // addAndSendMsgToChat. Se devuelve solo el JSON limpio.
+        const WW = window.WWebJS;
+        if (WW && typeof WW.processMediaData === 'function' && !WW.__mediaLimpia) {
+          const original = WW.processMediaData.bind(WW);
+          WW.processMediaData = async function (mediaInfo, opciones) {
+            const modelo = await original(mediaInfo, opciones);
+            let json = {};
+            try { json = modelo && typeof modelo.toJSON === 'function' ? modelo.toJSON() : (modelo || {}); } catch (e) { json = {}; }
+            const limpio = { ...json };
+            Object.defineProperty(limpio, 'toJSON', {
+              value: () => ({ ...json }),
+              enumerable: false,
+              configurable: true
+            });
+            return limpio;
+          };
+          WW.__mediaLimpia = true;
+        }
+        return true;
+      } catch (e) {
+        return 'error: ' + ((e && e.message) || e);
+      }
+    });
+    if (ok === true) {
+      if (!s.msgKeyParche) logFn(`[${s.id}] Compatibilidad de multimedia aplicada (MsgKey).`);
+      s.msgKeyParche = true;
+      return true;
+    }
+    logFn(`[${s.id}] No se pudo aplicar el parche de MsgKey: ${ok}`);
+    return false;
+  } catch (e) {
+    logFn(`[${s.id}] No se pudo aplicar el parche de MsgKey: ${e.message}`);
+    return false;
+  }
+}
+
 async function crearSesion(id, { onMensaje, onMensajePropio, onAck, log }) {
   const s = sesiones.get(id);
   const opciones = {
@@ -72,6 +152,7 @@ async function crearSesion(id, { onMensaje, onMensajePropio, onAck, log }) {
   const client = new Client(opciones);
   s.client = client;
   s.estado = 'iniciando';
+  s.msgKeyParche = false;
   s.onMensaje = onMensaje;
   s.onMensajePropio = onMensajePropio;
   s.onAck = onAck;
@@ -103,6 +184,8 @@ async function crearSesion(id, { onMensaje, onMensajePropio, onAck, log }) {
     s.autenticado = true;
     if (s.vigilante) { clearInterval(s.vigilante); s.vigilante = null; }
     log(`[${id}] WhatsApp conectado como +${s.numero || 'desconocido'}.`);
+    // WhatsApp Web nuevo: restaura MsgKey._serialized para poder enviar fotos.
+    parcharMsgKey(client, s);
   });
 
   client.on('auth_failure', m => {
@@ -134,8 +217,12 @@ async function crearSesion(id, { onMensaje, onMensajePropio, onAck, log }) {
   // Los que manda el propio bot se descartan aquí para no duplicarlos.
   client.on('message_create', async msg => {
     try {
+      // Descarta lo que acaba de enviar el propio bot (evita marcarlo como
+      // mensaje del dueño y duplicarlo). Se comprueba por id y, como respaldo,
+      // por texto, porque 'message_create' a veces llega antes que el id.
       const wid = idMensaje(msg);
       if (wid && enviadosPorBot.has(wid)) { enviadosPorBot.delete(wid); return; }
+      if (esEnvioPropioReciente(msg.body)) return;
       if (onMensajePropio) await onMensajePropio(msg, id);
     } catch (e) { log(`[${id}] Error al procesar mensaje propio: ${e.message}`); }
   });
@@ -222,6 +309,7 @@ export async function enviar(telefono, texto, sesionId = null) {
 
   const id = await s.client.getNumberId(limpio);
   if (!id) throw new Error(`El número +${limpio} no tiene WhatsApp`);
+  recordarEnvio(texto);
   const enviado = await s.client.sendMessage(id._serialized, texto);
   const waId = idMensaje(enviado);
   if (waId) {
@@ -247,6 +335,9 @@ export async function enviarImagen(telefono, media = {}, caption = '', sesionId 
   const s = sesionParaEnviar(sesionId);
   if (!s) throw new Error(sesionId ? `La sesión ${sesionId} no está conectada` : 'Ningún WhatsApp está conectado');
 
+  // Asegura la compatibilidad con el WhatsApp Web actual antes de enviar media.
+  await parcharMsgKey(s.client, s);
+
   const id = await s.client.getNumberId(limpio);
   if (!id) throw new Error(`El número +${limpio} no tiene WhatsApp`);
 
@@ -258,6 +349,7 @@ export async function enviarImagen(telefono, media = {}, caption = '', sesionId 
   } else {
     mm = await MessageMedia.fromUrl(media.url, { unsafeMime: true });
   }
+  recordarEnvio(caption);
   const enviado = await s.client.sendMessage(id._serialized, mm, caption ? { caption: String(caption).slice(0, 1000) } : {});
   const waId = idMensaje(enviado);
   if (waId) {

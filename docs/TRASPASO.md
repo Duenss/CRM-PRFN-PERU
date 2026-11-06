@@ -72,8 +72,9 @@
 
 ### Módulos nuevos (mejoras 1–5, 2026-11-06)
 1. **Foto + precio del perfume en las respuestas IA**: el prompt pide `productoId` (ids en el
-   catálogo) y regla 17 obliga a citar el precio real de 50 y 100 ml. Si hay `productoId`, el bot
-   envía la imagen (`enviarImagen()`) con el texto como caption; si falla, cae al mensaje de texto.
+   catálogo). Si hay `productoId`, el bot envía la imagen (`enviarImagen()`) con el `texto` como
+   caption y **luego** un segundo mensaje (`pregunta`) con los tamaños y precios reales de 50/100 ml
+   (ver *Fotos, tono conversacional y contador de no leídos*); si falla, cae al mensaje de texto.
    La foto sale de `mediaProducto()`: `imagen_ruta` local en `assets/img/products/` o, si no existe,
    `${PANEL_URL}/assets/img/products/<id>.jpg`. `productoPorId()` (`ai.js`) resuelve por id o nombre.
 2. **Pedidos y pagos** (`bot/src/pedidos.js`, `bot/src/pagos.js`): pestaña **Pedidos** en el panel.
@@ -125,6 +126,30 @@
 
 Variables nuevas en `bot/.env`: `PANEL_URL` (base de las fotos), `SEGUIMIENTO_DIAS_1`,
 `SEGUIMIENTO_DIAS_2`. CORS del bot ahora admite `PATCH` y `DELETE` (pedidos/plantillas).
+
+### Fotos, tono conversacional y contador de no leídos (2026-11-06)
+
+- **Envío de fotos reparado**. WhatsApp Web dejó de exponer `MsgKey._serialized` (ahora la clave
+  se obtiene con `toString()`) y además mezcla campos internos (`__x_*`, `parent`, `collection`)
+  del modelo de media en el mensaje, lo que hacía fallar `addAndSendMsgToChat` con
+  **"Data passed to getter must include an id property (it's how we memoize)"**.
+  `bot/src/whatsapp.js` → `parcharMsgKey()` restaura `_serialized` en el prototipo y envuelve
+  `WWebJS.processMediaData` para devolver un objeto limpio con `toJSON`. Se aplica en `ready` y
+  antes de cada `enviarImagen` (también arregla plantillas de pago). Log: *"Compatibilidad de
+  multimedia aplicada (MsgKey)."* No tocar sin volver a reproducir el error.
+- **IA en dos mensajes**. El prompt (`bot/src/ai.js`, reglas 16 y 17) devuelve `texto` (intro cálida
+  que acompaña la foto, sin precios) y `pregunta` (segundo mensaje con tamaños y precios reales).
+  El servidor envía la **foto + `texto`**, espera ~1.2 s y manda `pregunta`. Si el modelo omite
+  `pregunta` y `texto` no trae `S/`, el servidor la sintetiza con `precio_50ml`/`precio_100ml`.
+  `productoMencionado(texto)` detecta el perfume aunque el modelo olvide `productoId`, para que
+  la foto se envíe siempre. Tono más cálido e interactivo (frases cortas, máx. 45 palabras, ≤2 emojis).
+- **Contador de no leídos**. `registrar()` en `conversaciones.js` pone `noLeidos=0` en **cualquier**
+  mensaje saliente (IA, panel o dueño desde el celular). `registrarCabecera()` trata el
+  `unreadCount` de WhatsApp como autoritativo (`Math.max(0, noLeidos)`), de modo que si el dueño
+  responde desde el teléfono, el badge se limpia solo.
+- **No duplicar los mensajes del bot**. `enviosRecientes` + `recordarEnvio()` / `esEnvioPropioReciente()`
+  evitan que `message_create` registre como "panel" lo que acaba de enviar el bot (a veces el evento
+  llega antes de que `sendMessage` devuelva el id).
 
 ### Correcciones de sincronización y bandeja
 - **Entrantes de cualquier país**: `manejarMensaje` ya no descarta números que no son de Perú

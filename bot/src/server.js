@@ -626,6 +626,23 @@ async function manejarMensaje(msg, sesionId = null) {
       registrar({ telefono: tel, texto: ai.texto, direccion: 'saliente', nombre: nombreChat, clienteId: cliente?.id, origen: 'ia', waId: env?.waId || '' });
     }
 
+    // Segundo mensaje: pregunta cálida con tamaños y precios. Solo cuando la IA
+    // recomendó una fragancia y el cliente todavía no confirmó un pedido.
+    const preguntaIA = ai.pregunta || (prod && !pedidoIA && !/S\//i.test(ai.texto)
+      ? `¿Te gustaría que te preparemos el ${prod.nombre}? Tenemos 50 ml por S/ ${prod.precio_50ml ?? 56} y 100 ml por S/ ${prod.precio_100ml ?? 78} 😊`
+      : '');
+    if (prod && preguntaIA && !pedidoIA) {
+      try {
+        await new Promise(r => setTimeout(r, 1200));
+        const envQ = await enviar(tel, preguntaIA, sesionId);
+        await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'saliente', texto: preguntaIA, origen: 'ia' });
+        registrar({ telefono: tel, texto: preguntaIA, direccion: 'saliente', nombre: nombreChat, clienteId: cliente?.id, origen: 'ia', waId: envQ?.waId || '' });
+        log(`Pregunta interactiva enviada a +${tel}.`);
+      } catch (e) {
+        log('No se pudo enviar la pregunta de la IA: ' + e.message);
+      }
+    }
+
     // Efectivo: la venta se cierra de una vez (se cobra al entregar o recoger).
     if (pedidoIA && pedidoIA.nuevo && pedidoIA.pedido.metodo === 'efectivo' && pedidoIA.pedido.estado === 'por_entregar') {
       const items = (pedidoIA.pedido.items || []).map(i => `${i.cantidad} × ${i.nombre} ${i.ml} ml`).join(' · ');
@@ -1202,6 +1219,28 @@ app.post('/api/prueba', auth, async (req, res) => {
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/prueba-foto', auth, async (req, res) => {
+  const tel = normalizar(req.body?.telefono || config.ownerNumber || '');
+  const productoId = String(req.body?.productoId || '').trim();
+  const caption = String(req.body?.texto || '').trim();
+  if (!productoId) return res.status(400).json({ error: 'Falta productoId.' });
+  const permitidos = new Set([config.ownerNumber, ...config.numerosPrueba].filter(Boolean));
+  if (!config.modoPrueba && permitidos.size && !permitidos.has(tel)) {
+    return res.status(403).json({ error: 'En modo real solo puedes probar con OWNER_NUMBER o NUMEROS_PRUEBA.' });
+  }
+  try {
+    const prod = await productoPorId(productoId);
+    if (!prod) return res.status(404).json({ error: 'Producto no encontrado: ' + productoId });
+    const media = mediaProducto(prod);
+    if (!media) return res.status(404).json({ error: 'El producto no tiene imagen.' });
+    const env = await enviarImagen(tel, media, caption, req.body?.sesion || null);
+    await logMensaje({ telefono: tel, direccion: 'saliente', texto: '📷 ' + (caption || prod.nombre), origen: 'prueba' });
+    res.json({ ok: true, producto: prod.nombre, media, env });
+  } catch (e) {
+    res.status(500).json({ error: e.message, stack: String(e.stack || '').split('\n').slice(0, 6) });
   }
 });
 

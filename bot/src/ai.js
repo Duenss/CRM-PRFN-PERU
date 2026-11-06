@@ -28,6 +28,12 @@ export async function productoPorId(id) {
 const SYS = `Eres el asistente de WhatsApp de Perfumería Fina Perú, una tienda de perfumes en Perú.
 Respondes mensajes de clientes por WhatsApp. El dueño revisa la conversación después.
 
+REGLA DE ESTILO (muy importante):
+- Conversa como una persona amable, no como un catálogo. Frases cortas, naturales y cálidas.
+- Usa el nombre del cliente si lo conoces, una sola vez y sin exagerar.
+- No llenes el mensaje de datos. Primero conecta, luego ofrece.
+- Máximo 2 emojis por mensaje.
+
 REGLAS OBLIGATORIAS:
 1. Habla solo de la tienda y de los productos, precios, pagos, envíos y horarios que aparecen en los datos entregados. No inventes nada.
 2. Los productos son EQUIVALENTES: inspirados en marcas conocidas, con 50% de esencia y en su propio envase. Nunca digas que son originales ni de la marca. Usa "equivalente" o "inspirado en".
@@ -35,7 +41,7 @@ REGLAS OBLIGATORIAS:
 4. No ofrezcas descuentos ni promociones que no estén en los datos. Si preguntan por una promo, deriva al encargado.
 5. Si el cliente pide hablar con una persona, tiene un reclamo, un problema con un pedido, o pide factura/boleta, deriva al encargado.
 6. Tono cercano, amable y respetuoso, español peruano neutro, tuteo. Sin presión.
-7. Respuestas de máximo 60 palabras, con 1 o 2 emojis como máximo.
+7. Cada mensaje debe ser breve (máximo 45 palabras) y con 1 o 2 emojis como máximo.
 8. No pidas datos sensibles (DNI, tarjeta, contraseñas). No envíes enlaces externos.
 9. Si el mensaje es solo un saludo, saluda y pregunta qué fragancia busca.
 10. Si no sabes algo, deriva; no adivines.
@@ -46,10 +52,14 @@ REGLAS OBLIGATORIAS:
 14. Si el cliente confirma que quiere comprar (dice qué fragancia y qué tamaño), agrega "pedido" con productoId, ml (50 o 100), cantidad y método de pago si lo mencionó ("yape", "plin", "transferencia", "efectivo"). Si no mencionó método, deja "metodo":"".
 15. Nunca confirmes un pago, un comprobante ni una entrega: eso lo revisa el encargado.
 16. Devuelve SOLO JSON válido, sin markdown. Ejemplos:
-{"responder":true,"texto":"respuesta para el cliente","productoId":"khamrah"}
-{"responder":true,"texto":"respuesta","productoId":"yara","pedido":{"productoId":"yara","ml":100,"cantidad":1,"metodo":"yape"}}
+{"responder":true,"texto":"¡Claro, Juan! Te envío la foto de nuestra fragancia equivalente inspirada en Asad de Lattafa 📸","productoId":"asad","pregunta":"¿Te gustaría que te lo preparemos? Tenemos 50 ml por S/ 56 y 100 ml por S/ 78 😊"}
+{"responder":true,"texto":"respuesta","productoId":"yara","pregunta":"¿Te animas por el de 50 ml o el de 100 ml? Están S/ 56 y S/ 78 ✨","pedido":{"productoId":"yara","ml":100,"cantidad":1,"metodo":"yape"}}
 {"derivar":true,"motivo":"motivo corto para el dueño"}
-17. Cuando recomiendes una fragancia, incluye en el texto su nombre y el precio real del catálogo para 50 ml y 100 ml (por ejemplo: "S/ 58 en 50 ml y S/ 82 en 100 ml"). La foto se envía aparte.`;
+17. Cuando recomiendes una fragancia, la respuesta se envía en DOS mensajes:
+   - "texto": SOLO una introducción cálida que acompaña la foto. Sin precios. Máximo 30 palabras. Ejemplo: "¡Claro, Juan! Te envío la foto de nuestra fragancia equivalente inspirada en Asad de Lattafa 📸"
+   - "pregunta": un segundo mensaje que invita a decidir, mencionando los tamaños y los precios reales del catálogo (50 ml y 100 ml). Ejemplo: "¿Te gustaría que te lo preparemos? Tenemos 50 ml por S/ 56 y 100 ml por S/ 78 😊"
+   Si NO recomiendas una fragancia concreta, responde solo con "texto" (sin "pregunta") y no repitas precios si no te los piden.
+18. No envíes listas largas de perfumes ni varios precios de golpe: elige una fragancia y conversa sobre ella.`;
 
 function limpiarJSON(txt) {
   const clean = String(txt || '').replace(/```json/gi, '').replace(/```/g, '').trim();
@@ -125,7 +135,7 @@ async function contextoCliente(texto) {
     cfg.medios_de_pago && `Pagos: ${cfg.medios_de_pago}`,
     cfg.envios && `Envíos: ${cfg.envios}`,
     cfg.enlace_web && `Web: ${cfg.enlace_web}`
-  ].filter(Boolean).join('\n') || 'Perfumería Fina Perú. Perfumes equivalentes con 50% de esencia. Precios: S/ 58 por 50 ml y S/ 82 por 100 ml.';
+  ].filter(Boolean).join('\n') || 'Perfumería Fina Perú. Perfumes equivalentes con 50% de esencia. Precios: S/ 56 por 50 ml y S/ 78 por 100 ml.';
 
   const rel = relevantes(texto, productos);
   let lista;
@@ -135,9 +145,31 @@ async function contextoCliente(texto) {
     ).join('\n');
   } else {
     const muestra = productos.slice(0, 60).map(p => `[id: ${p.id}] ${p.nombre} (${p.casa_inspirada || '—'})`).join('; ');
-    lista = `El catálogo tiene ${productos.length} fragancias. Algunas: ${muestra}. Precios: 50 ml S/ 58 y 100 ml S/ 82.`;
+    lista = `El catálogo tiene ${productos.length} fragancias. Algunas: ${muestra}. Precios: 50 ml S/ 56 y 100 ml S/ 78.`;
   }
   return { tienda, lista };
+}
+
+/**
+ * Si el cliente nombró una fragancia concreta (o su casa inspirada), devuelve su
+ * id aunque el modelo haya olvidado `productoId`. Así la foto se envía siempre.
+ */
+async function productoMencionado(texto) {
+  const productos = await catalogo();
+  if (!productos.length) return '';
+  const rel = relevantes(texto, productos);
+  const t = sinAcentos(texto);
+  for (const p of rel.slice(0, 3)) {
+    const nombre = sinAcentos(p.nombre || '');
+    const casa = sinAcentos(p.casa_inspirada || '');
+    if (nombre && t.includes(nombre)) return String(p.id);
+    if (casa.length > 3 && t.includes(casa)) return String(p.id);
+    const tokens = palabras(texto);
+    for (const w of nombre.split(/\s+/).filter(x => x.length > 3)) {
+      if (tokens.some(tok => similitud(tok, w) >= 0.85)) return String(p.id);
+    }
+  }
+  return '';
 }
 
 function fallback(texto) {
@@ -148,7 +180,7 @@ function fallback(texto) {
     return { responder: true, texto: 'Hola 👋 Gracias por escribir a Perfumería Fina Perú. ¿Qué fragancia estás buscando?' };
   }
   if (/precio|cu[aá]nto|costo|tarifa/.test(t)) {
-    return { responder: true, texto: 'Manejamos S/ 58 el perfume de 50 ml y S/ 82 el de 100 ml. Son equivalentes con 50% de esencia, inspirados en marcas conocidas. ¿Cuál te gustaría conocer? ✨' };
+    return { responder: true, texto: 'Manejamos S/ 56 el perfume de 50 ml y S/ 78 el de 100 ml. Son equivalentes con 50% de esencia, inspirados en marcas conocidas. ¿Cuál te gustaría conocer? ✨' };
   }
   if (/env[ií]o|delivery|llega|provincia/.test(t)) {
     return { responder: true, texto: 'Enviamos a todo el Perú desde Lima. También puedes recoger en nuestras estaciones: VMT sin costo y las demás por S/ 5. ¿A dónde te lo llevamos? 📦' };
@@ -200,7 +232,12 @@ Responde ahora.`;
         }
       : null;
     const productoId = String(j.productoId || pedido?.productoId || '').trim();
-    return { responder: true, texto, productoId, pedido };
+    let productoFinal = productoId;
+    if (!productoFinal) {
+      try { productoFinal = await productoMencionado(mensaje); } catch {}
+    }
+    const pregunta = String(j.pregunta || '').trim().slice(0, 400);
+    return { responder: true, texto, productoId: productoFinal, pedido, pregunta };
   } catch (e) {
     console.warn('[ia] error:', e.message);
     return { ...fallback(mensaje), respaldo: true, motivoFallo: e.message };

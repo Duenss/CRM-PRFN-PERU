@@ -96,6 +96,7 @@ export function registrar({ telefono, texto, direccion = 'entrante', nombre = ''
     if (existente) {
       chat.ultimoTexto = existente.texto;
       chat.ultimoEn = existente.en;
+      if (direccion === 'saliente') chat.noLeidos = 0;
       chats[tel] = chat;
       guardar();
       return existente;
@@ -119,6 +120,9 @@ export function registrar({ telefono, texto, direccion = 'entrante', nombre = ''
   chat.ultimoTexto = mensaje.texto;
   chat.ultimoEn = mensaje.en;
   if (direccion === 'entrante') chat.noLeidos = (chat.noLeidos || 0) + 1;
+  // Si responde el bot, la IA o el dueño (aunque sea desde su celular), el chat
+  // ya está atendido: se limpia el contador de no leídos.
+  else chat.noLeidos = 0;
 
   chats[tel] = chat;
   recortar();
@@ -190,7 +194,9 @@ export function registrarCabecera({ telefono, nombre = '', nombreWa = '', nombre
   } else if (!chat.ultimoEn && ultimoTexto) {
     chat.ultimoTexto = String(ultimoTexto).slice(0, 300);
   }
-  if (noLeidos && noLeidos > (chat.noLeidos || 0)) chat.noLeidos = noLeidos;
+  // WhatsApp es la fuente de verdad para los no leídos: si el dueño respondió
+  // desde el celular, el chat llega en 0 y el contador debe limpiarse.
+  if (Number.isFinite(Number(noLeidos))) chat.noLeidos = Math.max(0, Number(noLeidos));
   chat.pin = !!pin;
   chat.wa = true;
   chats[tel] = chat;
