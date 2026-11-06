@@ -12,9 +12,17 @@
 - 8 pestañas: Inicio, Bandeja, Campañas, Clientes, Catálogo, Calendario, Asistente IA, Ajustes.
 - **Bandeja de entrada** en vivo y **Asistente IA** conectados al bot (`/api/ia`, `/api/conversaciones`).
 - **Conexión del bot dentro del dashboard**: chip de estado en la barra superior + tarjeta en IA/Ajustes.
-- Probado end-to-end: entrante → respuesta IA; maestro off y pausa por chat cortan las respuestas.
+- **Un solo dashboard**: el QR, el envío de prueba y el registro del bot viven en **Ajustes**;
+  ya no se abre el panel externo del bot (`bot/src/panel.html` queda solo como respaldo de la API).
+- **Sonidos de interfaz** (Web Audio, igual que `portafolio-v4`): botón de altavoz en la barra,
+  clic 480 Hz, confirmación y error, interruptor 620/820. Guardado en `localStorage` (`ui_sound`).
+- **Actualizaciones fantasma**: helper `fantasma()` / `fantasmaValor()` en `index.html`; las listas
+  y contadores solo se repintan si el HTML cambió, con transición suave (sin parpadeos).
+- Probado: todas las pestañas sin errores de consola; el QR se muestra en Ajustes; reintento
+  de carga con datos idénticos no re-renderiza (identidad de nodo conservada).
 - Config final: `HORA_INICIO=9`, `HORA_FIN=20`, `SIMULAR_ENTRANTES=false`, `NUMEROS_PRUEBA` con el número de prueba.
 - Repo git inicializado con commit inicial; `.env`, `node_modules`, `wwebjs_auth` y `bot/data` ignorados.
+- Probado end-to-end (sesión previa): entrante → respuesta IA; maestro off y pausa por chat cortan las respuestas.
 
 Pendiente del dueño antes de producción (ver `README.md` → *Puesta en producción*):
 `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`, ejecutar SQL 01–03, crear usuario dueño,

@@ -2,7 +2,7 @@ import express from 'express';
 import { fileURLToPath } from 'node:url';
 import { config, validarConfig, esNumeroPeru, normalizar } from './config.js';
 import { sb, getCliente, getClientes, logMensaje, historial, marcarBaja } from './supabase.js';
-import { iniciarWhatsApp, enviar, estadoWa, cerrarSesion, hayConexion, sesionDisponible } from './whatsapp.js';
+import { iniciarWhatsApp, enviar, estadoWa, cerrarSesion, reiniciarSesion, hayConexion, sesionDisponible } from './whatsapp.js';
 import { redactarRespuesta } from './ai.js';
 import { Cola, dormir, esperaEntreEnvios } from './queue.js';
 import { estadoIA, actualizarIA, pausarIA, estaPausado, promptIA, resumenIA } from './ia.js';
@@ -511,6 +511,16 @@ app.post('/api/prueba', auth, async (req, res) => {
 app.post('/api/logout', auth, async (req, res) => {
   await cerrarSesion(req.body?.sesion || null);
   res.json({ ok: true });
+});
+
+app.post('/api/sesion/reiniciar', auth, async (req, res) => {
+  try {
+    const ids = await reiniciarSesion(req.body?.sesion || null);
+    log(`Sesión(es) de WhatsApp reiniciada(s): ${ids.join(', ') || 'ninguna'}.`);
+    res.json({ ok: true, sesiones: ids });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 /* ---------------- prueba de auto-respuesta (apagada por defecto) ---------------- */

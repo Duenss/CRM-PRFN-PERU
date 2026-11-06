@@ -114,7 +114,16 @@ Deja `CHROME_PATH=` vacío en `bot/.env` para que use ese binario.
   marcar como leído y **pausar la IA en un chat concreto**.
 - **Asistente IA** — interruptor maestro, respuesta automática, máximo de respuestas
   por conversación, indicaciones de tono y lista de chats (pausar/reanudar).
-- **Ajustes** — dirección del bot, probar conexión, abrir panel y ver QR.
+- **Ajustes** — todo dentro del mismo dashboard: dirección del bot, probar y guardar
+  conexión, **QR para vincular WhatsApp**, **enviar mensaje de prueba** y **registro del
+  bot en vivo**. Un solo panel: no hay una segunda pantalla que abrir.
+
+Extras de acabado:
+
+- **Sonidos de interfaz** (tonos Web Audio, como el portafolio v4): botón de altavoz en
+  la barra superior para activar/desactivar; suenan clics, confirmaciones y errores.
+- **Actualizaciones fantasma**: las listas y contadores solo se repintan cuando cambian
+  de verdad y siempre con una transición suave, sin parpadeos.
 
 Todo se controla desde el bot (`/api/ia`), así que los cambios sobreviven al reinicio.
 
@@ -141,6 +150,9 @@ Todo se controla desde el bot (`/api/ia`), así que los cambios sobreviven al re
 | GET/POST | `/api/ia` | Leer/guardar estado de la IA |
 | POST | `/api/ia/pausar` | Pausar/reanudar IA por teléfono |
 | POST | `/api/prueba` | Enviar mensaje de prueba a OWNER_NUMBER/NUMEROS_PRUEBA |
+| GET | `/api/logs` | Últimas líneas del registro del bot |
+| POST | `/api/sesion/reiniciar` | Reiniciar la sesión de WhatsApp (regenera QR) |
+| POST | `/api/logout` | Cerrar sesión de WhatsApp |
 | POST | `/api/simular-entrante` | **Solo pruebas** con `SIMULAR_ENTRANTES=true` |
 
 ## Puesta en producción (checklist)

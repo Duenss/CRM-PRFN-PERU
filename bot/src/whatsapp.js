@@ -69,6 +69,7 @@ async function crearSesion(id, { onMensaje, log }) {
   const client = new Client(opciones);
   s.client = client;
   s.estado = 'iniciando';
+  s.onMensaje = onMensaje;
 
   client.on('qr', async qr => {
     s.estado = 'qr';
@@ -210,6 +211,7 @@ export async function cerrarSesion(sesionId) {
     if (!s) continue;
     try { await s.client?.logout(); } catch {}
     try { await s.client?.destroy(); } catch {}
+    if (s.vigilante) { clearInterval(s.vigilante); s.vigilante = null; }
     s.client = null;
     s.estado = 'desconectado';
     s.conectado = false;
@@ -218,6 +220,39 @@ export async function cerrarSesion(sesionId) {
     s.qrDataUrl = null;
     logFn(`[${id}] Sesión de WhatsApp cerrada.`);
   }
+}
+
+/**
+ * Destruye el cliente actual y lo vuelve a crear.
+ * Si no hay credenciales guardadas, genera un QR nuevo para vincular.
+ */
+export async function reiniciarSesion(sesionId = null) {
+  const ids = sesionId ? [String(sesionId)] : [...sesiones.keys()];
+  const reiniciadas = [];
+  for (const id of ids) {
+    const s = sesiones.get(id);
+    if (!s) continue;
+    if (s.vigilante) { clearInterval(s.vigilante); s.vigilante = null; }
+    try { await s.client?.destroy(); } catch {}
+    s.client = null;
+    s.estado = 'iniciando';
+    s.conectado = false;
+    s.numero = null;
+    s.qr = null;
+    s.qrDataUrl = null;
+    s.error = null;
+    s.llamandoSync = false;
+    s.autenticado = false;
+    s.reintentos = 0;
+    logFn(`[${id}] Reiniciando sesión de WhatsApp...`);
+    crearSesion(id, { onMensaje: s.onMensaje, log: logFn }).catch(e => {
+      const st = sesiones.get(id);
+      if (st) { st.estado = 'desconectado'; st.error = e.message; }
+      logFn(`No se pudo reiniciar la sesión ${id}: ${e.message}`);
+    });
+    reiniciadas.push(id);
+  }
+  return reiniciadas;
 }
 
 export function estadoWa() {
