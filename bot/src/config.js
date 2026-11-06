@@ -33,6 +33,8 @@ export const config = {
 
   delayMin: Math.max(5, num(process.env.DELAY_MIN, 25)),
   delayMax: Math.max(5, num(process.env.DELAY_MAX, 40)),
+  // Espera mínima entre dos respuestas automáticas seguidas al mismo número (segundos).
+  cooldownSegundos: Math.max(0, num(process.env.COOLDOWN_SEGUNDOS, 10)),
   maxPorDia: Math.max(1, num(process.env.MAX_POR_DIA, 80)),
   horaInicio: Math.min(23, Math.max(0, num(process.env.HORA_INICIO, 9))),
   horaFin: Math.min(24, Math.max(1, num(process.env.HORA_FIN, 20))),

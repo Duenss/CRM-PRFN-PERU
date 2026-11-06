@@ -296,7 +296,7 @@ code{background:var(--s2);padding:.05rem .35rem;border-radius:5px;font-size:.85e
 .msg.in{align-self:flex-start;background:var(--s2);border:1px solid var(--line);border-bottom-left-radius:3px}
 .msg.out{align-self:flex-end;background:#005C4B;border-bottom-right-radius:3px;color:#eafff6}
 .msg.sys{align-self:center;background:transparent;border:1px dashed var(--line2);color:var(--mute);font-size:.76rem;max-width:90%;text-align:center}
-.msg .who{font-size:.68rem;color:var(--mute);margin-bottom:.15rem}
+.msg .who{display:block;font-size:.66rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--mute);margin-bottom:.2rem}
 .in-form{display:flex;gap:.6rem;align-items:flex-end;padding:.7rem .9rem;border-top:1px solid var(--line);background:var(--s1)}
 .in-form textarea{min-height:42px;max-height:130px;resize:none;border-radius:12px;padding:.6rem .8rem}
 .in-form button{flex:none;min-height:42px}
@@ -452,7 +452,7 @@ dialog::backdrop{background:rgba(3,4,8,.66);backdrop-filter:blur(8px)}
     <section class="tab" id="t-bandeja" hidden>
       <div class="pagehead">
         <div><h1>Bandeja de entrada</h1><p class="muted" id="in-sub">Conversaciones de WhatsApp en vivo.</p></div>
-        <div class="bar" style="margin:0"><input id="in-q" type="search" placeholder="Buscar por nombre o número"><button class="ghost" id="in-sync" type="button">Sincronizar WhatsApp</button><button class="ghost" id="in-refresh" type="button">Actualizar</button></div>
+        <div class="bar" style="margin:0"><input id="in-q" type="search" placeholder="Buscar por nombre o número"><button class="ghost" id="in-sync" type="button">Sincronizar WhatsApp</button><button class="ghost" id="in-refresh" type="button">Actualizar</button><button class="ghost" id="in-pause" type="button" disabled>Pausar IA</button></div>
       </div>
       <div class="inbox">
         <div class="in-list" id="in-list"><p class="empty" style="padding:1rem">Cargando…</p></div>
@@ -461,7 +461,6 @@ dialog::backdrop{background:rgba(3,4,8,.66);backdrop-filter:blur(8px)}
           <div class="in-thread" id="in-thread" hidden>
             <div class="in-head">
               <div class="in-id"><div class="ava" id="in-ava">?</div><div><b id="in-name">—</b><small id="in-tel"></small></div></div>
-              <div class="in-head-act"><button class="ghost" id="in-pause" type="button">Pausar IA</button></div>
             </div>
             <div class="in-msgs" id="in-msgs"></div>
             <form class="in-form" id="in-form">
@@ -1340,6 +1339,7 @@ $('#k-baja').addEventListener('change',prev);
 
 /* ---------- utilidades de tiempo / iniciales ---------- */
 function hace(iso){if(!iso)return'';const s=Math.max(0,(Date.now()-new Date(iso).getTime())/1000);if(s<60)return'ahora';if(s<3600)return Math.floor(s/60)+' min';if(s<86400)return Math.floor(s/3600)+' h';return Math.floor(s/86400)+' d'}
+function horaWa(iso){if(!iso)return'';const d=new Date(iso);if(isNaN(d.getTime()))return'';const n=new Date();const a=new Date(d.getFullYear(),d.getMonth(),d.getDate());const b=new Date(n.getFullYear(),n.getMonth(),n.getDate());const dias=Math.round((b-a)/86400000);if(dias<=0)return d.toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'});if(dias===1)return'Ayer';if(dias<7)return d.toLocaleDateString('es-PE',{weekday:'short'});return d.toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit',year:'2-digit'})}
 function iniciales(n){const p=String(n||'?').trim().split(/\s+/);return((p[0]?.[0]||'?')+(p[1]?.[0]||'')).toUpperCase()}
 
 /* ---------- chip de estado del bot ---------- */
@@ -1364,7 +1364,7 @@ async function cargarBandeja(){
   try{
     const j=await botFetch('/api/conversaciones?limite=80');
     inChats=j.conversaciones||[];inPausados=new Set((j.ia?.pausados||[]).map(p=>p.telefono));
-    pintarLista();actualizarBadge(j.resumen?.noLeidos||0);
+    pintarLista();actualizarPausa();actualizarBadge(j.resumen?.noLeidos||0);
     if($('#in-sub'))$('#in-sub').textContent=`${j.resumen?.chats||0} conversaciones · ${j.resumen?.mensajesHoy||0} mensajes hoy`;
   }catch(e){l.innerHTML='<p class="empty" style="padding:1rem">No se pudo cargar. Revisa que el bot esté encendido.</p>';}
 }
@@ -1373,7 +1373,7 @@ function pintarLista(){
   const l=inChats.filter(c=>!q||[c.nombre,c.telefono,c.ultimoTexto].join(' ').toLowerCase().includes(q));
   fantasma($('#in-list'),l.map(c=>{
     const on=c.telefono===inTel?' on':'';
-    return `<div class="in-item${on}" data-tel="${esc(c.telefono)}"><div class="ava">${esc(iniciales(c.nombre))}</div><div class="ib"><b>${esc(c.nombre||('+'+c.telefono))}</b><small>${esc((c.ultimoTexto||'').slice(0,44)||'—')}</small></div><div class="imeta"><time>${esc(hace(c.ultimoEn))}</time>${inPausados.has(c.telefono)?'<span class="paused">IA off</span>':''}${c.noLeidos?`<span class="unread">${c.noLeidos}</span>`:''}</div></div>`;
+    return `<div class="in-item${on}" data-tel="${esc(c.telefono)}"><div class="ava">${esc(iniciales(c.nombre))}</div><div class="ib"><b>${esc(c.nombre||('+'+c.telefono))}</b><small>${esc((c.ultimoTexto||'').slice(0,44)||'—')}</small></div><div class="imeta"><time>${esc(horaWa(c.ultimoEn))}</time>${inPausados.has(c.telefono)?'<span class="paused">IA off</span>':''}${c.noLeidos?`<span class="unread">${c.noLeidos}</span>`:''}</div></div>`;
   }).join('')||'<p class="empty" style="padding:1rem">Sin conversaciones todavía.</p>');
 }
 async function importarHilo(tel){
@@ -1421,6 +1421,8 @@ function pintarHilo(msgs){
 }
 function actualizarPausa(){
   const b=$('#in-pause');if(!b)return;
+  if(!inTel){b.disabled=true;b.textContent='Pausar IA';b.className='ghost';return;}
+  b.disabled=false;
   const pausado=inPausados.has(inTel);
   b.textContent=pausado?'Reanudar IA':'Pausar IA';
   b.className=pausado?'':'ghost';

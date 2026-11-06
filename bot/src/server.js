@@ -2,7 +2,7 @@ import express from 'express';
 import { fileURLToPath } from 'node:url';
 import { config, validarConfig, esNumeroPeru, normalizar } from './config.js';
 import { sb, getCliente, getClientes, logMensaje, historial, marcarBaja, importarClientes } from './supabase.js';
-import { iniciarWhatsApp, enviar, estadoWa, cerrarSesion, reiniciarSesion, hayConexion, sesionDisponible, listarChatsWa, listarContactosWa, historialWa, resolverTelefonoWa } from './whatsapp.js';
+import { iniciarWhatsApp, enviar, estadoWa, cerrarSesion, reiniciarSesion, hayConexion, sesionDisponible, listarChatsWa, listarContactosWa, historialWa, resolverTelefonoWa, idMensaje } from './whatsapp.js';
 import { redactarRespuesta } from './ai.js';
 import { Cola, dormir, esperaEntreEnvios } from './queue.js';
 import { estadoIA, actualizarIA, pausarIA, estaPausado, promptIA, resumenIA } from './ia.js';
@@ -184,6 +184,10 @@ async function enviarCampana(id) {
 }
 
 /* ---------------- auto-respuesta ---------------- */
+// Ids de mensajes entrantes ya procesados: evita responder dos veces al mismo
+// mensaje cuando WhatsApp Web emite el evento duplicado (historial + en vivo).
+const yaRespondidos = new Set();
+// Última respuesta por teléfono: frena ráfagas sin bloquear (cooldown corto).
 const cooldown = new Map();
 
 /** Texto de un mensaje o un marcador si es multimedia. */
@@ -205,6 +209,7 @@ function textoDe(msg) {
  */
 async function manejarMensajePropio(msg, sesionId = null) {
   if (!msg.fromMe || msg.isStatus) return;
+  if (String(msg.type || '') === 'reaction' || msg.isNotification) return;
   const dest = String(msg.to || '');
   if (dest.endsWith('@g.us') || dest === 'status@broadcast') return;
   let tel = normalizar(dest.split('@')[0]);
@@ -219,7 +224,7 @@ async function manejarMensajePropio(msg, sesionId = null) {
   if (propios.includes(tel)) return;
   const texto = textoDe(msg);
   if (!texto) return;
-  const waId = msg?.id?._serialized || '';
+  const waId = idMensaje(msg);
   if (yaExisteWa(tel, waId)) return;
   let cliente = null;
   try { cliente = await getCliente(tel); } catch {}
@@ -244,6 +249,7 @@ async function notificarDueno(texto, sesionId = null) {
 
 async function manejarMensaje(msg, sesionId = null) {
   if (msg.fromMe || msg.isStatus) return;
+  if (String(msg.type || '') === 'reaction' || msg.isNotification) return;
   const chat = String(msg.from || '');
   if (chat.endsWith('@g.us') || chat === 'status@broadcast') return;
   let tel = normalizar(chat.split('@')[0]);
@@ -258,6 +264,15 @@ async function manejarMensaje(msg, sesionId = null) {
     return;
   }
 
+  // Dedupe por id crudo del mensaje: WhatsApp Web puede reemitir el mismo
+  // mensaje (historial + en vivo), y sin esto la IA respondería dos veces.
+  const waId = idMensaje(msg);
+  if (waId && yaRespondidos.has(waId)) return;
+  if (waId) {
+    yaRespondidos.add(waId);
+    if (yaRespondidos.size > 1200) yaRespondidos.delete(yaRespondidos.values().next().value);
+  }
+
   const texto = textoDe(msg);
   if (!texto) {
     log(`Mensaje vacío de +${tel} (sin texto ni multimedia).`);
@@ -268,7 +283,6 @@ async function manejarMensaje(msg, sesionId = null) {
   const cliente = await getCliente(tel);
   const hist = await historial(tel, 8);
   const nombreChat = cliente?.nombre || msg._data?.notifyName || `+${tel}`;
-  const waId = msg?.id?._serialized || '';
   await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'entrante', texto, origen: 'cliente' });
   registrar({ telefono: tel, texto, direccion: 'entrante', nombre: nombreChat, clienteId: cliente?.id, origen: 'cliente', waId });
 
@@ -298,17 +312,15 @@ async function manejarMensaje(msg, sesionId = null) {
   const esPrueba = config.numerosPrueba.includes(tel) || (config.ownerNumber && tel === config.ownerNumber);
   if (!esPrueba && !dentroHorario()) { log(`Mensaje fuera de horario de +${tel}; no se responde automáticamente.`); return; }
   if (!cliente && !config.responderDesconocidos) return;
-  if (ia.maxPorConversacion > 0 && respuestasIA(tel) >= ia.maxPorConversacion) {
+  if (!esPrueba && ia.maxPorConversacion > 0 && respuestasIA(tel) >= ia.maxPorConversacion) {
     log(`Límite de ${ia.maxPorConversacion} respuestas automáticas alcanzado con +${tel}; queda para el dueño.`);
     return;
   }
-
-  const ahora = Date.now();
-  if (ahora - (cooldown.get(tel) || 0) < 90 * 1000) {
-    log(`Respuesta omitida por enfriamiento (${tel}).`);
+  if (!esPrueba && config.cooldownSegundos > 0 && Date.now() - (cooldown.get(tel) || 0) < config.cooldownSegundos * 1000) {
+    log(`Respuesta omitida por enfriamiento corto (${tel}, ${config.cooldownSegundos}s).`);
     return;
   }
-  cooldown.set(tel, ahora);
+  cooldown.set(tel, Date.now());
 
   try {
     const ai = await redactarRespuesta({ mensaje: texto, historial: hist, cliente, contexto: promptIA() });
@@ -459,7 +471,7 @@ app.post('/api/ia', auth, (req, res) => {
 app.post('/api/ia/pausar', auth, (req, res) => {
   try {
     const tel = normalizar(req.body?.telefono);
-    if (!esNumeroPeru(tel)) return res.status(400).json({ error: 'Teléfono inválido.' });
+    if (!/^\d{8,15}$/.test(tel)) return res.status(400).json({ error: 'Teléfono inválido.' });
     const pausado = req.body?.pausado !== false;
     const estado = pausarIA(tel, pausado, req.body?.motivo || '', req.body?.nombre || '');
     log(`${pausado ? 'IA pausada' : 'IA reanudada'} para +${tel}${pausado && req.body?.motivo ? ' (' + req.body.motivo + ')' : ''}.`);
@@ -499,6 +511,19 @@ app.post('/api/sincronizar', auth, async (req, res) => {
     if (hacerChats) {
       const lista = await listarChatsWa(req.body?.sesion || null);
       salida.chatsTotal = lista.length;
+      if (req.body?.diagnostico) {
+        salida.detalle = lista.map(c => ({
+          telefono: c.telefono,
+          nombre: c.nombre,
+          ultimoEn: c.ultimoEn,
+          pin: !!c.pin,
+          real: c.real !== false,
+          tsReal: c.tsReal || 0,
+          hay: c.ultimoTexto ? String(c.ultimoTexto).slice(0, 24) : '',
+          esGrupo: !!c.esGrupo,
+          noLeidos: c.noLeidos || 0
+        }));
+      }
       for (const c of lista) {
         if (c.esGrupo || !/^\d{8,15}$/.test(c.telefono)) continue;
         registrarCabecera({
@@ -506,7 +531,9 @@ app.post('/api/sincronizar', auth, async (req, res) => {
           nombre: c.nombre,
           ultimoTexto: c.ultimoTexto,
           ultimoEn: c.ultimoEn,
-          noLeidos: c.noLeidos
+          noLeidos: c.noLeidos,
+          pin: c.pin,
+          real: c.real !== false
         });
         salida.chats++;
       }

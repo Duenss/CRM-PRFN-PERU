@@ -132,7 +132,7 @@ async function crearSesion(id, { onMensaje, onMensajePropio, log }) {
   // Los que manda el propio bot se descartan aquí para no duplicarlos.
   client.on('message_create', async msg => {
     try {
-      const wid = msg?.id?._serialized;
+      const wid = idMensaje(msg);
       if (wid && enviadosPorBot.has(wid)) { enviadosPorBot.delete(wid); return; }
       if (onMensajePropio) await onMensajePropio(msg, id);
     } catch (e) { log(`[${id}] Error al procesar mensaje propio: ${e.message}`); }
@@ -214,10 +214,10 @@ export async function enviar(telefono, texto, sesionId = null) {
   const id = await s.client.getNumberId(limpio);
   if (!id) throw new Error(`El número +${limpio} no tiene WhatsApp`);
   const enviado = await s.client.sendMessage(id._serialized, texto);
-  const waId = (enviado && enviado.id && enviado.id._serialized) || '';
+  const waId = idMensaje(enviado);
   if (waId) {
     enviadosPorBot.add(waId);
-    if (enviadosPorBot.size > 500) enviadosPorBot.delete(enviadosPorBot.values().next().value);
+    if (enviadosPorBot.size > 800) enviadosPorBot.delete(enviadosPorBot.values().next().value);
   }
   return { ok: true, sesion: s.id, waId };
 }
@@ -229,6 +229,12 @@ function telDe(item) {
     || item.contact?.number || item.number || '';
   const tel = normalizar(candidato);
   return /^\d{8,15}$/.test(tel) ? tel : '';
+}
+
+/** Id crudo (clave) de un mensaje, consistente entre historial y eventos en vivo. */
+export function idMensaje(msg) {
+  const id = (msg && msg.id) || {};
+  return id.id || id._serialized || (msg && msg._data && msg._data.id && (msg._data.id.id || msg._data.id._serialized)) || '';
 }
 
 /** Dado el id de un chat (@lid o @c.us), devuelve el teléfono real (solo dígitos) o ''. */
@@ -277,7 +283,11 @@ export async function listarChatsWa(sesionId = null) {
       esGrupo: !!c.isGroup,
       nombre: c.name || c.contact?.name || c.contact?.pushname || '',
       ultimoTexto: c.lastMessage?.body || '',
-      ts: c.timestamp || 0,
+      ts: c.timestamp || c.lastMessage?.timestamp || c.lastMessage?.t || 0,
+      tsReal: 0,
+      pin: !!c.pinned,
+      archived: !!c.archived,
+      real: true,
       noLeidos: c.unreadCount || 0
     }));
   } catch {
@@ -301,9 +311,59 @@ export async function listarChatsWa(sesionId = null) {
             let nombre = '';
             try { nombre = c.formattedTitle || c.name || (c.contact && (c.contact.name || c.contact.pushname)) || ''; } catch (e) {}
             let ultimoTexto = '';
-            try { ultimoTexto = (c.lastMessage && c.lastMessage.body) || ''; } catch (e) {}
             let ts = 0;
-            try { ts = c.timestamp || (c.lastMessage && c.lastMessage.t) || 0; } catch (e) {}
+            let tsReal = 0;
+            let real = true;
+            try {
+              const esReaccion = m => String((m && m.type) || '') === 'reaction' || !!(m && m.isNotification);
+              const cuerpo = m => {
+                if (!m) return '';
+                const tipo = String(m.type || '');
+                const cap = String(m.caption || '').trim();
+                if (cap) return cap;
+                if (!tipo || tipo === 'chat' || tipo === 'text') return String(m.body || '').trim();
+                return '';
+              };
+              const tieneContenido = m => !!cuerpo(m) || !!(m && m.hasMedia);
+              const buscarReal = arr => {
+                for (let i = arr.length - 1; i >= 0; i--) {
+                  const m = arr[i];
+                  if (!m || esReaccion(m)) continue;
+                  if (tieneContenido(m)) return m;
+                }
+                return null;
+              };
+              let lista = (c.msgs && c.msgs.getModelsArray && c.msgs.getModelsArray()) || [];
+              let ultimoReal = buscarReal(lista);
+              // Si lo cargado son solo reacciones, busca más atrás para confirmar
+              // si el chat tiene algún mensaje real (evita ocultar chats válidos).
+              if (!ultimoReal && lista.length > 0) {
+                let vueltas = 0;
+                while (vueltas < 4) {
+                  vueltas++;
+                  let cargados = null;
+                  try { cargados = await W.require('WAWebChatLoadMessages').loadEarlierMsgs({ chat: c }); } catch (e) { cargados = null; break; }
+                  if (!cargados || !cargados.length) break;
+                  lista = [...cargados.filter(m => m && !m.isNotification), ...lista];
+                  ultimoReal = buscarReal(lista);
+                  if (ultimoReal) break;
+                }
+              }
+              if (ultimoReal) {
+                tsReal = ultimoReal.t || 0;
+                ultimoTexto = cuerpo(ultimoReal) || (ultimoReal.hasMedia ? '[archivo]' : '');
+              }
+              ts = c.t || c.timestamp || (c.lastMessage && (c.lastMessage.t || c.lastMessage.timestamp)) || tsReal || 0;
+              if (!ultimoTexto && c.lastMessage && !esReaccion(c.lastMessage)) ultimoTexto = cuerpo(c.lastMessage);
+              // Sin mensaje real (solo reacciones) => no es una conversación real.
+              real = !!ultimoReal || lista.length === 0;
+            } catch (e) {}
+            let pin = false;
+            let archived = false;
+            try {
+              pin = !!(c.pin || c.pinned || c.isPinned);
+              archived = !!(c.archive || c.archived || c.isArchived);
+            } catch (e) {}
             let noLeidos = 0;
             try { noLeidos = c.unreadCount || 0; } catch (e) {}
 
@@ -336,6 +396,10 @@ export async function listarChatsWa(sesionId = null) {
               nombre: String(nombre || ''),
               ultimoTexto: String(ultimoTexto || ''),
               ts,
+              tsReal,
+              pin,
+              archived,
+              real,
               noLeidos
             });
           } catch (e) {}
@@ -347,15 +411,24 @@ export async function listarChatsWa(sesionId = null) {
 
   const propio = normalizar(s.numero);
   return crudos
-    .map(c => ({
-      telefono: telDe({ isGroup: c.esGrupo, number: c.tel }),
-      esGrupo: !!c.esGrupo,
-      nombre: String(c.nombre || '').trim(),
-      ultimoTexto: String(c.ultimoTexto || '').slice(0, 300),
-      ultimoEn: c.ts ? new Date(c.ts * 1000).toISOString() : null,
-      noLeidos: c.noLeidos || 0
-    }))
-    .filter(c => !c.esGrupo ? (c.telefono && c.telefono !== propio) : true);
+    .map(c => {
+      // Si lo último es solo una reacción (sin mensaje real), no le damos fecha:
+      // así cae al fondo y no desplaza a las conversaciones reales.
+      const t = c.real === false ? 0 : (c.tsReal || c.ts);
+      return {
+        telefono: telDe({ isGroup: c.esGrupo, number: c.tel }),
+        esGrupo: !!c.esGrupo,
+        nombre: String(c.nombre || '').trim(),
+        ultimoTexto: String(c.ultimoTexto || '').slice(0, 300),
+        ultimoEn: t ? new Date(t * 1000).toISOString() : null,
+        noLeidos: c.noLeidos || 0,
+        pin: !!c.pin,
+        archived: !!c.archived,
+        real: c.real !== false,
+        tsReal: c.tsReal || 0
+      };
+    })
+    .filter(c => !c.esGrupo ? (c.telefono && (c.telefono !== propio || c.pin)) : true);
 }
 
 /** Todos los contactos guardados/iniciados en el WhatsApp vinculado. */
@@ -409,18 +482,19 @@ export async function historialWa(telefono, limite = 50, sesionId = null) {
     const vistos = new Set();
     return lista
       .map(m => {
-        let texto = String((m.body || m.caption || '')).trim();
+        const tipo = String(m.type || '');
+        let texto = String(m.caption || '').trim();
+        if (!texto && (!tipo || tipo === 'chat' || tipo === 'text')) texto = String(m.body || '').trim();
         if (!texto) {
-          const t = String(m.type || '');
           texto = ({
             image: '[imagen]', video: '[video]', audio: '[audio]', ptt: '[nota de voz]',
-            document: '[documento]', sticker: '[sticker]', location: '[ubicación]',
-            vcard: '[contacto]', multi_vcard: '[contactos]'
-          })[t] || (m.hasMedia ? '[archivo]' : '');
+            document: `[documento]${m.filename ? ' ' + m.filename : ''}`, sticker: '[sticker]',
+            location: '[ubicación]', vcard: '[contacto]', multi_vcard: '[contactos]'
+          })[tipo] || (m.hasMedia ? '[archivo]' : '');
         }
         const idObj = m.id || {};
-        const waId = idObj._serialized || idObj.id || (m.key && m.key.id) || '';
-        if (!texto && !waId) return null;
+        const waId = idObj.id || idObj._serialized || (m.key && m.key.id) || '';
+        if (!texto) return null;
         if (waId) { if (vistos.has(waId)) return null; vistos.add(waId); }
         return {
           waId,

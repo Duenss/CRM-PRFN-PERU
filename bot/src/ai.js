@@ -27,6 +27,8 @@ REGLAS OBLIGATORIAS:
 8. No pidas datos sensibles (DNI, tarjeta, contraseñas). No envíes enlaces externos.
 9. Si el mensaje es solo un saludo, saluda y pregunta qué fragancia busca.
 10. Si no sabes algo, deriva; no adivines.
+11. Corrige los nombres mal escritos que escriba el cliente y responde por la fragancia real del catálogo (por ejemplo, "Kharmash" se refiere a "Khamrah"; "Dior Sovaje" es "Sauvage"). Si el cliente describe una familia olfativa o notas (por ejemplo, "algo amaderado", "algo dulce"), ofrece las fragancias de esa familia/notas que aparezcan en el catálogo relevante.
+12. Nunca digas que no tienes la fragancia si en el catálogo relevante aparece algo equivalente o parecido: ofrécelo por su nombre correcto.
 
 Devuelve SOLO JSON válido, sin markdown:
 {"responder":true,"texto":"respuesta para el cliente"}
@@ -41,16 +43,56 @@ function limpiarJSON(txt) {
   return null;
 }
 
+/** Quita tildes/diéresis y pasa a minúsculas para comparar. */
+const sinAcentos = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+const palabras = s => sinAcentos(s).split(/[^a-z0-9]+/).filter(w => w.length > 2);
+
+function bigramas(s) {
+  const t = ` ${s} `;
+  const g = new Set();
+  for (let i = 0; i < t.length - 1; i++) g.add(t.slice(i, i + 2));
+  return g;
+}
+
+/** Similitud 0..1 entre dos palabras (Dice por bigramas), tolera errores de escritura. */
+function similitud(a, b) {
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  if (a.includes(b) || b.includes(a)) return 0.9;
+  const A = bigramas(a), B = bigramas(b);
+  let inter = 0;
+  for (const g of A) if (B.has(g)) inter++;
+  return (2 * inter) / (A.size + B.size);
+}
+
 function relevantes(texto, productos) {
-  const t = String(texto || '').toLowerCase();
+  const t = sinAcentos(texto);
+  const tokens = palabras(texto);
   const puntos = [];
   for (const p of productos) {
     let score = 0;
-    if (t.includes(String(p.nombre || '').toLowerCase())) score += 5;
-    const casa = String(p.casa_inspirada || '').toLowerCase();
-    if (casa && t.includes(casa)) score += 3;
-    for (const palabra of String(p.nombre || '').toLowerCase().split(/\s+/)) {
-      if (palabra.length > 3 && t.includes(palabra)) score += 1;
+    const nombre = sinAcentos(p.nombre || '');
+    const casa = sinAcentos(p.casa_inspirada || '');
+    if (nombre && t.includes(nombre)) score += 6;
+    if (casa && casa.length > 3 && t.includes(casa)) score += 4;
+    for (const palabra of nombre.split(/\s+/)) {
+      if (palabra.length > 3 && t.includes(palabra)) score += 1.5;
+    }
+    for (const palabra of palabras(p.familia_olfativa)) {
+      if (t.includes(palabra)) score += 2;
+    }
+    for (const palabra of palabras(p.notas)) {
+      if (t.includes(palabra)) score += 1;
+    }
+    // Coincidencia aproximada: "Kharmash" -> "Khamrah", "Sovaje" -> "Sauvage".
+    const objetivo = [...nombre.split(/\s+/), ...casa.split(/\s+/)].filter(w => w.length > 3);
+    for (const tok of tokens) {
+      for (const ob of objetivo) {
+        if (tok === ob) continue;
+        const s = similitud(tok, ob);
+        if (s >= 0.85) { score += 2.5; break; }
+        if (s >= 0.7) { score += 1.2; break; }
+      }
     }
     if (score) puntos.push({ p, score });
   }
@@ -73,7 +115,7 @@ async function contextoCliente(texto) {
   let lista;
   if (rel.length) {
     lista = rel.map(p =>
-      `- ${p.nombre} | inspirado en: ${p.casa_inspirada || '—'} | ${p.categoria || ''}/${p.genero || ''} | ${p.familia_olfativa || ''} | 50 ml S/ ${p.precio_50ml ?? '—'} · 100 ml S/ ${p.precio_100ml ?? '—'} | ${p.descripcion || ''}`
+      `- ${p.nombre} | inspirado en: ${p.casa_inspirada || '—'} | ${p.categoria || ''}/${p.genero || ''} | familia: ${p.familia_olfativa || '—'} | notas: ${p.notas || '—'} | 50 ml S/ ${p.precio_50ml ?? '—'} · 100 ml S/ ${p.precio_100ml ?? '—'} | ${p.descripcion || ''}`
     ).join('\n');
   } else {
     const muestra = productos.slice(0, 60).map(p => `${p.nombre} (${p.casa_inspirada || '—'})`).join('; ');

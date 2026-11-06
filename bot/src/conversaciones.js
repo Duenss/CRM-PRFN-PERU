@@ -36,10 +36,18 @@ function guardar() {
 
 const limpiarTel = t => String(t || '').replace(/\D/g, '');
 const ahora = () => new Date().toISOString();
+/** Milisegundos de una fecha ISO; 0 si no se puede interpretar (ordenan al final). */
+const tiempo = c => {
+  const t = Date.parse(c && c.ultimoEn);
+  return Number.isFinite(t) ? t : 0;
+};
 
 export function registrar({ telefono, texto, direccion = 'entrante', nombre = '', clienteId = null, origen = '', estado = 'ok', waId = '', en = null }) {
   const tel = limpiarTel(telefono);
   if (!tel) return null;
+  // Nunca guardamos mensajes sin contenido (reacciones, avisos de sistema, etc.):
+  // contaminaban la fecha y el orden de la bandeja.
+  if (!String(texto || '').trim()) return null;
   const chat = chats[tel] || {
     telefono: tel,
     nombre: nombre || `+${tel}`,
@@ -51,7 +59,6 @@ export function registrar({ telefono, texto, direccion = 'entrante', nombre = ''
   };
   if (nombre) chat.nombre = String(nombre).slice(0, 120);
   if (clienteId) chat.clienteId = clienteId;
-
   // Dedupe por identificador de WhatsApp (evita duplicar al reimportar historial).
   if (waId && chat.mensajes.some(m => m.waId === waId)) return null;
 
@@ -80,13 +87,13 @@ function recortar() {
   const claves = Object.keys(chats);
   if (claves.length <= MAX_CHATS) return;
   claves
-    .sort((a, b) => String(chats[a].ultimoEn).localeCompare(String(chats[b].ultimoEn)))
+    .sort((a, b) => tiempo(chats[a]) - tiempo(chats[b]))
     .slice(0, claves.length - MAX_CHATS)
     .forEach(k => delete chats[k]);
 }
 
 /** Crea/actualiza un chat solo con su cabecera (sincronización desde WhatsApp). */
-export function registrarCabecera({ telefono, nombre = '', ultimoTexto = '', ultimoEn = null, noLeidos = 0 }) {
+export function registrarCabecera({ telefono, nombre = '', ultimoTexto = '', ultimoEn = null, noLeidos = 0, pin = false, real = true }) {
   const tel = limpiarTel(telefono);
   if (!tel) return null;
   const chat = chats[tel] || {
@@ -95,13 +102,26 @@ export function registrarCabecera({ telefono, nombre = '', ultimoTexto = '', ult
     clienteId: null,
     noLeidos: 0,
     ultimoTexto: '',
-    ultimoEn: ultimoEn || ahora(),
+    ultimoEn: ultimoEn || '',
     mensajes: []
   };
   if (nombre && (!chat.nombre || chat.nombre === `+${tel}`)) chat.nombre = String(nombre).slice(0, 120);
-  if (ultimoTexto && String(ultimoEn || '') >= String(chat.ultimoEn || '')) chat.ultimoTexto = String(ultimoTexto).slice(0, 300);
-  if (ultimoEn && String(ultimoEn) > String(chat.ultimoEn || '')) chat.ultimoEn = ultimoEn;
+  // La cabecera viene del listado real de WhatsApp: si trae fecha, es la buena.
+  if (real === false) {
+    // Lo último es solo una reacción/aviso (sin mensaje real): usamos la fecha
+    // del último mensaje real guardado (o sin fecha si nunca hubo conversación),
+    // para que no suba por encima de conversaciones reales.
+    const ult = chat.mensajes && chat.mensajes[chat.mensajes.length - 1];
+    chat.ultimoEn = ult ? ult.en : '';
+    chat.ultimoTexto = ult ? ult.texto : '';
+  } else if (ultimoEn) {
+    chat.ultimoEn = ultimoEn;
+    if (ultimoTexto) chat.ultimoTexto = String(ultimoTexto).slice(0, 300);
+  } else if (!chat.ultimoEn && ultimoTexto) {
+    chat.ultimoTexto = String(ultimoTexto).slice(0, 300);
+  }
   if (noLeidos && noLeidos > (chat.noLeidos || 0)) chat.noLeidos = noLeidos;
+  chat.pin = !!pin;
   chat.wa = true;
   chats[tel] = chat;
   recortar();
@@ -126,6 +146,7 @@ export function importarMensajes(telefono, mensajes = []) {
   const vistos = new Set(chat.mensajes.map(clave));
   let nuevos = 0;
   for (const m of mensajes) {
+    if (!String(m.texto || '').trim()) continue;
     const k = clave({ ...m, texto: String(m.texto || '') });
     if (vistos.has(k)) continue;
     const item = {
@@ -162,7 +183,7 @@ export function yaExisteWa(telefono, waId) {
 
 export function listar(limite = 40) {
   return Object.values(chats)
-    .sort((a, b) => String(b.ultimoEn).localeCompare(String(a.ultimoEn)))
+    .sort((a, b) => (Number(!!b.pin) - Number(!!a.pin)) || (tiempo(b) - tiempo(a)))
     .slice(0, limite)
     .map(c => ({
       telefono: c.telefono,
@@ -172,6 +193,7 @@ export function listar(limite = 40) {
       ultimoTexto: c.ultimoTexto,
       ultimoEn: c.ultimoEn,
       total: c.mensajes.length,
+      pin: !!c.pin,
       wa: !!c.wa
     }));
 }
@@ -186,8 +208,9 @@ export function obtener(telefono) {
     noLeidos: c.noLeidos || 0,
     ultimoTexto: c.ultimoTexto,
     ultimoEn: c.ultimoEn,
+    pin: !!c.pin,
     wa: !!c.wa,
-    mensajes: c.mensajes.slice(-MAX_MENSAJES)
+    mensajes: c.mensajes.filter(m => String(m.texto || '').trim()).slice(-MAX_MENSAJES)
   };
 }
 

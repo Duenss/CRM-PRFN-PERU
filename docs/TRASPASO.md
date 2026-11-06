@@ -17,7 +17,12 @@
   cargados). Al abrir un chat sincronizado se importa su historial desde WhatsApp a demanda.
   Rutas: `POST /api/sincronizar` y `POST /api/conversaciones/:telefono/importar`.
   - Los chats `@lid` (identificadores nuevos de WhatsApp Web) se resuelven a teléfono real vía
-    `contact.phoneNumber` / `enforceLidAndPnRetrieval`; se excluye el chat propio.
+    `contact.phoneNumber` / `enforceLidAndPnRetrieval`; se excluye el chat propio **salvo que esté
+    fijado** (así el orden refleja el de WhatsApp, donde el auto-chat suele estar anclado).
+  - **Orden de la bandeja**: fijados primero (`c.pin > 0`) y luego por la hora real del último
+    mensaje (ignorando reacciones). Los chats que solo tienen reacciones/avisos quedan sin fecha y
+    al final, nunca por encima de conversaciones reales. La hora se muestra estilo WhatsApp
+    (`HH:mm`, `Ayer`, día de la semana o fecha) en `horaWa()`.
   - `registrarCabecera` guarda a disco, así los chats sincronizados persisten tras reiniciar.
   - `getChats`/`getChatById`/`fetchMessages` de whatsapp-web.js fallan ("r") en la versión actual de
     WhatsApp Web: se leen chats y mensajes directo de la página, tolerando errores por chat.
@@ -292,6 +297,11 @@ curl -X POST http://localhost:3000/api/ia/pausar -H "Content-Type: application/j
 | `Cannot read properties of null (reading 'Socket')` | Dos sesiones a la vez | `SESIONES=1` y arranque escalonado de 12 s |
 | `window.Store` es `false` | Normal en esta versión (usa `window.require`) | No es un problema |
 | Cloudflare no puede correr el bot | Necesita Node + Chromium | Panel y función IA en Pages; bot en PC/VPS |
+| Chats "fantasma" (Alvarito, etc.) arriba de conversaciones reales | WhatsApp sube `c.t` al reaccionar; el chat no tenía mensaje real | Se usa `tsReal` (último mensaje real, ignorando reacciones); si solo hay reacciones se usa la fecha del último mensaje guardado o queda sin fecha (al fondo) |
+| Orden de la bandeja no coincide con WhatsApp | No se respetaban fijados y se usaba `c.t` (reacciones) | Orden: fijados primero (`c.pin > 0`) y luego por fecha real del último mensaje |
+| Un archivo/imagen se veía como base64 | `m.body` de multimedia trae el thumbnail | Para tipos no-texto se usa `m.caption` o marcadores `[imagen]/[video]/[documento] nombre` |
+| Mensajes vacíos (reacciones/avisos) contaminaban fechas | `registrar` aceptaba texto vacío | `registrar` ignora texto vacío; `manejarMensaje`/`manejarMensajePropio` ignoran `type:'reaction'` e `isNotification` |
+| Respuestas IA tardaban ~90 s | Cooldown largo | `COOLDOWN_SEGUNDOS` (por defecto 10 s) + dedupe por id de mensaje; número de prueba y dueño lo saltan |
 
 ## 10. Prompt para la siguiente IA
 
