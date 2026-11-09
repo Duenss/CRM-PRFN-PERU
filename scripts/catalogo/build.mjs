@@ -42,8 +42,11 @@ const PREVIEW_PRODUCTS = path.join(OUT_DIR, 'preview-productos.png');
 
 const PDF_REL = 'docs/catalogo/catalogo-navidad-2026.pdf';
 const TITULO = 'Catálogo Navidad 2026 · Perfumería Fina Perú';
-const WHATSAPP = '+51 933 221 690';
-const FOOTER_TXT = `Perfumería Fina Perú · WhatsApp ${WHATSAPP} · JV`;
+// Datos de contacto del pie: los dos números reales del negocio.
+// (Antes el pie decía "WhatsApp +51 933 221 690 · JV", que no era el número público.)
+const WHATSAPP = '+51 910 418 951';
+const WHATSAPP_ALT = '+51 935 765 136';
+const FOOTER_TXT = `Perfumería Fina Perú · ${WHATSAPP} · ${WHATSAPP_ALT}`;
 
 const PER_PAGE = 6;                 // 2 columnas x 3 filas
 const REMOTE_BASE = 'https://perfumeriafinaperu.com/';
