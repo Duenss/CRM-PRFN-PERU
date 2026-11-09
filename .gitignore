@@ -21,6 +21,10 @@ logs/
 docs/catalogo/img-opt/
 docs/catalogo/catalogo.html
 
+# Imágenes cosechadas de la web (intermedias, se regeneran con
+# scripts/catalogo/fase1-candidatos.js y fase2-validar.py)
+docs/catalogo/_imagenes-nuevas/
+
 # Sistema
 .DS_Store
 Thumbs.db
