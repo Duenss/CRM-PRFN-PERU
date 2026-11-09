@@ -1,8 +1,8 @@
 {
   "kind": "e2e",
-  "ts": "2026-11-08T21:44:46.729Z",
-  "startedAt": "2026-11-08T21:44:06.482Z",
-  "durationMs": 40246,
+  "ts": "2026-11-09T15:20:14.873Z",
+  "startedAt": "2026-11-09T15:19:35.677Z",
+  "durationMs": 39196,
   "environment": {
     "node": "v24.16.0",
     "platform": "win32/x64",
@@ -14,9 +14,9 @@
   },
   "index": {
     "path": "C:\\Users\\Juan Pablo\\Documents\\WEB PROJECTS\\Crm Perfumeriafina\\index.html",
-    "bytes": 147222,
-    "sha256": "9f2000f25d4e9e8db53ee67db9b599398e64f42840a6e7433fe9b8086bfc3fab",
-    "mtime": "2026-11-08T21:28:43.740Z"
+    "bytes": 158117,
+    "sha256": "b70c445921e1756dfc8009407ec732d2419a2f22afef23a39d73a0fea08a270d",
+    "mtime": "2026-11-09T15:03:23.722Z"
   },
   "supabaseScript": {
     "source": "bot/node_modules (offline)",
@@ -33,7 +33,7 @@
       "id": "E2E-02",
       "name": "Todas las pestañas abren sin excepciones",
       "status": "PASS",
-      "detail": "10 pestañas: inicio, bandeja, pedidos, analiticas, campanas, clientes, catalogo, calendario, ia, bot"
+      "detail": "11 pestañas: inicio, bandeja, pedidos, analiticas, campanas, anuncios, clientes, catalogo, calendario, ia, bot"
     },
     {
       "id": "E2E-03",
@@ -75,7 +75,7 @@
       "id": "E2E-09",
       "name": "Fallo de red del bot NO borra la lista ya pintada",
       "status": "PASS",
-      "detail": "3 items intactos · aviso \"⚠ Sin conexión con el bot · datos de 04:44 p. m.\" · recuperada y asentada"
+      "detail": "3 items intactos · aviso \"⚠ Sin conexión con el bot · datos de 10:19 a. m.\" · recuperada y asentada"
     },
     {
       "id": "E2E-10",
@@ -101,7 +101,7 @@
     "pageErrors": [],
     "netErrors": [
       {
-        "ts": 1794174280674,
+        "ts": 1794237608778,
         "type": "error",
         "text": "Failed to load resource: net::ERR_EMPTY_RESPONSE",
         "url": "http://127.0.0.1:3199/api/conversaciones?limite=80"
@@ -109,7 +109,7 @@
     ],
     "requestFailures": [
       {
-        "ts": 1794174280672,
+        "ts": 1794237608777,
         "url": "http://127.0.0.1:3199/api/conversaciones?limite=80",
         "method": "GET",
         "error": "net::ERR_EMPTY_RESPONSE"
@@ -119,15 +119,16 @@
   },
   "requests": {
     "botByPath": {
+      "/api/conversaciones": 12,
       "/api/estadisticas": 3,
-      "/api/conversaciones": 11,
-      "/api/estado": 6,
+      "/api/estado": 5,
       "/api/stream": 1,
-      "/api/pedidos": 4,
+      "/api/pedidos": 3,
       "/api/analiticas": 1,
+      "/api/anuncios": 1,
       "/api/ia": 1,
-      "/api/logs": 2,
-      "/api/conversaciones/51910418951": 3,
+      "/api/logs": 1,
+      "/api/conversaciones/51910418951": 4,
       "/api/conversaciones/51910418951/leido": 1,
       "/api/conversaciones/51910418951/importar": 1
     },

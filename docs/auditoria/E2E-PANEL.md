@@ -16,8 +16,8 @@
 |---|---|---|
 | Self-test del arnés (sin navegador) | ✅ **9/9 PASS** | `capturas/e2e-selftest.json` |
 | **Corrida E2E real con Chromium** | ✅ **11/11 PASS · 0 FAIL · 0 SKIP · exit 0** | `capturas/e2e-resultado.json` |
-| Comando y duración | `node scripts/e2e-panel.mjs` · **40,2 s** (40.246 ms) · Chromium 146 headless 1440×900 | 2026-11-08T21:44:06.482Z → 2026-11-08T21:44:46.729Z |
-| `index.html` probado | **`sha256=9f2000f25d4e9e8db53ee67db9b599398e64f42840a6e7433fe9b8086bfc3fab`** · 147.222 bytes · mtime 2026-11-08T21:28:43Z | campo `index` del JSON |
+| Comando y duración | `node scripts/e2e-panel.mjs` · **39,2 s** (39.196 ms) · Chromium 146 headless 1440×900 | 2026-11-09T15:19:35.677Z → 2026-11-09T15:20:14.873Z |
+| `index.html` probado | **`sha256=b70c445921e1756dfc8009407ec732d2419a2f22afef23a39d73a0fea08a270d`** · 158.117 bytes · mtime 2026-11-09T15:03:23Z | campo `index` del JSON |
 | Entorno | Node **v24.16.0** · Puppeteer **24.38.0** · Chrome for Testing **146.0.7680.31** (win32/x64) | campo `environment` |
 | Errores | **0 `console.error` JS · 0 `pageerror`** · 1 aviso de red esperado (fallo simulado `E2E-09` + imágenes offline) | campo `errors` |
 
@@ -236,7 +236,7 @@ comando de §3 funciona directamente.
 ## 8. Hallazgos
 
 **No se encontraron bugs en el panel.** Los 11 casos pasan sobre el `index.html` final
-(`sha256=9f2000f2…`), en particular los comportamientos anti-parpadeo:
+(`sha256=b70c4459…`), en particular los comportamientos anti-parpadeo:
 
 - SSE de mensaje se **agrega** al hilo (0 nodos removidos, 30/30 previos conservados).
 - Scroll anclado al fondo solo si el usuario ya estaba abajo; si está arriba, no se mueve.
@@ -284,8 +284,8 @@ Durante el desarrollo del arnés se encontraron y corrigieron **dos bugs del pro
 
 - El `index.html` se sirve **sin tocarlo** en cada petición; al empezar la corrida se registra su
   `sha256`, tamaño y `mtime` en `e2e-resultado.json` para saber exactamente qué versión se probó.
-  Corrida final: **`sha256=9f2000f25d4e9e8db53ee67db9b599398e64f42840a6e7433fe9b8086bfc3fab`**,
-  147.222 bytes.
+  Corrida final: **`sha256=b70c445921e1756dfc8009407ec732d2419a2f22afef23a39d73a0fea08a270d`**,
+  158.117 bytes.
 - Si el panel cambia de IDs/endpoints, el arnés falla con un mensaje claro (p. ej. "no existe
   `#t-<tab>`", "no se observó `new EventSource()`", "el hilo no se abrió con mensajes").
 - Si el contrato SSE cambia (tipos/campos), actualizar `createBotMock()` y `ST-05`.

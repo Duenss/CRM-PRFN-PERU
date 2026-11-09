@@ -573,6 +573,19 @@ function createBotMock() {
     /* pagos */
     if (p === '/api/pagos') return json(res, 200, { plantillas: [] });
 
+    /* anuncios */
+    if (p === '/api/anuncios') {
+      return json(res, 200, {
+        anuncios: [],
+        resumen: { total: 0, porEstado: { borrador: 0, enviando: 0, enviado: 0, cancelado: 0 }, mensajesEnviados: 0 },
+        filtros: ['todos', 'etiquetas', 'telefonos'],
+        estados: ['borrador', 'enviando', 'enviado', 'cancelado'],
+      });
+    }
+    if (p === '/api/anuncios/preview') return json(res, 200, { total: 3, sinConsentimiento: 1, ejemplos: [] });
+    if (/^\/api\/anuncios\/[^/]+\/enviar$/.test(p)) return json(res, 200, { ok: true, cola: 1 });
+    if (/^\/api\/anuncios\/[^/]+$/.test(p)) return json(res, 200, { ok: true, anuncio: { id: p.split('/').pop(), estado: 'borrador' } });
+
     /* seguimiento */
     if (/^\/api\/seguimiento(\/[^/]+)?$/.test(p)) return json(res, 200, { activo: false, items: [] });
 

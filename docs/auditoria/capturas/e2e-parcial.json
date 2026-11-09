@@ -1,11 +1,11 @@
 {
   "kind": "e2e-parcial",
-  "ts": "2026-11-08T21:44:46.727Z",
+  "ts": "2026-11-09T15:20:14.871Z",
   "index": {
     "path": "C:\\Users\\Juan Pablo\\Documents\\WEB PROJECTS\\Crm Perfumeriafina\\index.html",
-    "bytes": 147222,
-    "sha256": "9f2000f25d4e9e8db53ee67db9b599398e64f42840a6e7433fe9b8086bfc3fab",
-    "mtime": "2026-11-08T21:28:43.740Z"
+    "bytes": 158117,
+    "sha256": "b70c445921e1756dfc8009407ec732d2419a2f22afef23a39d73a0fea08a270d",
+    "mtime": "2026-11-09T15:03:23.722Z"
   },
   "totals": {
     "total": 11,
@@ -24,7 +24,7 @@
       "id": "E2E-02",
       "name": "Todas las pestañas abren sin excepciones",
       "status": "PASS",
-      "detail": "10 pestañas: inicio, bandeja, pedidos, analiticas, campanas, clientes, catalogo, calendario, ia, bot"
+      "detail": "11 pestañas: inicio, bandeja, pedidos, analiticas, campanas, anuncios, clientes, catalogo, calendario, ia, bot"
     },
     {
       "id": "E2E-03",
@@ -66,7 +66,7 @@
       "id": "E2E-09",
       "name": "Fallo de red del bot NO borra la lista ya pintada",
       "status": "PASS",
-      "detail": "3 items intactos · aviso \"⚠ Sin conexión con el bot · datos de 04:44 p. m.\" · recuperada y asentada"
+      "detail": "3 items intactos · aviso \"⚠ Sin conexión con el bot · datos de 10:19 a. m.\" · recuperada y asentada"
     },
     {
       "id": "E2E-10",
