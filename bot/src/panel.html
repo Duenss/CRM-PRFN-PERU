@@ -149,11 +149,11 @@ async function cargar(){
             ${s.estado==='conectado'?`<button class="danger" data-out="${esc(s.id)}">Cerrar sesión</button>`:''}
           </div>
         </div>
-        ${s.qr?`<img src="${s.qr}" data-ses="${esc(s.id)}" alt="QR para ${esc(s.etiqueta)}">`:''}
+        ${s.estado==='qr'?`<img src="/api/qr?sesion=${encodeURIComponent(s.id)}&token=${encodeURIComponent(token)}&t=${Date.now()}" data-ses="${esc(s.id)}" alt="QR para ${esc(s.etiqueta)}">`:''}
       </div>`).join('');
     if(zoomSesion){
       const z=sesiones.find(s=>String(s.id)===String(zoomSesion));
-      if(z&&z.qr){$('#qrbig').src=z.qr}
+      if(z&&z.estado==='qr'){$('#qrbig').src=`/api/qr?sesion=${encodeURIComponent(z.id)}&token=${encodeURIComponent(token)}&t=${Date.now()}`}
       else{$('#qrzoom').hidden=true;zoomSesion=null}
     }
     $('#t-ses').innerHTML=sesiones.map(s=>`<option value="${esc(s.id)}">${esc(s.etiqueta)}${s.numero?' (+'+esc(s.numero)+')':''}</option>`).join('')||'<option value="">Sin sesiones</option>';

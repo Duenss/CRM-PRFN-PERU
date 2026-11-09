@@ -9,6 +9,9 @@ Bot con escaneo de QR, uno o dos números, cola de envíos con retraso y auto-re
   `npx puppeteer browsers install chrome` (instala el Chrome de pruebas de Puppeteer
   en `%USERPROFILE%\.cache\puppeteer`). Deja `CHROME_PATH=` vacío en `.env`.
   Tu navegador personal (Brave, Edge, etc.) no se usa ni se toca.
+- El bot corre **sin ventana de Chrome** (`HEADLESS=true` en `.env`): el QR se escanea
+  desde el panel del CRM (Ajustes → Conectar WhatsApp), no en una ventana aparte.
+  `HEADLESS=false` queda solo para depurar un problema de vinculación.
 - Una cuenta de Supabase con las tablas del proyecto.
 - Una clave de Gemini o Anthropic (opcional; sin IA responde mensajes básicos).
 
@@ -80,11 +83,64 @@ Límites por defecto:
 | `HORA_INICIO` / `HORA_FIN` | 9:00 / 20:00 (Lima) |
 | `LUNES_A_SABADO` | true |
 
+## Estado de un envío (claim atómico) y migración 07
+
+Cada fila de `envios` de una campaña pasa por este ciclo:
+
+```
+pendiente → enviando → enviado
+                    ↘ error / omitido
+```
+
+Antes de mandar el WhatsApp, el bot **reclama** la fila con un update atómico
+`pendiente → enviando` (filtrado por `id` y `estado`). Si el update falla (red,
+RLS, constraint), **no se envía nada** y la campaña queda programada: se prefiere
+un envío perdido visible a un mensaje duplicado. Al terminar el bucle la campaña
+se cierra **siempre** (`finally`): si ya no quedan pendientes pasa a `enviada`.
+Al arrancar, los envíos que quedaron en `enviando` hace más de 10 minutos pasan a
+`error` con nota `proceso interrumpido`.
+
+Esto requiere la migración [`sql/07_envios_claim.sql`](../sql/07_envios_claim.sql)
+(idempotente): añade `envios.wa_id`, `envios.nota`, permite el estado `enviando`
+y crea el índice `(campana_id, estado)`. **Sin esa migración las campañas no se
+envían** (fail-safe) y el log muestra `❌ Falta aplicar sql/07_envios_claim.sql`.
+
+## API del bot (novedades)
+
+- `GET /api/stream?token=…` — **SSE** en vivo para el panel (`Content-Type:
+  text/event-stream`, `retry: 3000`, ping `: ping` cada 15 s). Cada evento llega
+  como `id: <n>\ndata: <json>\n\n` con `{id, tipo, en, …}`. Tipos emitidos:
+  - `mensaje` — `{telefono, nombre, nombreWa, mensaje:{…}, noLeidos, ultimoTexto, ultimoEn}`
+  - `ack` — mismo payload, con el mensaje actualizado y su `ack`
+  - `leido` — `{telefono, nombre, nombreWa, mensaje:null, noLeidos:0, ultimoTexto, ultimoEn}`
+  - `campana` — `{campanaId, estado, enviados, total, errores}` (+ `pendientes`,
+    `pausada`, `motivo` cuando se pausa)
+  - `ia` — `{accion:'config'|'pausar'|'reanudar', activa, autoRespuesta,
+    pausadas}` (+ `telefono`, `pausado`, `motivo` al pausar/reanudar)
+  - `pedido` — `{telefono, nombre, pedidoId, estado, total, metodo, detalle}`
+  - `derivacion` / `comprobante` / `seguimiento` — se emiten como antes.
+  `GET /api/eventos?desde=<id>` sigue existiendo como respaldo por polling.
+- `GET /api/estado` — cacheado 2 s, sin el campo `qr` en `sesiones` y con
+  `programadas` actualizado en segundo plano cada 30 s. El QR se pide a
+  `GET /api/qr?sesion=1` (binario PNG).
+- Timeouts: los envíos, lecturas de historial/chats/contactos y la sincronización
+  tienen techo de tiempo (`conTimeout`); la cola tiene watchdog de 2 minutos, así
+  que un cuelgue de WhatsApp no deja el bot "enviando…" para siempre.
+- Apagado ordenado con `SIGINT` y `SIGTERM`: cierra SSE, hace `flush()` de
+  conversaciones y cierra la sesión de WhatsApp con timeout.
+
+Pruebas del backend (sin dependencias nuevas):
+
+```powershell
+node --test --test-isolation=none bot/test/politicas.test.mjs bot/test/eventos.test.mjs bot/test/campanas.test.mjs
+```
+
 ## Auto-respuesta con IA
 
 - Responde solo dentro del horario y con un enfriamiento de 90 s por contacto.
 - Nunca inventa precios, stock, promociones ni pedidos.
 - Si el cliente pide un humano, tiene un reclamo o pregunta por su pedido, deriva al dueño.
+- **Pagos digitales (Yape/Plin/transferencia): la IA nunca confirma el pago.** El pedido queda en `esperando_pago` (o `comprobante_recibido`), se avisa al dueño y además **se pausa la IA de ese chat** hasta que el dueño verifique y la reanude desde el panel. Solo el efectivo cierra la venta (`por_entregar`, se cobra al entregar).
 - Si el cliente escribe **BAJA**, lo marca en Supabase y no le vuelve a escribir.
 - Los mensajes entrantes y salientes se guardan en la tabla `mensajes`.
 - Si no hay clave de IA, usa respuestas básicas para saludo, precios, envíos y pagos.

@@ -33,11 +33,11 @@ from (values
   ('Cumpleaños', 'cumpleaños',
    '¡Feliz cumpleaños, {nombre}! 🎉 En Perfumería Fina Perú queremos celebrarlo contigo con un detalle especial. Escríbenos y te ayudamos a elegir tu próxima fragancia.'),
   ('Recompra a los 2 meses', 'recompra',
-   'Hola {nombre} 👋 Ya pasaron unas semanas desde tu última compra. ¿Quieres renovar tu fragancia o probar una nueva? Tenemos 50 ml desde S/ 58 y 100 ml desde S/ 82. Te ayudo a elegir.'),
+   'Hola {nombre} 👋 Ya pasaron unas semanas desde tu última compra. ¿Quieres renovar tu fragancia o probar una nueva? Tenemos 50 ml desde S/ 56 y 100 ml desde S/ 78. Te ayudo a elegir.'),
   ('Novedad de la semana', 'novedad',
    'Hola {nombre} ✨ Llegaron nuevas fragancias a Perfumería Fina Perú. Son equivalentes de alta calidad, con 50% de esencia y en nuestro propio envase. ¿Te muestro las novedades de esta semana?'),
   ('Fiestas Patrias', 'festividad',
-   'Hola {nombre} 🇵🇪 En Perfumería Fina Perú celebramos Fiestas Patrias con una promo especial. Fragancias equivalentes de 50 ml desde S/ 58 y 100 ml desde S/ 82. ¿Te reservo la tuya?'),
+   'Hola {nombre} 🇵🇪 En Perfumería Fina Perú celebramos Fiestas Patrias con una promo especial. Fragancias equivalentes de 50 ml desde S/ 56 y 100 ml desde S/ 78. ¿Te reservo la tuya?'),
   ('Día de la Madre', 'festividad',
    'Hola {nombre} 🌸 Se acerca el Día de la Madre. En Perfumería Fina Perú tenemos fragancias equivalentes de alta calidad para sorprenderla. ¿Te ayudo a elegir la ideal?')
 ) as v(nombre, tipo, texto_base)

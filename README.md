@@ -1,8 +1,65 @@
 # CRM Perfumería Fina Perú
 
-Panel privado para clientes, catálogo, campañas y envío semi-manual por WhatsApp.
+Panel privado para clientes, catálogo, campañas, anuncios y envío semi-manual por WhatsApp.
 Incluye un bot con QR para programar envíos, una **bandeja de entrada** en vivo y un
 **Asistente IA** que responde consultas (nunca envía campañas solo).
+
+## Novedades 2026-11-09 (producción)
+
+- **Bienvenida en dos mensajes**: toda conversación nueva empieza con saludo según la hora
+  de Lima + agradecimiento (“Nos alegra que hayas elegido a *Perfumería Fina Perú* como tu
+  perfumería de preferencia”), y después el tema que pidió el cliente.
+- **Catálogo PDF navideño**: si el cliente pide el catálogo, el bot envía
+  `docs/catalogo/catalogo-navidad-2026.pdf` (41 páginas, 202 fragancias) con los rangos por
+  categoría: **Diseñador 4–28 · Árabes 30–35 · Nicho 37–41**.
+- **Módulo de Anuncios** (nueva pestaña): un mensaje único que redactas y envías a *todos*,
+  *por etiquetas* o a *números seleccionados*, con vista previa, conteo de destinatarios y
+  progreso en vivo. Respeta consentimiento, bajas, horario y límite diario.
+- **Medios de pago**: “¿cuáles son tus medios de pago?” responde efectivo/Yape/Plin/
+  transferencia (ya no una lista de perfumes). Se eliminaron las plantillas de pago: los
+  datos salen de `PAGO_*` y **el administrador verifica el pago digital**.
+- **Agenda con cupos**: las entregas/recojos se agendan con fecha y hora en formato
+  a. m./p. m., validando `CUPOS_ESTACION` por hora para no saturar una franja.
+- **Audios completos**: transcripción completa (4096 tokens, 60 s, 4000 caracteres) con
+  rotación de modelos y respaldo gratuito opcional con Groq Whisper.
+- **Despliegue listo**: `Dockerfile`, `docker-compose.yml`, `ecosystem.config.cjs`,
+  `bot/.env.production.example`, egg de Pterodactyl en `deploy/pterodactyl/` y guía en
+  **`docs/DESPLIEGUE-PRODUCCION.md`**.
+- **Limpieza para producción**: `bot/scripts/limpiar-datos.mjs` respalda y vacía clientes y
+  datos locales antes de entregar.
+- **Tests**: `51/51` pruebas unitarias (`bot/test`) + arnés e2e del panel
+  (`scripts/e2e-panel.mjs`). Ver `docs/auditoria/ENTREGA-2026-11-08.md`.
+
+## Novedades 2026-11-08 (importante antes de desplegar)
+
+- **Tiempo real (SSE)**: el panel usa `GET /api/stream` del bot; si el stream falla, cae
+  solo al polling. Ya no hay doble polling ni re-render completo del hilo.
+- **Campañas a prueba de duplicados**: el bot reclama cada envío en Supabase antes de
+  mandarlo y cierra la campaña siempre. Requiere ejecutar **`sql/07_envios_claim.sql`**;
+  sin esa migración las campañas **no se envían** (fail-safe) y el log lo avisa.
+- **IA de campañas**: los borradores salen con el formato de WhatsApp de la tienda
+  (gancho ✨, beneficios ✅, fragancias 🔥, envíos 🚚, CTA 🛍️ y link). Si la IA falla o no
+  hay clave, hay 3 borradores de respaldo con el catálogo real.
+- **IA del asistente**: si el cliente pide opciones o una familia (p. ej. "amaderados"),
+  responde con **3 opciones en viñetas** (nombre + inspirado en, sin precios); el precio
+  y la foto se envían cuando el cliente elige o pregunta.
+- **Estilo profesional de WhatsApp**: la IA usa *negrita* para nombres/precios, _cursiva_
+  para matices, viñetas `•` y emojis con criterio; el bot normaliza el markdown de web
+  (`**` → `*`) y el panel muestra el formato en el hilo y en la vista previa.
+- **Pagos**: solo **efectivo** cierra la venta desde el bot. Yape/Plin/transferencia
+  **nunca** se confirman: avisa al dueño, deriva y **pausa la IA de ese chat** hasta que el
+  dueño verifique y reanude.
+- **Conexión sin ventana de Chrome**: `HEADLESS=true` en `bot/.env` evita que el bot abra
+  una ventana de WhatsApp Web. El QR se escanea **solo en Ajustes** y la sesión queda
+  guardada en `bot/.wwebjs_auth` (no se repite al reiniciar). El envío manual de campañas
+  abre WhatsApp Web en tu mismo navegador (Brave) o la app de escritorio, según Ajustes.
+- **Tests**: `43/43` pruebas unitarias (`bot/test`) + arnés e2e del panel
+  (`scripts/e2e-panel.mjs`). Ver `docs/auditoria/ENTREGA-2026-11-08.md`.
+- **Roadmap de mejoras**: `docs/MEJORAS-ROADMAP.md` (conexión, campañas, IA, bandeja, datos,
+  analítica y seguridad, priorizado por esfuerzo/impacto).
+
+> Si vienes de una instalación anterior: primero corre `sql/07_envios_claim.sql`, luego
+> reinicia el bot y por último despliega el panel.
 
 ## Estructura
 
@@ -17,6 +74,7 @@ sql/01d_productos_153-202.sql Perfumes 153 a 202
 sql/01_productos.sql          Catálogo completo en un solo archivo (referencia)
 sql/02_datos_y_esquema.sql    Tienda, plantillas, calendario y tabla de mensajes
 sql/03_seguridad_rls.sql      Políticas de acceso (RLS)
+sql/07_envios_claim.sql       Claim de envíos de campaña (obligatorio para enviar)
 sql/00_instalar_todo.sql      Todo en un solo archivo (opción rápida)
 bot/                       Bot de WhatsApp con QR, cola de envíos, bandeja e IA
 docs/                      Contratos de diseño y traspaso técnico (leer antes de tocar)
@@ -39,6 +97,8 @@ En Supabase → **SQL Editor**, ejecuta los archivos **uno por uno**, en este or
 4. `sql/01d_productos_153-202.sql` → perfumes 153 a 202.
 5. `sql/02_datos_y_esquema.sql` → datos de la tienda, plantillas y columnas nuevas.
 6. `sql/03_seguridad_rls.sql` → deja el acceso solo para el dueño con sesión iniciada.
+7. `sql/07_envios_claim.sql` → claim de envíos de campaña (estado `enviando`, `wa_id`,
+   índice). **Sin este paso las campañas no se envían** (fail-safe).
 
 > **Importante:** antes de pulsar **Run**, haz clic dentro del editor y presiona `Ctrl+A`
 > (o asegúrate de no tener texto seleccionado). Si hay una selección parcial, Supabase
@@ -141,7 +201,9 @@ Todo se controla desde el bot (`/api/ia`), así que los cambios sobreviven al re
 
 | Método | Ruta | Para qué |
 | --- | --- | --- |
-| GET | `/api/estado` | Conexión, cola, enviados hoy, horario, resumen IA |
+| GET | `/api/estado` | Conexión, cola, enviados hoy, horario, resumen IA (sin QR; caché 2 s) |
+| GET | `/api/stream?token=…` | **SSE en vivo** para el panel (mensajes, ack, campañas, IA, pedidos) |
+| GET | `/api/qr?sesion=1&token=…` | QR de WhatsApp como imagen PNG |
 | GET | `/api/estadisticas?dias=7` | Serie de mensajes por día |
 | GET | `/api/conversaciones` | Lista de chats (con no leídos y pausas) |
 | GET | `/api/conversaciones/:telefono` | Hilo completo |

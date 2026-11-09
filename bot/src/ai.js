@@ -1,5 +1,15 @@
 import { config } from './config.js';
 import { getProductos, getConfiguracion } from './supabase.js';
+import {
+  formatearCampana,
+  formatearOpciones,
+  borradoresDeRespaldo,
+  buscarPorFamilia,
+  detectarFamilia,
+  detectarCategoria,
+  detectarPeticionOpciones,
+  normalizarWhatsApp
+} from './mensajes.js';
 
 let cache = { at: 0, productos: [] };
 
@@ -29,37 +39,60 @@ const SYS = `Eres el asistente de WhatsApp de Perfumería Fina Perú, una tienda
 Respondes mensajes de clientes por WhatsApp. El dueño revisa la conversación después.
 
 REGLA DE ESTILO (muy importante):
-- Conversa como una persona amable, no como un catálogo. Frases cortas, naturales y cálidas.
-- Usa el nombre del cliente si lo conoces, una sola vez y sin exagerar.
+- Escribe como una persona real de tienda, profesional y cálida: nada de robot, call center ni plantilla.
+- FORMATO WHATSAPP: usa *negrita* solo para el dato clave (nombre del perfume, precio o tamaño); _cursiva_ solo para un matiz suave; viñetas "•" solo en listas; emojis con criterio (1 por mensaje, máximo 2; en la lista de 3 opciones, uno por línea o ninguno).
+- NUNCA uses markdown de web: nada de **dobles**, # títulos, __cursiva__, bloques de código ni HTML. WhatsApp usa UN asterisco para negrita y UN guion bajo para cursiva.
+- Estructura: 1 o 2 párrafos cortos (máximo 55 palabras) y UNA pregunta concreta al final. No mandes muros de texto ni repitas el mismo dato.
+- Varía las aperturas; evita el "¡Claro!" o "¡Hola!" repetido en cada respuesta. Usa el nombre del cliente como máximo una vez.
+- No suenes a plantilla: evita "Como asistente virtual", "Estoy aquí para ayudarte" y "¿En qué más puedo ayudarte?".
+- Si el cliente escribe con errores, responde normal; no lo corrijas de forma pedante.
 - No llenes el mensaje de datos. Primero conecta, luego ofrece.
-- Máximo 2 emojis por mensaje.
 
 REGLAS OBLIGATORIAS:
-1. Habla solo de la tienda y de los productos, precios, pagos, envíos y horarios que aparecen en los datos entregados. No inventes nada.
+1. Habla SOLO de Perfumería Fina Perú: fragancias, precios, tamaños, familias, notas, envíos, pagos, pedidos, horarios, cuidados y equivalencias. No inventes nada y no des información de otras tiendas.
 2. Los productos son EQUIVALENTES: inspirados en marcas conocidas, con 50% de esencia y en su propio envase. Nunca digas que son originales ni de la marca. Usa "equivalente" o "inspirado en".
 3. No confirmes stock, pedidos, pagos recibidos ni fechas de entrega. Si preguntan por eso, deriva al encargado.
 4. No ofrezcas descuentos ni promociones que no estén en los datos. Si preguntan por una promo, deriva al encargado.
 5. Si el cliente pide hablar con una persona, tiene un reclamo, un problema con un pedido, o pide factura/boleta, deriva al encargado.
+5.1 ALCANCE (solo tienda): si preguntan por OTRA tienda/perfumería, por el precio de otra tienda, o por la diferencia con otra perfumería (o con la marca original), responde con amabilidad y generosidad, pero di con claridad que **no manejamos precios ni datos de otras tiendas** (ese tipo de preguntas no está en lo que puedo responder); luego ofrece lo que sí puedes resolver (qué fragancia equivalente tenemos, notas, precios, envíos). Nunca inventes precios ni datos de competidores. Ejemplo: "Ese tipo de preguntas no las manejo: no doy precios ni datos de otras tiendas. Sí te cuento que tenemos equivalentes inspirados en [marca], con 50% de esencia". Si insiste en el tema ajeno, deriva al encargado.
+5.2 RECLAMOS: si el cliente reclama (pedido no llegó, producto en mal estado, cobro, demora, trato, devolución o reembolso), discúlpate breve y sinceramente, dile que lo pasas con un ADMINISTRADOR y deriva con motivo "reclamo del cliente". No prometas solución, reembolso ni plazo; eso lo decide el administrador.
+5.3 TEMAS AJENOS: no des asesoría legal, médica, financiera ni de otras marcas/tiendas. Redirige con amabilidad a lo que sí hacemos.
 6. Tono cercano, amable y respetuoso, español peruano neutro, tuteo. Sin presión.
-7. Cada mensaje debe ser breve (máximo 45 palabras) y con 1 o 2 emojis como máximo.
+7. Cada mensaje debe ser breve (máximo 45 palabras) y con 1 o 2 emojis como máximo. La única excepción es la lista de 3 opciones de la regla 18.
 8. No pidas datos sensibles (DNI, tarjeta, contraseñas). No envíes enlaces externos.
 9. Si el mensaje es solo un saludo, saluda y pregunta qué fragancia busca.
 10. Si no sabes algo, deriva; no adivines.
-11. Corrige los nombres mal escritos que escriba el cliente y responde por la fragancia real del catálogo (por ejemplo, "Kharmash" se refiere a "Khamrah"; "Dior Sovaje" es "Sauvage"). Si el cliente describe una familia olfativa o notas (por ejemplo, "algo amaderado", "algo dulce"), ofrece las fragancias de esa familia/notas que aparezcan en el catálogo relevante.
+11. Corrige los nombres mal escritos que escriba el cliente y responde por la fragancia real del catálogo (por ejemplo, "Kharmash" se refiere a "Khamrah"; "Dior Sovaje" es "Sauvage"). Si el cliente describe una familia olfativa o notas (por ejemplo, "algo amaderado", "algo dulce"), responde con las 3 opciones de la regla 18 usando el catálogo relevante. Si pide una categoría ("nicho", "árabe", "de diseñador"), también responde con 3 opciones de esa categoría: SÍ tenemos nicho (25), árabe (31) y diseñador (146).
 12. Nunca digas que no tienes la fragancia si en el catálogo relevante aparece algo equivalente o parecido: ofrécelo por su nombre correcto.
 
 13. Cuando recomiendes una fragancia concreta del catálogo, agrega su id exacto en "productoId" (el id va entre corchetes en la lista: [id: khamrah]). Sirve para enviarle la foto.
-14. Si el cliente confirma que quiere comprar (dice qué fragancia y qué tamaño), agrega "pedido" con productoId, ml (50 o 100), cantidad y método de pago si lo mencionó ("yape", "plin", "transferencia", "efectivo"). Si no mencionó método, deja "metodo":"".
-15. Nunca confirmes un pago, un comprobante ni una entrega: eso lo revisa el encargado.
+14. Si el cliente confirma que quiere comprar (dice qué fragancia y qué tamaño), agrega "pedido" con productoId, ml (50 o 100), cantidad y método de pago si lo mencionó ("yape", "plin", "transferencia", "efectivo"). Si menciona recojo en una estación, agrega "entrega":"estacion" y "estacion":"nombre de la estación"; si es delivery, "entrega":"delivery". Si menciona día/hora, agrega "fecha":"YYYY-MM-DD" y "hora":"HH:MM". Si no mencionó método, deja "metodo":""; si no mencionó entrega, deja "entrega":""; si no mencionó fecha/hora, déjalas vacías.
+15. PAGOS (regla estricta, no negociable):
+   - La ÚNICA forma de cerrar la venta es EFECTIVO: se paga al entregar (Lima) o al recoger. Con efectivo sí puedes confirmar el pedido y decir que paga al recibir.
+   - Yape, Plin, transferencia u otra billetera digital: NUNCA confirmes, valides ni des por hecho el pago. Pide que envíe el comprobante y explica que el encargado lo verificará; la verificación se deriva al encargado.
+   - Nunca digas "pago confirmado", "pago verificado", "pago recibido" ni "ya está pagado".
+   - Si el cliente dice que ya pagó por Yape/Plin/transferencia: pide el comprobante y avisa que queda en revisión, sin confirmar el pago.
 16. Devuelve SOLO JSON válido, sin markdown. Ejemplos:
-{"responder":true,"texto":"¡Claro, Juan! Te envío la foto de nuestra fragancia equivalente inspirada en Asad de Lattafa 📸","productoId":"asad","pregunta":"¿Te gustaría que te lo preparemos? Tenemos 50 ml por S/ 56 y 100 ml por S/ 78 😊"}
-{"responder":true,"texto":"respuesta","productoId":"yara","pregunta":"¿Te animas por el de 50 ml o el de 100 ml? Están S/ 56 y S/ 78 ✨","pedido":{"productoId":"yara","ml":100,"cantidad":1,"metodo":"yape"}}
+{"responder":true,"texto":"¡Perfecto, Juan! Te envío la foto de *Asad*, nuestro equivalente inspirado en Lattafa 📸","productoId":"asad","pregunta":"¿Lo prefieres en 50 ml (*S/ 56*) o en 100 ml (*S/ 78*)? 😊"}
+{"responder":true,"texto":"respuesta","productoId":"yara","pregunta":"¿Te animas por el de 50 ml (*S/ 56*) o el de 100 ml (*S/ 78*)? ✨","pedido":{"productoId":"yara","ml":100,"cantidad":1,"metodo":"yape"}}
 {"derivar":true,"motivo":"motivo corto para el dueño"}
-17. Cuando recomiendes una fragancia, la respuesta se envía en DOS mensajes:
-   - "texto": SOLO una introducción cálida que acompaña la foto. Sin precios. Máximo 30 palabras. Ejemplo: "¡Claro, Juan! Te envío la foto de nuestra fragancia equivalente inspirada en Asad de Lattafa 📸"
-   - "pregunta": un segundo mensaje que invita a decidir, mencionando los tamaños y los precios reales del catálogo (50 ml y 100 ml). Ejemplo: "¿Te gustaría que te lo preparemos? Tenemos 50 ml por S/ 56 y 100 ml por S/ 78 😊"
+17. Cuando recomiendes UNA fragancia concreta, la respuesta se envía en DOS mensajes:
+   - "texto": SOLO una introducción cálida que acompaña la foto, sin precios. Máximo 30 palabras. Ejemplo: "¡Perfecto, Juan! Te envío la foto de *Asad*, nuestro equivalente inspirado en Lattafa 📸"
+   - "pregunta": un segundo mensaje que invita a decidir, mencionando los tamaños y los precios reales del catálogo en *negrita*. Ejemplo: "¿Lo prefieres en 50 ml (*S/ 56*) o en 100 ml (*S/ 78*)? 😊"
    Si NO recomiendas una fragancia concreta, responde solo con "texto" (sin "pregunta") y no repitas precios si no te los piden.
-18. No envíes listas largas de perfumes ni varios precios de golpe: elige una fragancia y conversa sobre ella.`;
+18. OPCIONES (obligatorio): si el cliente pide opciones, recomendaciones, alternativas o "cuáles", o menciona una familia olfativa (amaderado, dulce, floral, fresco, cítrico, frutal, oriental, gourmand, aromático, especiado, acuático, chipre, cuero, ámbar, etc.), o una categoría (nicho, árabe, diseñador), responde con EXACTAMENTE 3 opciones en viñetas, una por línea y con este formato:
+   • *Nombre* (inspirado en X)
+   - 3 viñetas ni más ni menos; usa SOLO productos del catálogo relevante. Si el prompt trae "Candidatos por familia", usa esos.
+   - El nombre va en *negrita*; sin precios, "S/", tamaños ni "50 ml/100 ml" dentro de la lista: se ve repetitivo. El precio se manda SOLO cuando el cliente elige una o lo pregunta.
+   - Para la lista de 3, deja "productoId" vacío y "pregunta" vacía: la foto y el precio se envían cuando el cliente elija.
+   - La lista de 3 opciones va SOLO en "texto". Puedes cerrar con una línea corta y una pregunta, sin emojis de más.
+19. No envíes listas largas de perfumes ni el catálogo completo: la única lista permitida es la de EXACTAMENTE 3 opciones de la regla 18.
+20. DESPUÉS de la lista de 3: si el cliente elige una ("el Asad", "ese", "el segundo", "muéstrame el Hamarain"), responde con UNA sola fragancia: "texto" como introducción a la foto (con el nombre en *negrita*), "productoId" de esa fragancia y "pregunta" con sus precios reales en *negrita* (50 ml y 100 ml). No repitas la lista.
+   - Si pregunta "¿cuánto cuesta?" sin elegir, responde una sola vez "50 ml *S/ 56* · 100 ml *S/ 78*" y pregunta cuál le interesa (no repitas el precio por cada producto).
+   - Si dice "ese" / "me gusta" sin especificar, pregunta cuál de las 3 opciones es.
+21. CATEGORÍAS: el catálogo SÍ tiene fragancias de nicho, árabes y de diseñador (nicho: 25, árabe: 31, diseñador: 146). Si el cliente pide "algo de nicho", "un árabe" o "de diseñador", ofrécele 3 opciones de esa categoría en viñetas. NUNCA derives ni digas que no hay esa categoría.
+22. SALUDO: si es el PRIMER mensaje de la conversación, o si el cliente envía un resumen de compra, empieza con "Buenos días", "Buenas tardes" o "Buenas noches" (según la hora de Lima: 5-11, 12-18, 19-4) seguido del nombre del cliente y una frase corta. Ejemplo: "Buenas tardes, Juan. Gracias por tu resumen 😊". No repitas el saludo en los mensajes siguientes.
+23. RESUMEN DE COMPRA: si el cliente manda producto, tamaño, cantidad, total o método de pago, confirma el resumen con esos datos y explica el siguiente paso (efectivo al recibir/recoger; digital: enviar comprobante y el encargado verifica). No inventes productos ni precios y no confirmes el pago.`;
 
 function limpiarJSON(txt) {
   const clean = String(txt || '').replace(/```json/gi, '').replace(/```/g, '').trim();
@@ -107,6 +140,13 @@ function relevantes(texto, productos) {
     for (const palabra of palabras(p.familia_olfativa)) {
       if (t.includes(palabra)) score += 2;
     }
+    // Categoría del catálogo: "nicho", "arabe", "disenador".
+    for (const palabra of palabras(p.categoria)) {
+      if (palabra.length >= 4 && t.includes(palabra)) score += 3;
+    }
+    for (const palabra of palabras(p.genero)) {
+      if (palabra.length >= 3 && t.includes(palabra)) score += 1;
+    }
     for (const palabra of palabras(p.notas)) {
       if (t.includes(palabra)) score += 1;
     }
@@ -125,6 +165,12 @@ function relevantes(texto, productos) {
   return puntos.sort((a, b) => b.score - a.score).slice(0, 8).map(x => x.p);
 }
 
+/**
+ * Arma el contexto de la tienda y del catálogo relevante para el modelo.
+ * Si el cliente pide opciones o menciona una familia olfativa, agrega los
+ * "Candidatos por familia" (ya buscados sin acentos) para que el modelo
+ * responda las 3 opciones en viñetas.
+ */
 async function contextoCliente(texto) {
   const [cfg, productos] = await Promise.all([getConfiguracion(), catalogo()]);
   const tienda = [
@@ -138,6 +184,20 @@ async function contextoCliente(texto) {
   ].filter(Boolean).join('\n') || 'Perfumería Fina Perú. Perfumes equivalentes con 50% de esencia. Precios: S/ 56 por 50 ml y S/ 78 por 100 ml.';
 
   const rel = relevantes(texto, productos);
+  const familia = detectarFamilia(texto);
+  const categoria = detectarCategoria(texto);
+  const pideOpciones = detectarPeticionOpciones(texto);
+
+  let candidatos = [];
+  if (familia) {
+    candidatos = buscarPorFamilia(productos, familia, 3);
+  } else if (categoria) {
+    // "algo de nicho/árabe/diseñador": el catálogo SÍ tiene esas categorías.
+    candidatos = buscarPorFamilia(productos, categoria, 3);
+  } else if (pideOpciones) {
+    candidatos = (rel.length ? rel : productos.slice(0, 3)).slice(0, 3);
+  }
+
   let lista;
   if (rel.length) {
     lista = rel.map(p =>
@@ -147,14 +207,27 @@ async function contextoCliente(texto) {
     const muestra = productos.slice(0, 60).map(p => `[id: ${p.id}] ${p.nombre} (${p.casa_inspirada || '—'})`).join('; ');
     lista = `El catálogo tiene ${productos.length} fragancias. Algunas: ${muestra}. Precios: 50 ml S/ 56 y 100 ml S/ 78.`;
   }
-  return { tienda, lista };
+
+  if (candidatos.length) {
+    const etiqueta = familia ? `familia "${familia}"` : categoria ? `categoría "${categoria}"` : 'relevantes';
+    lista += `\n\nCandidatos por ${etiqueta} (usa EXACTAMENTE estos 3 en viñetas, SIN precios):\n`;
+    lista += candidatos.map(p =>
+      `• ${p.nombre} (inspirado en ${p.casa_inspirada || '—'}) [id: ${p.id}]`
+    ).join('\n');
+  } else if (pideOpciones) {
+    lista += '\n\nEl cliente pidió opciones: responde con 3 viñetas usando los productos relevantes de arriba, sin precios.';
+  } else if (categoria) {
+    lista += `\n\nEl cliente pidió categoría "${categoria}" y el catálogo sí tiene productos de esa categoría (nicho: 25, árabe: 31, diseñador: 146). Ofrece 3 en viñetas; nunca derives por creer que no hay.`;
+  }
+
+  return { tienda, lista, pideOpciones, familia, categoria, candidatos };
 }
 
 /**
  * Si el cliente nombró una fragancia concreta (o su casa inspirada), devuelve su
  * id aunque el modelo haya olvidado `productoId`. Así la foto se envía siempre.
  */
-async function productoMencionado(texto) {
+export async function productoMencionado(texto) {
   const productos = await catalogo();
   if (!productos.length) return '';
   const rel = relevantes(texto, productos);
@@ -172,21 +245,42 @@ async function productoMencionado(texto) {
   return '';
 }
 
+/** ¿El mensaje es un reclamo/problema que debe ver un administrador? */
+function esReclamo(texto) {
+  const t = String(texto || '').toLowerCase();
+  return /\b(reclamo|queja|no me lleg[oó]|no lleg[oó]|mal estado|roto|defectuoso|estafa|me cobraron|devoluci[oó]n|reembolso|no es lo que ped[ií]|p[eé]sima atenci[oó]n|p[eé]simo)\b/i.test(t);
+}
+
 function fallback(texto) {
   // Quita emojis/símbolos iniciales (p. ej. el prefijo de una nota de voz) para
   // que las reglas por palabra clave sigan funcionando.
   const t = String(texto || '').toLowerCase().replace(/^[^a-z0-9áéíóúñü]+/, '');
   if (/^(hola|buenas|buenos d|hey|qué tal|que tal)/.test(t)) {
-    return { responder: true, texto: 'Hola 👋 Gracias por escribir a Perfumería Fina Perú. ¿Qué fragancia estás buscando?' };
+    return { responder: true, texto: 'Hola 👋 Gracias por escribir a *Perfumería Fina Perú*. ¿Qué fragancia estás buscando?' };
+  }
+  if (/(otra tienda|otra perfumer[ií]a|comparar|comparaci[oó]n|diferencia entre|marca original|precio en otra|cu[aá]nto cuesta en)/.test(t)) {
+    return { responder: true, texto: 'Ese tipo de preguntas no las manejo: no doy precios ni datos de otras tiendas. Sí te cuento que tenemos *equivalentes inspirados* en marcas conocidas, con 50% de esencia. ¿Qué fragancia buscas o qué notas te gustan? 😊' };
   }
   if (/precio|cu[aá]nto|costo|tarifa/.test(t)) {
-    return { responder: true, texto: 'Manejamos S/ 56 el perfume de 50 ml y S/ 78 el de 100 ml. Son equivalentes con 50% de esencia, inspirados en marcas conocidas. ¿Cuál te gustaría conocer? ✨' };
+    return { responder: true, texto: 'Manejamos *S/ 56* el perfume de 50 ml y *S/ 78* el de 100 ml. Son equivalentes con 50% de esencia, inspirados en marcas conocidas. ¿Cuál te gustaría conocer? ✨' };
   }
   if (/env[ií]o|delivery|llega|provincia/.test(t)) {
-    return { responder: true, texto: 'Enviamos a todo el Perú desde Lima. También puedes recoger en nuestras estaciones: VMT sin costo y las demás por S/ 5. ¿A dónde te lo llevamos? 📦' };
+    return { responder: true, texto: 'Enviamos a todo el Perú desde Lima.\n• Recoges en *VMT sin costo*\n• Otras estaciones por *S/ 5*\n¿A dónde te lo llevamos? 📦' };
   }
-  if (/pago|yape|oy|efectivo/.test(t)) {
-    return { responder: true, texto: 'Puedes pagar con Yape, OY! o efectivo. ¿Te ayudo a elegir una fragancia? 💛' };
+  if (/horario|atienden|abren|cierran/.test(t)) {
+    return { responder: true, texto: 'Atendemos de *lunes a sábado*, de *9:00 a 20:00* (hora de Lima). ¿Qué fragancia te gustaría ver? 🕘' };
+  }
+  if (/original|equivalente|inspirad|50%|esencia/.test(t)) {
+    return { responder: true, texto: 'Nuestras fragancias son *equivalentes inspiradas* en marcas conocidas: 50% de esencia y envase propio. No son originales de la marca, pero huelen muy parecido 😊 ¿Buscas alguna en particular?' };
+  }
+  if (/dura|fijaci[oó]n|estela|cu[aá]nto tiempo/.test(t)) {
+    return { responder: true, texto: 'La duración depende de la piel y la fragancia; en general nuestras *equivalencias al 50%* tienen buena fijación. ¿Buscas algo para el día o para la noche? ✨' };
+  }
+  if (/\b(pago|pagar|yape|plin|transferencia|efectivo)\b/.test(t)) {
+    return { responder: true, texto: 'Puedes cerrar tu compra en *efectivo* al entregar (Lima) o al recoger. Si prefieres *Yape*, *Plin* o transferencia, pide los datos, envía tu comprobante y el encargado lo verifica; el pago no se confirma automáticamente 💛' };
+  }
+  if (/gracias|genial|perfecto|ok/.test(t)) {
+    return { responder: true, texto: '¡Con gusto! 😊 Si quieres, te ayudo a elegir una fragancia o te paso fotos y precios de las que te interesen.' };
   }
   // Si la IA no está disponible, es mejor responder algo útil que derivar y
   // pausar la conversación ante cualquier mensaje. El dueño puede tomar el control
@@ -194,10 +288,77 @@ function fallback(texto) {
   return { responder: true, texto: '¡Gracias por escribir a Perfumería Fina Perú! Cuéntame qué fragancia buscas o qué notas te gustan y te ayudo a elegir 😊' };
 }
 
-export async function redactarRespuesta({ mensaje, historial = [], cliente, contexto = '' }) {
-  if (!config.geminiKey && !config.anthropicKey) return { ...fallback(mensaje), respaldo: true };
+/** ¿La respuesta trae 3 viñetas con "inspirado en" y SIN precios (formato pedido)? */
+function cumpleTresOpciones(texto) {
+  const lineas = String(texto || '').split('\n')
+    .map(l => l.trim())
+    .filter(l => /^[•\-*]\s+/.test(l));
+  if (lineas.length !== 3) return false;
+  if (/S\s*\/\s*\d/i.test(lineas.join(' '))) return false;
+  return lineas.every(l => /inspirad[oa]\s+en/i.test(l));
+}
 
-  const { tienda, lista } = await contextoCliente(mensaje);
+/**
+ * Respuesta determinística de 3 opciones con el catálogo real. Se usa cuando
+ * el cliente pide opciones/familia y la IA no está disponible, falla o no
+ * cumple con las 3 viñetas. Devuelve null si no aplica o no hay catálogo.
+ */
+async function respuestaOpciones(texto) {
+  if (!detectarPeticionOpciones(texto)) return null;
+  if (esPreguntaMediosPago(texto)) return null;
+  try {
+    const productos = await catalogo();
+    if (!productos.length) return null;
+    const familia = detectarFamilia(texto);
+    const categoria = detectarCategoria(texto);
+    let candidatos = familia ? buscarPorFamilia(productos, familia, 3) : [];
+    if (!candidatos.length && categoria) candidatos = buscarPorFamilia(productos, categoria, 3);
+    if (!candidatos.length && !familia && !categoria) {
+      const rel = relevantes(texto, productos);
+      candidatos = (rel.length ? rel : productos.slice(0, 3)).slice(0, 3);
+    }
+    if (!candidatos.length) return null;
+    const titulo = familia
+      ? `Estas son 3 opciones de ${familia} que te pueden gustar:`
+      : categoria
+        ? `Estas son 3 opciones de ${categoria} que te pueden gustar:`
+        : '';
+    const respuesta = formatearOpciones(candidatos, { titulo });
+    if (!respuesta) return null;
+    return { texto: respuesta, productoId: '', pregunta: '' };
+  } catch (e) {
+    console.warn('[ia] no se pudo armar la respuesta de opciones:', e.message);
+    return null;
+  }
+}
+
+/** ¿Pregunta por los medios de pago de la tienda? */
+function esPreguntaMediosPago(texto) {
+  const t = String(texto || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  return /(medios?|formas?|metodos?)\s+de\s+pago|como\s+(puedo\s+)?pagar|puedo\s+pagar|aceptan?\s+(yape|plin|tarjeta|efectivo|transferencia)/.test(t);
+}
+
+function respuestaMediosPago() {
+  return '¡Claro! Aceptamos estos medios de pago:\n\n• *Efectivo* al entregar o recoger\n• *Yape*\n• *Plin*\n• *Transferencia*\n\nPara Yape, Plin o transferencia, envías tu comprobante y el administrador verifica el pago. ¿Cuál te acomoda? 😊';
+}
+
+export async function redactarRespuesta({ mensaje, historial = [], cliente, contexto = '' }) {
+  const pideOpciones = detectarPeticionOpciones(mensaje);
+  // Medios de pago: respuesta directa, nunca una lista de perfumes.
+  if (esPreguntaMediosPago(mensaje)) {
+    return { responder: true, texto: respuestaMediosPago(), productoId: '', pedido: null, pregunta: '' };
+  }
+  // Reclamos: siempre a un administrador, sin que la IA improvise soluciones.
+  if (esReclamo(mensaje)) return { derivar: true, motivo: 'reclamo del cliente' };
+  if (!config.geminiKey && !config.anthropicKey && !config.groqKey) {
+    if (pideOpciones) {
+      const op = await respuestaOpciones(mensaje);
+      if (op) return { responder: true, texto: op.texto, productoId: op.productoId, pedido: null, pregunta: '', respaldo: true };
+    }
+    return { ...fallback(mensaje), respaldo: true };
+  }
+
+  const { tienda, lista, pideOpciones: pideOpcionesCtx, familia, candidatos } = await contextoCliente(mensaje);
   const prev = historial.map(h =>
     `${h.direccion === 'entrante' ? 'Cliente' : 'Tienda'}: ${String(h.texto || '').slice(0, 300)}`
   ).join('\n');
@@ -212,23 +373,56 @@ ${lista}
 
 Cliente: ${cliente?.nombre || 'nuevo contacto'}
 ${prev ? `Conversación reciente:\n${prev}\n` : ''}
-Mensaje nuevo del cliente: ${String(mensaje).slice(0, 800)}
+Mensaje nuevo del cliente: ${String(mensaje).slice(0, 2500)}
 
 Responde ahora.`;
 
   try {
-    const raw = config.geminiKey ? await gemini(prompt) : await anthropic(prompt);
+    let raw;
+    if (config.geminiKey) {
+      try {
+        raw = await gemini(prompt);
+      } catch (eGem) {
+        if (!config.groqKey) throw eGem;
+        console.warn('[ia] Gemini sin cuota/error; se prueba Groq:', eGem.message);
+        raw = await groqChat(prompt);
+      }
+    } else if (config.groqKey) {
+      raw = await groqChat(prompt);
+    } else {
+      raw = await anthropic(prompt);
+    }
     const j = limpiarJSON(raw);
-    if (!j) return { ...fallback(mensaje), respaldo: true };
-    if (j.derivar) return { derivar: true, motivo: String(j.motivo || 'Revisión manual').slice(0, 160) };
-    const texto = String(j.texto || '').trim().slice(0, 900);
-    if (!texto) return { ...fallback(mensaje), respaldo: true };
+    if (!j) {
+      const op = pideOpciones ? await respuestaOpciones(mensaje) : null;
+      if (op) return { responder: true, texto: op.texto, productoId: op.productoId, pedido: null, pregunta: '', respaldo: true };
+      return { ...fallback(mensaje), respaldo: true };
+    }
+    if (j.derivar) {
+      // Si pidió opciones/familia/categoría, se responde con catálogo real antes
+      // de derivar: no queremos que "algo de nicho" acabe en un mensaje genérico.
+      if (pideOpciones) {
+        const op = await respuestaOpciones(mensaje);
+        if (op) return { responder: true, texto: op.texto, productoId: '', pedido: null, pregunta: '', respaldo: true };
+      }
+      return { derivar: true, motivo: String(j.motivo || 'Revisión manual').slice(0, 160) };
+    }
+    let texto = normalizarWhatsApp(String(j.texto || '').trim()).slice(0, 900);
+    if (!texto) {
+      const op = pideOpciones ? await respuestaOpciones(mensaje) : null;
+      if (op) return { responder: true, texto: op.texto, productoId: op.productoId, pedido: null, pregunta: '', respaldo: true };
+      return { ...fallback(mensaje), respaldo: true };
+    }
     const pedido = j.pedido && typeof j.pedido === 'object'
       ? {
           productoId: String(j.pedido.productoId || j.productoId || '').trim(),
           ml: Number(j.pedido.ml) === 100 ? 100 : 50,
           cantidad: Math.max(1, Math.min(9, Math.round(Number(j.pedido.cantidad) || 1))),
-          metodo: String(j.pedido.metodo || '').toLowerCase().trim()
+          metodo: String(j.pedido.metodo || '').toLowerCase().trim(),
+          entrega: String(j.pedido.entrega || '').toLowerCase().trim(),
+          estacion: String(j.pedido.estacion || '').trim(),
+          fecha: String(j.pedido.fecha || '').trim(),
+          hora: String(j.pedido.hora || '').trim()
         }
       : null;
     const productoId = String(j.productoId || pedido?.productoId || '').trim();
@@ -236,10 +430,33 @@ Responde ahora.`;
     if (!productoFinal) {
       try { productoFinal = await productoMencionado(mensaje); } catch {}
     }
-    const pregunta = String(j.pregunta || '').trim().slice(0, 400);
+    let pregunta = normalizarWhatsApp(String(j.pregunta || '').trim()).slice(0, 400);
+
+    // Garantía: si pidieron opciones/familia y el modelo no trajo las 3
+    // viñetas (con inspirado en + precio), se completa con el catálogo real.
+    if (pideOpcionesCtx && candidatos.length >= 3 && !cumpleTresOpciones(texto)) {
+      const titulo = familia ? `Estas son 3 opciones de ${familia} que te pueden gustar:` : '';
+      const garantizada = formatearOpciones(candidatos, { titulo });
+      if (garantizada) {
+        texto = garantizada.slice(0, 900);
+        if (!productoFinal && candidatos[0]?.id) productoFinal = String(candidatos[0].id);
+        pregunta = '';
+      }
+    }
+
+    // Si la respuesta es la lista de 3 opciones, NO se manda foto ni precios
+    // todavía: el cliente elige primero y recién ahí se le manda la ficha.
+    const esLista = (String(texto).match(/^\s*[•\-*]\s+/gm) || []).length >= 3;
+    if (pideOpcionesCtx && esLista) {
+      productoFinal = '';
+      pregunta = '';
+    }
+
     return { responder: true, texto, productoId: productoFinal, pedido, pregunta };
   } catch (e) {
     console.warn('[ia] error:', e.message);
+    const op = pideOpciones ? await respuestaOpciones(mensaje) : null;
+    if (op) return { responder: true, texto: op.texto, productoId: op.productoId, pedido: null, pregunta: '', respaldo: true, motivoFallo: e.message };
     return { ...fallback(mensaje), respaldo: true, motivoFallo: e.message };
   }
 }
@@ -251,7 +468,7 @@ async function gemini(prompt, opts = {}) {
   const preferido = config.aiModel || 'gemini-3.6-flash';
   // Orden probado con la clave actual: 3.6 responde rápido; el resto son
   // alternativas si hay alta demanda (503) o cuota agotada (429).
-  const modelos = [...new Set([preferido, 'gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-3.5-flash', 'gemini-3-flash-preview'])];
+  const modelos = [...new Set([preferido, 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3-flash-preview', 'gemini-3.8-flash', 'gemini-3.7-flash'])];
   const timeout = (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') ? () => AbortSignal.timeout(20000) : () => undefined;
   let ultimo;
   for (const model of modelos) {
@@ -295,6 +512,61 @@ async function gemini(prompt, opts = {}) {
   throw ultimo || new Error('Gemini sin respuesta');
 }
 
+/**
+ * Respaldo gratuito con Groq (API compatible con OpenAI). Se usa cuando Gemini
+ * no tiene cuota o no hay GEMINI_API_KEY. Config: GROQ_API_KEY.
+ */
+async function groqChat(prompt, opts = {}) {
+  if (!config.groqKey) throw new Error('Sin GROQ_API_KEY');
+  const sistema = opts.system || SYS;
+  const cuerpo = {
+    model: config.groqModel || 'llama-3.3-70b-versatile',
+    messages: [
+      { role: 'system', content: sistema },
+      { role: 'user', content: String(prompt || '') }
+    ],
+    temperature: Number.isFinite(opts.temperature) ? opts.temperature : 0.6,
+    max_tokens: Number.isFinite(opts.maxOutputTokens) ? opts.maxOutputTokens : 800
+  };
+  if (opts.json) cuerpo.response_format = { type: 'json_object' };
+  const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${config.groqKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(cuerpo),
+    signal: AbortSignal.timeout(Number(opts.timeout) || 30000)
+  });
+  if (!r.ok) {
+    const detalle = (await r.text().catch(() => '')).slice(0, 200);
+    throw new Error(`Groq ${r.status}: ${detalle}`);
+  }
+  const j = await r.json();
+  return String(j.choices?.[0]?.message?.content || '').trim();
+}
+
+/** Transcripción gratuita con Groq Whisper (si GROQ_API_KEY está configurada). */
+async function groqTranscribir(base64, mimeType = 'audio/ogg') {
+  if (!config.groqKey) return '';
+  const mime = String(mimeType || 'audio/ogg').split(';')[0];
+  const ext = /wav/.test(mime) ? 'wav' : /mp3|mpeg/.test(mime) ? 'mp3' : /mp4|m4a/.test(mime) ? 'm4a' : 'ogg';
+  const form = new FormData();
+  form.append('file', new Blob([Buffer.from(base64, 'base64')], { type: mime }), `audio.${ext}`);
+  form.append('model', config.groqAudioModel || 'whisper-large-v3-turbo');
+  form.append('language', 'es');
+  form.append('response_format', 'json');
+  const r = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${config.groqKey}` },
+    body: form,
+    signal: AbortSignal.timeout(60000)
+  });
+  if (!r.ok) {
+    const detalle = (await r.text().catch(() => '')).slice(0, 200);
+    throw new Error(`Groq audio ${r.status}: ${detalle}`);
+  }
+  const j = await r.json();
+  return String(j.text || '').trim();
+}
+
 async function anthropic(prompt) {  const r = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -320,10 +592,23 @@ async function anthropic(prompt) {  const r = await fetch('https://api.anthropic
  * o cadena vacía si no se pudo. La entrada es base64 (sin prefijo data:).
  */
 export async function transcribirAudio({ base64, mimeType = 'audio/ogg' }) {
-  if (!config.geminiKey || !base64) return '';
-  const modelos = [...new Set([config.aiModel || 'gemini-3.6-flash', 'gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-3.5-flash'])];
-  const timeout = (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') ? () => AbortSignal.timeout(30000) : () => undefined;
-  const orden = 'Transcribe literalmente este audio en el idioma en que esté (normalmente español de Perú). Devuelve SOLO la transcripción, sin comillas, sin comentarios y sin formato. Si no se entiende nada, devuelve una cadena vacía.';
+  if (!base64) return '';
+  // Primero Groq Whisper si está configurado: capa gratuita más generosa y no
+  // gasta la cuota de Gemini. Si falla, sigue con Gemini.
+  if (config.groqKey) {
+    try {
+      const tg = await groqTranscribir(base64, mimeType);
+      if (tg) return tg.slice(0, 4000);
+    } catch (e) {
+      console.warn('[ia] Groq audio falló, se intenta Gemini:', e.message);
+    }
+  }
+  if (!config.geminiKey) return '';
+  const modelos = [...new Set([config.aiModel || 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3-flash-preview', 'gemini-3.6-flash', 'gemini-3.8-flash', 'gemini-3.7-flash'])];
+  // Audios de WhatsApp: transcripción COMPLETA. 60 s por intento y salida amplia
+  // (antes 400 tokens / 30 s cortaban notas largas a mitad de frase).
+  const timeout = (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') ? () => AbortSignal.timeout(60000) : () => undefined;
+  const orden = 'Transcribe COMPLETA y literalmente este audio en el idioma en que esté (normalmente español de Perú). No resumas, no omitas frases, no cortes la última idea: quiero todo lo que dice la persona. Ignora silencios o muletillas extremas. Devuelve SOLO la transcripción, sin comillas, sin comentarios y sin formato. Si no se entiende nada, devuelve una cadena vacía.';
   for (const model of modelos) {
     try {
       const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(config.geminiKey)}`, {
@@ -331,14 +616,14 @@ export async function transcribirAudio({ base64, mimeType = 'audio/ogg' }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ role: 'user', parts: [{ text: orden }, { inlineData: { mimeType, data: base64 } }] }],
-          generationConfig: { temperature: 0.2, maxOutputTokens: 400 }
+          generationConfig: { temperature: 0.1, maxOutputTokens: 4096 }
         }),
         signal: timeout()
       });
       if (!r.ok) continue;
       const j = await r.json();
       const t = (j.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('').trim();
-      if (t) return t.slice(0, 800);
+      if (t) return t.slice(0, 4000);
     } catch (e) {
       console.warn('[ia] transcripción con ' + model + ': ' + e.message);
     }
@@ -346,81 +631,150 @@ export async function transcribirAudio({ base64, mimeType = 'audio/ogg' }) {
   return '';
 }
 
-const SYS_BORRADORES = `Eres el asistente de redacción de Perfumería Fina Perú, una tienda de perfumes en Perú.
-Tu única tarea es redactar BORRADORES de mensajes de WhatsApp y textos promocionales para que el dueño los revise.
+const SYS_BORRADORES = `Eres el redactor de campañas de WhatsApp de Perfumería Fina Perú, una tienda de perfumes equivalentes en Perú.
+Tu única tarea es entregar 3 BORRADORES de campaña para que el dueño los revise. No envías nada ni inventas datos.
+
+ESTILO OBLIGATORIO (el del WhatsApp real de la tienda):
+- Gancho corto y potente para la primera línea (la app lo muestra en mayúsculas entre ✨ ... ✨).
+- Subtítulo de una línea que explique la campaña.
+- 3 o 4 beneficios concretos, en frases cortas (la app les pone ✅ delante).
+- 3 fragancias destacadas elegidas de la lista de productos (SOLO ids válidos de esa lista).
+- Cierre con un llamado a la acción claro (la app le pone 🛍️ delante).
+- El encabezado, las viñetas con precios, la línea de envíos y el link web los agrega el sistema: NO los escribas.
+- No incluyas BAJA ni frases de opt-out (el servidor la agrega al final).
 
 Reglas:
 1. Habla solo de la tienda y de los productos que aparecen en los datos que te entrego. No inventes perfumes, precios, descuentos, stock, notas olfativas ni promociones.
-2. Si falta un dato, escribe [COMPLETAR] en lugar de inventarlo.
-3. No compares con competidores ni hables de otras marcas o tiendas.
-4. Tono: cercano, amable y respetuoso, en español peruano neutro. Sin presionar al cliente. Trata de "tú".
-5. Mensajes cortos (máximo 60 a 80 palabras), con un llamado a la acción claro y como máximo 2 emojis.
-6. Usa {nombre} donde deba ir el nombre del cliente.
-7. No prometas cosas que no estén en los datos (envíos, garantías, autenticidad) salvo que aparezcan ahí.
-8. Los productos son perfumes EQUIVALENTES (inspirados en marcas conocidas, con 50% de esencia y en su propio envase). Nunca los presentes como el perfume original ni como de la marca. Usa "equivalente" o "inspirado en".
-9. Entrega exactamente 3 versiones distintas.
-10. Si te piden algo ajeno a la tienda, responde: "Solo puedo ayudar con mensajes de la tienda".
+2. Los precios NO van en el JSON: el sistema toma el precio real del catálogo para cada producto. No escribas cifras ni "S/".
+3. Los productos son perfumes EQUIVALENTES (inspirados en marcas conocidas, con 50% de esencia y en su propio envase). Nunca los presentes como el perfume original ni como de la marca. Usa "equivalente" o "inspirado en".
+4. No compares con competidores ni nombres de otras tiendas.
+5. Tono: cercano, amable y respetuoso, español peruano neutro, tuteo, sin presionar.
+6. Usa {nombre} como máximo una vez por versión, solo si suena natural (la app lo reemplaza por el nombre del cliente).
+7. Entrega EXACTAMENTE 3 versiones distintas: la 1) promo/oferta, la 2) regalo/novedad y la 3) colección/variedad.
+8. Si falta un dato, no lo inventes: describe la fragancia con la familia/notas que sí aparecen en la lista.
+9. No prometas envíos gratis, garantías, sorteos ni autenticidad salvo que estén en las condiciones escritas por el dueño.
+10. Pagos: si mencionas pago, solo efectivo al entregar o al recoger (Lima). Yape/Plin/transferencia nunca se confirman: no prometas confirmación de pago.
+11. Cada texto final debe quedar por debajo de 900 caracteres.
+12. Si te piden algo ajeno a la tienda, responde: "Solo puedo ayudar con mensajes de la tienda".
 
-Formato de salida: JSON válido, sin markdown, con esta forma:
-{"borradores":["texto 1","texto 2","texto 3"]}`;
+Formato de salida: SOLO JSON válido, sin markdown, con esta forma exacta:
+{"borradores":[{"gancho":"REGALA LA FELICIDAD ESTA NAVIDAD","subtitulo":"...","beneficios":["...","...","..."],"productos":["khamrah","asad","santal-33"],"cierre":"..."},{"gancho":"...","subtitulo":"...","beneficios":["...","...","..."],"productos":["...","...","..."],"cierre":"..."},{"gancho":"...","subtitulo":"...","beneficios":["...","...","..."],"productos":["...","...","..."],"cierre":"..."}]}`;
 
-/** Separa los borradores aunque el modelo agregue markdown o numeración. */
-function parseBorradores(txt) {
-  const clean = String(txt || '').replace(/```json/gi, '').replace(/```/g, '').trim();
-  try {
-    const j = JSON.parse(clean);
-    if (Array.isArray(j.borradores)) return j.borradores.map(String).map(s => s.trim()).filter(Boolean);
-  } catch {}
-  const m = clean.match(/\{[\s\S]*\}/);
-  if (m) {
-    try {
-      const j = JSON.parse(m[0]);
-      if (Array.isArray(j.borradores)) return j.borradores.map(String).map(s => s.trim()).filter(Boolean);
-    } catch {}
-  }
-  return clean.split(/\n(?=\d[\.\)]\s)/).map(s => s.replace(/^\d[\.\)]\s*/, '').trim()).filter(Boolean);
+/**
+ * Normaliza la respuesta estructurada de la IA a objetos de campaña.
+ * Acepta `{"borradores":[{...}]}` y, como respaldo, textos sueltos.
+ * Exportada para poder probarla sin llamar a la IA.
+ */
+export function parseBorradoresEstructurados(txt) {
+  const j = limpiarJSON(txt);
+  const crudos = Array.isArray(j?.borradores) ? j.borradores : [];
+  if (!crudos.length) return [];
+  return crudos.map(b => {
+    if (typeof b === 'string') {
+      return { gancho: b.slice(0, 80), subtitulo: '', beneficios: [], productos: [], cierre: b.slice(0, 160) };
+    }
+    if (!b || typeof b !== 'object') return null;
+    return {
+      gancho: String(b.gancho || '').trim().slice(0, 90),
+      subtitulo: String(b.subtitulo || '').trim().slice(0, 200),
+      beneficios: (Array.isArray(b.beneficios) ? b.beneficios : [])
+        .map(x => String(x || '').replace(/\s+/g, ' ').trim())
+        .filter(Boolean)
+        .slice(0, 4),
+      productos: (Array.isArray(b.productos) ? b.productos : [])
+        .map(x => String(x || '').trim())
+        .filter(Boolean)
+        .slice(0, 3),
+      cierre: String(b.cierre || '').trim().slice(0, 240)
+    };
+  }).filter(Boolean);
 }
 
 /**
  * Redacta 3 borradores de campaña usando el catálogo real de Supabase.
  * No envía nada: solo devuelve texto para que el dueño lo revise.
+ * Si falta GEMINI_API_KEY, la IA falla o devuelve algo inválido, cae a
+ * `borradoresDeRespaldo` (textos ya formateados con el catálogo real).
  */
 export async function redactarBorradores({ objetivo = 'promo', condiciones = '', segmento = [], productos = [] } = {}) {
-  if (!config.geminiKey) throw new Error('Falta configurar GEMINI_API_KEY en el bot.');
   const [cfg, todos] = await Promise.all([getConfiguracion(), getProductos()]);
-  const ids = new Set((Array.isArray(productos) ? productos : []).map(String));
-  const elegidos = ids.size ? todos.filter(p => ids.has(String(p.id))) : todos.slice(0, 40);
+  const ids = new Set((Array.isArray(productos) ? productos : []).map(x => String(x || '').trim()).filter(Boolean));
+  let elegidos = ids.size ? todos.filter(p => ids.has(String(p.id))) : [];
+  if (!elegidos.length) {
+    console.warn('[ia] campaña: no hubo productos seleccionados; se usa el inicio del catálogo.');
+    elegidos = todos.slice(0, 40);
+  }
+  if (!elegidos.length) throw new Error('No hay productos en el catálogo para redactar la campaña.');
 
-  const tienda = [
-    cfg.nombre && `Nombre: ${cfg.nombre}`,
-    cfg.tono_de_voz && `Tono de voz: ${cfg.tono_de_voz}`,
-    cfg.whatsapp && `WhatsApp: +${cfg.whatsapp}`,
-    cfg.horario && `Horario: ${cfg.horario}`,
-    cfg.medios_de_pago && `Pagos: ${cfg.medios_de_pago}`,
-    cfg.envios && `Envíos: ${cfg.envios}`,
-    cfg.enlace_web && `Web: ${cfg.enlace_web}`
+  const tienda = cfg && typeof cfg === 'object' ? cfg : {};
+  const respaldo = () => borradoresDeRespaldo({ productos: elegidos, tienda, objetivo, condiciones });
+
+  // Sin clave de IA (o solo con Anthropic, que no se usa para campañas) se
+  // devuelven 3 borradores de respaldo, no un error.
+  if (!config.geminiKey && !config.groqKey) return respaldo();
+
+  const datosTienda = [
+    tienda.nombre && `Nombre: ${tienda.nombre}`,
+    tienda.tono_de_voz && `Tono de voz: ${tienda.tono_de_voz}`,
+    tienda.whatsapp && `WhatsApp: +${tienda.whatsapp}`,
+    tienda.horario && `Horario: ${tienda.horario}`,
+    tienda.medios_de_pago && `Pagos: ${tienda.medios_de_pago}`,
+    tienda.envios && `Envíos: ${tienda.envios}`,
+    tienda.enlace_web && `Web: ${tienda.enlace_web}`
   ].filter(Boolean).join('\n') || 'Perfumería Fina Perú, perfumes equivalentes con 50% de esencia.';
 
-  const lista = elegidos.length
-    ? elegidos.map(p =>
-        `- ${p.nombre} | inspirado en: ${p.casa_inspirada || '[COMPLETAR]'} | ${p.categoria || ''}/${p.genero || ''} | ${p.familia_olfativa || ''} | 50 ml S/ ${p.precio_50ml ?? '[COMPLETAR]'} · 100 ml S/ ${p.precio_100ml ?? '[COMPLETAR]'}`
-      ).join('\n')
-    : 'No se seleccionaron productos. No inventes nombres; pide al dueño que agregue uno.';
+  const lista = elegidos.map(p =>
+    `- id: ${p.id} | ${p.nombre} | inspirado en: ${p.casa_inspirada || '—'} | ${p.categoria || ''}/${p.genero || ''} | familia: ${p.familia_olfativa || '—'} | notas: ${p.notas || '—'}`
+  ).join('\n');
 
   const prompt = `Tipo de campaña: ${String(objetivo || 'promo').slice(0, 40)}
 Datos de la tienda:
-${tienda}
+${datosTienda}
 
-Productos disponibles para esta campaña:
+Productos disponibles para esta campaña (usa SOLO estos ids en "productos"):
 ${lista}
 
 Condiciones de la promoción escritas por el dueño:
-${String(condiciones || '').slice(0, 600) || '[COMPLETAR]'}
+${String(condiciones || '').slice(0, 600) || 'Sin condiciones especiales'}
 
 Segmento de clientes: ${(Array.isArray(segmento) ? segmento.slice(0, 10).join(', ') : '') || 'todos los clientes con consentimiento'}
 
-Redacta exactamente 3 versiones distintas. Devuelve solo el JSON indicado.`;
+Redacta las 3 versiones (promo, regalo/novedad y colección) y devuelve solo el JSON indicado.`;
 
-  const raw = await gemini(prompt, { system: SYS_BORRADORES, temperature: 0.85, maxOutputTokens: 1600 });
-  return parseBorradores(raw).slice(0, 3);
+  try {
+    let raw;
+    try {
+      raw = await gemini(prompt, { system: SYS_BORRADORES, temperature: 0.85, maxOutputTokens: 2200 });
+    } catch (eGem) {
+      if (!config.groqKey) throw eGem;
+      console.warn('[ia] campaña: Gemini falló, se usa Groq:', eGem.message);
+      raw = await groqChat(prompt, { system: SYS_BORRADORES, temperature: 0.85, maxOutputTokens: 2200, json: true });
+    }
+    const estructurados = parseBorradoresEstructurados(raw);
+    if (!estructurados.length) throw new Error('La IA no devolvió borradores estructurados');
+
+    const porId = new Map(elegidos.map(p => [sinAcentos(p.id), p]));
+    const porNombre = new Map(elegidos.map(p => [sinAcentos(p.nombre), p]));
+    const textos = [];
+    for (const b of estructurados) {
+      const productosBorrador = b.productos
+        .map(id => porId.get(sinAcentos(id)) || porNombre.get(sinAcentos(id)))
+        .filter(Boolean);
+      const ps = productosBorrador.length ? productosBorrador : elegidos.slice(0, 3);
+      textos.push(formatearCampana({ ...b, productos: ps, tienda, contexto: condiciones }));
+    }
+
+    // Garantiza 3 textos distintos completando con el respaldo si hace falta.
+    const unicos = [...new Set(textos.filter(Boolean))];
+    if (unicos.length < 3) {
+      for (const t of respaldo()) {
+        if (unicos.length >= 3) break;
+        if (!unicos.includes(t)) unicos.push(t);
+      }
+    }
+    return unicos.slice(0, 3);
+  } catch (e) {
+    console.warn('[ia] borradores con IA fallaron, usando respaldo:', e.message);
+    return respaldo();
+  }
 }

@@ -111,6 +111,12 @@ export function crear(datos = {}) {
     saldo: 0,
     metodo,
     estado,
+    // Entrega: 'delivery' (a domicilio) o 'estacion' (recojo en estación).
+    entrega: ['delivery', 'estacion'].includes(String(datos.entrega || '')) ? String(datos.entrega) : '',
+    estacion: String(datos.estacion || '').slice(0, 120),
+    fechaEntrega: String(datos.fechaEntrega || '').slice(0, 10),
+    horaEntrega: String(datos.horaEntrega || '').slice(0, 5),
+    refExterna: String(datos.refExterna || '').slice(0, 80),
     comprobantes: [],
     pagoEnviadoEn: null,
     notas: String(datos.notas || '').slice(0, 800),
@@ -163,6 +169,11 @@ export function actualizar(id, cambios = {}) {
   if (cambios.adelanto !== undefined) p.adelanto = cambios.adelanto;
   if (cambios.notas !== undefined) p.notas = String(cambios.notas || '').slice(0, 800);
   if (cambios.items !== undefined) p.items = cambios.items;
+  if (cambios.entrega !== undefined && ['delivery', 'estacion', ''].includes(String(cambios.entrega))) p.entrega = String(cambios.entrega);
+  if (cambios.estacion !== undefined) p.estacion = String(cambios.estacion || '').slice(0, 120);
+  if (cambios.fechaEntrega !== undefined) p.fechaEntrega = String(cambios.fechaEntrega || '').slice(0, 10);
+  if (cambios.horaEntrega !== undefined) p.horaEntrega = String(cambios.horaEntrega || '').slice(0, 5);
+  if (cambios.refExterna !== undefined) p.refExterna = String(cambios.refExterna || '').slice(0, 80);
   if (cambios.estado !== undefined) {
     const nuevo = estadoValido(cambios.estado);
     p.estado = nuevo;

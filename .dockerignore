@@ -1,0 +1,19 @@
+# Cosas que NO deben entrar a la imagen Docker (reducen peso y evitan secretos)
+.git
+.gitignore
+bot/.env
+bot/.env.*.example
+bot/data
+bot/.wwebjs_auth
+bot/.wwebjs_cache
+bot/node_modules
+**/node_modules
+docs/catalogo/img-opt
+docs/catalogo/catalogo.html
+docs/catalogo/preview-*.png
+docs/catalogo/productos.json
+docs/auditoria
+scripts
+sql
+*.log
+tmp-*.mjs

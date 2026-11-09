@@ -1,0 +1,43 @@
+{
+  "_comment": "Egg de Pterodactyl para el bot de Perfumería Fina. Requiere una imagen Docker que YA incluya Chromium (el egg estándar de Node.js NO lo trae, y whatsapp-web.js lo necesita). Importar en el panel: Admin → Nests → Import Egg. Ajusta 'docker_images' si usas tu propia imagen construida con el Dockerfile del repo (por ejemplo ghcr.io/TU_USUARIO/pf-bot:latest).",
+  "meta": {
+    "version": "PTDL_v2",
+    "update_url": null
+  },
+  "exported_at": "2026-11-09T00:00:00+00:00",
+  "name": "PF Bot WhatsApp (Node 22 + Chromium)",
+  "author": "panel@perfumeriafina.local",
+  "description": "Bot de WhatsApp (whatsapp-web.js + Puppeteer) y API del CRM de Perfumería Fina. Necesita Chromium dentro de la imagen Docker; el egg de Node.js por defecto no lo incluye.",
+  "features": null,
+  "docker_images": {
+    "Playwright Jammy (incluye Chromium y Node 20)": "mcr.microsoft.com/playwright:v1.49.0-jammy",
+    "Imagen propia pf-bot": "ghcr.io/CAMBIAR_USUARIO/pf-bot:latest"
+  },
+  "file_denylist": [],
+  "startup": "node src/server.js",
+  "config": {
+    "files": "{}",
+    "startup": "{\"done\": \"Panel del bot\"}",
+    "logs": "{}",
+    "stop": "^C"
+  },
+  "scripts": {
+    "installation": {
+      "script": "#!/bin/bash\n# Instalación del bot dentro del servidor de Pterodactyl.\nset -e\ncd /mnt/server\n\nif [ ! -d bot ]; then\n  echo \"[PF] Sube el contenido del repositorio a la raíz del servidor (debe existir la carpeta bot/).\"\nfi\n\ncd /mnt/server/bot\nif [ -f package.json ]; then\n  npm install --omit=dev\nelse\n  echo \"[PF] No se encontró bot/package.json\"\nfi\n\necho \"[PF] Listo. Configura las variables de entorno y arranca el servidor.\"\n",
+      "container": "node:22-bookworm-slim",
+      "entrypoint": "bash"
+    }
+  },
+  "variables": [
+    { "name": "Supabase URL", "description": "URL del proyecto Supabase", "env_variable": "SUPABASE_URL", "default_value": "https://pcesvmsewfpvmqmfmswn.supabase.co", "user_viewable": true, "user_editable": true, "rules": "required|string", "field_type": "text" },
+    { "name": "Supabase service_role", "description": "Clave service_role (secreta)", "env_variable": "SUPABASE_SERVICE_ROLE_KEY", "default_value": "", "user_viewable": true, "user_editable": true, "rules": "required|string", "field_type": "text" },
+    { "name": "Token del panel", "description": "Protege el panel y la API del bot", "env_variable": "BOT_TOKEN", "default_value": "", "user_viewable": true, "user_editable": true, "rules": "nullable|string", "field_type": "text" },
+    { "name": "Gemini API Key", "description": "Clave de la API de Gemini (con facturación)", "env_variable": "GEMINI_API_KEY", "default_value": "", "user_viewable": true, "user_editable": true, "rules": "nullable|string", "field_type": "text" },
+    { "name": "Groq API Key", "description": "Respaldo gratuito para texto y audio", "env_variable": "GROQ_API_KEY", "default_value": "", "user_viewable": true, "user_editable": true, "rules": "nullable|string", "field_type": "text" },
+    { "name": "Número del dueño", "description": "Recibe los avisos (formato 51910418951)", "env_variable": "OWNER_NUMBER", "default_value": "", "user_viewable": true, "user_editable": true, "rules": "required|string", "field_type": "text" },
+    { "name": "Modo prueba", "description": "true = no envía nada real", "env_variable": "MODO_PRUEBA", "default_value": "false", "user_viewable": true, "user_editable": true, "rules": "required|in:true,false", "field_type": "text" },
+    { "name": "Chromium", "description": "Ruta del binario de Chromium dentro de la imagen", "env_variable": "CHROME_PATH", "default_value": "/ms-playwright/chromium-1148/chrome-linux/chrome", "user_viewable": true, "user_editable": true, "rules": "nullable|string", "field_type": "text" },
+    { "name": "Sin ventana", "description": "HEADLESS=true obligatorio en servidor", "env_variable": "HEADLESS", "default_value": "true", "user_viewable": true, "user_editable": true, "rules": "required|in:true,false", "field_type": "text" },
+    { "name": "Puerto", "description": "Puerto de la API/panel del bot", "env_variable": "PORT", "default_value": "3000", "user_viewable": true, "user_editable": false, "rules": "required|integer", "field_type": "text" }
+  ]
+}

@@ -1,0 +1,74 @@
+{
+  "kind": "self-test",
+  "ts": "2026-11-08T19:20:23.723Z",
+  "node": "v24.16.0",
+  "platform": "win32/x64",
+  "index": {
+    "path": "C:\\Users\\Juan Pablo\\Documents\\WEB PROJECTS\\Crm Perfumeriafina\\index.html",
+    "bytes": 146815,
+    "sha256": "dd9e74530fd56ddc32f5c1f35af033857945ace55003fdf1b334feacf8f006bc",
+    "mtime": "2026-11-08T19:19:17.553Z"
+  },
+  "cases": [
+    {
+      "id": "ST-01",
+      "name": "index.html real se sirve por HTTP",
+      "status": "PASS",
+      "detail": "HTTP 200 · 146320 bytes"
+    },
+    {
+      "id": "ST-02",
+      "name": "GET /api/estado tiene la forma que usa el panel",
+      "status": "PASS",
+      "detail": "sesiones=1 · modoPrueba=true"
+    },
+    {
+      "id": "ST-03",
+      "name": "GET /api/conversaciones y detalle (30 mensajes de scroll, orden por ultimoEn)",
+      "status": "PASS",
+      "detail": "3 chats ordenados · hilo=30 mensajes"
+    },
+    {
+      "id": "ST-03b",
+      "name": "SSE y REST comparten estado (clave para idle sin parpadeo)",
+      "status": "PASS",
+      "detail": "REST sincronizado con SSE · ultimoTexto/noLeidos/orden/detalle OK"
+    },
+    {
+      "id": "ST-04",
+      "name": "resto de endpoints del bot responden con la forma esperada",
+      "status": "PASS",
+      "detail": "9 endpoints OK · QR 70 bytes PNG"
+    },
+    {
+      "id": "ST-05",
+      "name": "SSE /api/stream: retry, hola, mensaje, ack, campana, derivación",
+      "status": "PASS",
+      "detail": "frames=5 · tipos=hola,mensaje,ack,campana,derivacion"
+    },
+    {
+      "id": "ST-06",
+      "name": "Supabase interceptado: fixtures, 404 controlado y refresh de auth",
+      "status": "PASS",
+      "detail": "clientes/productos/plantillas/campanas/envios + 404 + refresh OK"
+    },
+    {
+      "id": "ST-07",
+      "name": "la sesión falsa de Supabase es aceptada por supabase-js real",
+      "status": "PASS",
+      "detail": "storageKey=sb-pcesvmsewfpvmqmfmswn-auth-token · sesión aceptada (exp 1794169223)"
+    },
+    {
+      "id": "ST-08",
+      "name": "supabase-js UMD local disponible para servir en lugar del CDN",
+      "status": "PASS",
+      "detail": "bot/node_modules (offline) · v2.119.0 · 215 KB"
+    }
+  ],
+  "totals": {
+    "total": 9,
+    "pass": 9,
+    "fail": 0,
+    "skip": 0
+  }
+}

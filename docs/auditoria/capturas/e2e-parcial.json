@@ -1,0 +1,84 @@
+{
+  "kind": "e2e-parcial",
+  "ts": "2026-11-08T21:44:46.727Z",
+  "index": {
+    "path": "C:\\Users\\Juan Pablo\\Documents\\WEB PROJECTS\\Crm Perfumeriafina\\index.html",
+    "bytes": 147222,
+    "sha256": "9f2000f25d4e9e8db53ee67db9b599398e64f42840a6e7433fe9b8086bfc3fab",
+    "mtime": "2026-11-08T21:28:43.740Z"
+  },
+  "totals": {
+    "total": 11,
+    "pass": 11,
+    "fail": 0,
+    "skip": 0
+  },
+  "cases": [
+    {
+      "id": "E2E-01",
+      "name": "Arranque limpio: login oculto, app visible, sesión Supabase aceptada",
+      "status": "PASS",
+      "detail": "sesión=qa.e2e@perfumeriafina.test · 4 de 4 clientes · 2 pueden recibir promociones · captura 01-inicio.png"
+    },
+    {
+      "id": "E2E-02",
+      "name": "Todas las pestañas abren sin excepciones",
+      "status": "PASS",
+      "detail": "10 pestañas: inicio, bandeja, pedidos, analiticas, campanas, clientes, catalogo, calendario, ia, bot"
+    },
+    {
+      "id": "E2E-03",
+      "name": "Bandeja: lista pintada y chat abierto",
+      "status": "PASS",
+      "detail": "3 chats · hilo 30 mensajes · captura 02-bandeja.png"
+    },
+    {
+      "id": "E2E-04",
+      "name": "SSE conectado: el panel abre /api/stream y recibe eventos",
+      "status": "PASS",
+      "detail": "url=http://127.0.0.1:3199/api/stream?token= · clientes=1 · peticiones stream=1"
+    },
+    {
+      "id": "E2E-05",
+      "name": "Evento SSE \"mensaje\" se AGREGA al hilo sin remover nodos previos",
+      "status": "PASS",
+      "detail": "+1 nodo(s), -0, 30/30 previos conservados"
+    },
+    {
+      "id": "E2E-06",
+      "name": "Eventos ack/campana/derivación no reemplazan el hilo",
+      "status": "PASS",
+      "detail": "sin removals · alert-badge \"1\""
+    },
+    {
+      "id": "E2E-07",
+      "name": "Scroll del hilo se conserva si el usuario está arriba",
+      "status": "PASS",
+      "detail": "scrollTop 0 → 0 · 31 mensajes conservados"
+    },
+    {
+      "id": "E2E-08",
+      "name": "Idle 20 s: sin mutaciones, sin polling de eventos ni recargas",
+      "status": "PASS",
+      "detail": "0 mutaciones · 0 eventos · 2 req (conversaciones×1, estado×1) · 0 REST"
+    },
+    {
+      "id": "E2E-09",
+      "name": "Fallo de red del bot NO borra la lista ya pintada",
+      "status": "PASS",
+      "detail": "3 items intactos · aviso \"⚠ Sin conexión con el bot · datos de 04:44 p. m.\" · recuperada y asentada"
+    },
+    {
+      "id": "E2E-10",
+      "name": "TOKEN_REFRESHED de Supabase NO recarga la app ni repite GET REST",
+      "status": "PASS",
+      "detail": "INITIAL_SESSION, TOKEN_REFRESHED · 0 GET REST · 3 items intactos"
+    },
+    {
+      "id": "E2E-11",
+      "name": "Cero errores de consola JS y cero pageerror en toda la corrida",
+      "status": "PASS",
+      "detail": "0 console.error JS · 0 pageerror · 1 aviso(s) de red esperados (fallo simulado/imágenes offline)"
+    }
+  ]
+}

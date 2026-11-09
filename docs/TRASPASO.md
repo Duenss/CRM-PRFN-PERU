@@ -444,3 +444,288 @@ Reglas:
 
 Objetivo inmediato: [FASE 1 | FASE 2 | FASE 3 | ...]
 ```
+
+---
+
+## IA — Asistente, campañas y pagos (actualizado 2026-11-08)
+
+### Archivos
+
+- `bot/src/mensajes.js` (**nuevo, puro y testeable**: sin red, Supabase ni fs):
+  `formatearCampana`, `borradoresDeRespaldo`, `formatearOpciones`,
+  `buscarPorFamilia`, `detectarPeticionOpciones`, `detectarFamilia` y
+  `formatearProducto`. No agrega dependencias.
+- `bot/src/ai.js`: `SYS` del asistente, `contextoCliente`, `redactarRespuesta`,
+  `SYS_BORRADORES`, `parseBorradoresEstructurados` y `redactarBorradores`.
+  Se mantienen sin cambios `productoPorId`, `transcribirAudio`, `gemini()` y el
+  endpoint `POST /api/borradores` (`{borradores:[string,string,string]}`).
+- `bot/test/mensajes.test.mjs`: `node:test`, sin dependencias.
+
+### Formato de campaña (estilo WhatsApp de referencia)
+
+`formatearCampana({gancho, subtitulo, beneficios, productos, cierre, tienda, web})`
+genera **siempre** este orden (≤ 900 caracteres):
+
+```
+✨ GANCHO EN MAYÚSCULAS ✨
+
+subtítulo de una línea
+
+✅ beneficio (3 o 4)
+
+🔥 FRAGANCIAS DESTACADAS 🔥
+
+• *Nombre* (inspirado en X) — 50 ml *S/ 56* · 100 ml *S/ 78*
+• ...
+
+🚚 Envíos a todo el Perú. En Lima pagas al recibir.
+
+🛍️ {cierre}
+
+Y visítanos en nuestra página Web https://perfumeriafinaperu.com
+```
+
+Reglas garantizadas: los precios salen **solo** de `precio_50ml`/`precio_100ml`
+del producto (si falta, no se escribe precio); `{nombre}` se conserva para que el
+panel lo reemplace; **nunca** agrega `BAJA` (la pone el servidor); si la IA ya
+metió emojis de adorno (p. ej. `✨ ... ✨` en el gancho) se limpian para no
+duplicarlos; si el texto excede 900 caracteres se recortan productos/beneficios.
+
+### Borradores de campaña con IA
+
+`SYS_BORRADORES` pide **JSON estructurado** (no textos sueltos):
+
+```json
+{"borradores":[
+  {"gancho":"...","subtitulo":"...","beneficios":["...","...","..."],
+   "productos":["id1","id2","id3"],"cierre":"..."}
+]}
+```
+
+`redactarBorradores()` parsea ese JSON (`parseBorradoresEstructurados`), resuelve
+los ids contra el catálogo real y formatea cada versión con `formatearCampana`.
+Son 3 versiones distintas: **promo/oferta**, **regalo/novedad** y
+**colección/variedad**. Si falta `GEMINI_API_KEY`, la IA falla o devuelve algo
+inválido, **no lanza**: devuelve `borradoresDeRespaldo()` (3 textos ya formateados
+con los productos reales). Solo lanza si el catálogo viene vacío.
+
+### 3 opciones por familia (respuesta garantizada)
+
+- `detectarPeticionOpciones(texto)` detecta "opciones", "recomiéndame",
+  "cuáles", "3 opciones", "alternativas", "sugiéreme" y **familias olfativas**
+  (amaderado, dulce, floral, fresco, cítrico, frutal, oriental, gourmand,
+  aromático, especiado, acuático, chipre, fougère, cuero, verde, ámbar, etc.).
+  No confunde "cuánto cuesta", "yape", "envíos" ni saludos.
+- `buscarPorFamilia(productos, termino, limite=3)` busca sin acentos sobre
+  `familia_olfativa`, `categoria`, `notas`, `descripcion` y `nombre`, con
+  sinónimos/raíces (`amaderado` → "amaderado/a", "maderas", "cedro", "sándalo",
+  "vetiver", "oud") y prioriza la familia exacta.
+- `formatearOpciones(productos)` responde **exactamente 3 viñetas** con
+  `• *Nombre* (inspirado en X)` y **sin precios** (a propósito: repetir "S/ 56 · S/ 78"
+  en cada viñeta se ve repetitivo). Cierra preguntando cuál quiere ver en foto.
+- **Flujo de precio (regla 20 del prompt):** con la lista de 3 el bot **no** manda
+  foto ni precio; cuando el cliente elige una ("el Asad", "el segundo", "muéstrame
+  el Hamarain") recién se envía **esa** fragancia con su foto y sus precios 50/100 ml.
+  Si pregunta "¿cuánto cuesta?" sin elegir, responde una sola vez "50 ml S/ 56 ·
+  100 ml S/ 78" y pregunta cuál le interesa. Si dice "ese/me gusta" sin especificar,
+  pregunta cuál de las 3.
+- En el prompt (`SYS`, reglas 18–20) el modelo debe responder con esas 3 viñetas
+  cuando el cliente pida opciones o mencione una familia. `contextoCliente` le
+  inyecta los `Candidatos por familia` **sin precios**. Si aun así el modelo no
+  devuelve 3 viñetas (o mete precios), `redactarRespuesta` **completa
+  determinísticamente** con `formatearOpciones` y deja `productoId`/`pregunta`
+  vacíos para no mandar foto todavía. También hay respuesta determinística cuando
+  no hay clave de IA o el modelo falla.
+
+### Estilo WhatsApp (2026-11-08)
+
+- La IA usa el formato real de WhatsApp: `*negrita*` para nombre/precio/dato clave,
+  `_cursiva_` para matices, viñetas `•`, emojis con criterio (1 por mensaje, máx. 2)
+  y mensajes de 1–2 párrafos con UNA pregunta final.
+- `normalizarWhatsApp()` (`mensajes.js`) convierte markdown de web (`**x**` → `*x*`,
+  `__x__` → `_x_`), quita `#`/bloques de código y cambia `- item` por `• item`.
+- La lista de 3 opciones lleva el **nombre en negrita** y sin precios; al elegir, la
+  foto y los precios van en negrita.
+- El panel interpreta `*negrita*`/`_cursiva_`/`~tachado~` al pintar el hilo y la vista
+  previa de campaña; en la lista de chats muestra el texto plano (sin asteriscos).
+- Las campañas formatean `*Nombre*` y `*S/ precio*` en las viñetas de producto.
+- **Alcance solo tienda**: preguntas de otras tiendas/competencia se responden con
+  amabilidad pero aclarando que no manejamos precios ni datos de otras tiendas; se ofrece
+  el equivalente propio. Reclamos (`esReclamo`) se derivan directo a un administrador con
+  el mensaje “Te paso con un administrador…”, sin prometer reembolsos ni plazos.
+- **Sonidos del panel**: entrante suena siempre (aunque el chat esté cerrado); saliente
+  solo si estás en ese chat. Maestro = botón de sonido (activo por defecto); el primer
+  clic desbloquea el audio del navegador.
+- **Resumen de compra**: `parseResumenCompra()` lee el mensaje de pedido (ítems, entrega,
+  total, referencia), crea/actualiza el pedido en `pedidos.json` (visible en Pedidos) y
+  responde con saludo por hora + nombre + elección de pago. Si elige Yape/Plin/transferencia:
+  “Entendido” + datos de pago (`PAGO_*_NUMERO/TITULAR` (sin plantillas; el admin verifica)), aviso al
+  administrador, pedido `esperando_pago` y pausa de IA. Efectivo → `por_entregar`.
+- **Agenda**: `parseFechaHoraPedido()` entiende hoy/mañana/días y horas; para recojo en
+  estación valida `CUPOS_ESTACION` (2/hora por defecto) y ofrece alternativas; delivery no
+  tiene cupo. Campos nuevos: `entrega`, `estacion`, `fechaEntrega`, `horaEntrega`,
+  `refExterna`.
+- **Audio**: detección robusta por tipo/_data.type/mimetype, transcripción completa
+  (4096 tokens/60 s, hasta 4000 caracteres, rotación de modelos) y respuesta de fallback
+  si no se puede transcribir (nunca se deja al cliente en visto).
+- **Proveedores IA**: `GEMINI_API_KEY` (API, facturación aparte de Gemini Pro/Advanced) y
+  `GROQ_API_KEY` como respaldo gratuito para texto y audio (Whisper). Sin claves, respuestas
+  determinísticas con catálogo real.
+
+### Bandeja completa (2026-11-08)
+
+- Todos los envíos del bot se registran en `conversaciones.json` y se ven en la Bandeja:
+  IA, panel, bot, **campaña**, **prueba**, **aviso al dueño**, plantilla de pago y
+  seguimiento. Antes `/api/prueba`, `enviarCampana` y `notificarDueno` solo enviaban/logueaban
+  en Supabase y no aparecían en el panel.
+- Los textos se guardan en UTF-8 (tildes/emojis correctos) y el panel interpreta
+  `*negrita*`, `_cursiva_` y `~tachado~`; la lista de chats muestra el texto plano.
+- **Puesta al día con WhatsApp**: al conectar/reconectar, `sincronizarAuto()` trae la lista
+  de chats y `actualizarHistorialesConocidos()` importa los últimos 25 mensajes de los chats
+  ya conocidos (27 chats hoy; 7 con novedades). Cada 5 min se refrescan cabeceras; el evento
+  SSE `sync` hace que la Bandeja recargue. La lista de WhatsApp Web puede devolver contactos
+  nuevos como `@lid` sin teléfono resuelto: esos casos quedan como limitación conocida.
+
+
+### Regla de pagos (asistente)
+
+- **Efectivo = única forma de cerrar la venta**: se paga al entregar (Lima) o al
+  recoger. Con efectivo sí se puede confirmar el pedido.
+- **Yape/Plin/transferencia = NUNCA confirmar el pago**: se pide el comprobante y
+  se deriva al encargado para que lo verifique.
+- El asistente nunca dice "pago confirmado", "pago verificado", "pago recibido"
+  ni "ya está pagado". El respaldo sin IA (`fallback`) también respeta esta regla.
+- (Las plantillas de pago, los estados del pedido y la verificación del dueño ya
+  estaban descritos en *Analíticas y etiquetas en la Bandeja* y en `pagos.js`.)
+
+### Cómo probar
+
+```powershell
+node --check bot/src/ai.js
+node --check bot/src/mensajes.js
+node --test bot/test/mensajes.test.mjs
+# En este entorno con sandbox de Windows, `node --test` no puede crear el
+# subproceso con pipes (EPERM): usar la misma prueba sin aislamiento.
+node --test --test-isolation=none bot/test/mensajes.test.mjs
+```
+
+---
+
+## Conexión de WhatsApp sin ventana (2026-11-08)
+
+- `HEADLESS=true` por defecto (`.env` y `.env.example`): el bot **no abre ventana de Chrome**.
+  El QR se muestra en el panel (`GET /api/qr`) y se escanea una sola vez; la sesión persiste
+  en `SESSION_PATH` (`.wwebjs_auth`). `HEADLESS=false` queda solo para depurar.
+- `bot/src/panel.html` (panel de respaldo del bot) también usa `/api/qr?sesion=N&token=…`.
+- Envío manual desde Campañas: `Ajustes → Envío manual` elige WhatsApp Web en el navegador
+  actual (`https://web.whatsapp.com/send?phone=…`) o la app de escritorio (`whatsapp://send`).
+  Ya no se abre un Chrome aparte ni se pide QR si el navegador ya tiene sesión de WhatsApp Web.
+
+## Implementación 2026-11-08 — tiempo real, campañas seguras, IA y pagos
+
+> Esta sección resume lo implementado tras la auditoría [`auditoria/AUDITORIA-SENIOR.md`](auditoria/AUDITORIA-SENIOR.md).
+> El detalle de entrega y los comandos están en [`auditoria/ENTREGA-2026-11-08.md`](auditoria/ENTREGA-2026-11-08.md).
+
+### 1. Panel (`index.html`)
+
+- **Un solo scheduler** (`TAREAS` + `iniciarScheduler`): reemplaza los timers sueltos de
+  bandeja (12 s + 15 s), hilo (20 s), QR (2,5 s), logs (6 s), chip (20 s) y eventos (8 s).
+  Cada tarea tiene `ms`, *single-flight* y se pausa con `document.hidden`. Al volver a la
+  pestaña se refresca inmediatamente. En reposo ya no hay doble polling.
+- **SSE con respaldo**: `conectarSSE()` abre `GET /api/stream?token=…`; los eventos se
+  aplican por delta (mensaje/ack/leido/campana/ia/pedido/derivacion/comprobante). Si el
+  stream falla, reconecta con espera creciente (2 s → 30 s) y el polling de `/api/eventos`
+  vuelve a activarse como respaldo.
+- **Hilo sin parpadeo**: `pintarHilo()` se usa solo al abrir/cambiar de chat; el resto de
+  actualizaciones usan `agregarMensajes()` (append por `waId`/id), `actualizarAckUI()`
+  (palomitas por nodo) y **scroll anclado solo si el usuario ya estaba abajo**. Se quitó
+  `animation:fade` de `.msg`; solo los nodos nuevos llevan `.nuevo`.
+- **`fantasma()` ya no anima el contenedor completo** (eso era el “parpadeo” de las listas):
+  solo evita el repintado cuando el HTML no cambió.
+- **Caché de último dato bueno**: si el bot/red falla, la Bandeja/Pedidos/Analíticas
+  conservan lo pintado y muestran `⚠ Sin conexión con el bot · datos de HH:mm`; nunca se
+  sustituyen datos buenos por un mensaje de error.
+- **Auth sin recargas**: `show(true)` es idempotente (`appVisible`); se ignoran
+  `INITIAL_SESSION` y `TOKEN_REFRESHED`. El panel ya no se recarga al refrescar el token.
+- **QR**: usa `GET /api/qr?sesion=N&token=…` (PNG binario) cada 15 s; `/api/estado` ya no
+  transporta el QR en base64.
+- **Gráfico** `pintarChart()` cachea la firma de los datos: no se re-anima si nada cambió.
+- **Timeouts**: `botFetch` aplica 12 s por defecto y acepta `timeoutMs` para operaciones
+  lentas (sync 120 s, importar historial 45 s, enviar 60 s, analíticas 60 s, borradores 60 s).
+
+### 2. Bot (`bot/src`)
+
+- **SSE** (`GET /api/stream`): frames `id: <n>` + `data: {id,tipo,en,…}`, `retry: 3000`,
+  ping cada 15 s, sin replay. Eventos: `mensaje`, `ack`, `leido`, `campana`, `ia`, `pedido`
+  + los existentes (`derivacion`, `comprobante`, `seguimiento`). `/api/eventos` se mantiene.
+- **`/api/estado`** cacheado 2 s, `programadas` refrescado en segundo plano cada 30 s y sin
+  el campo `qr` en `sesiones`.
+- **Campañas F-01** (`server.js` + `campanas.js`): claim atómico `pendiente→enviando` antes
+  de enviar, updates filtrados por `estado='enviando'`, cierre **siempre** en `finally`,
+  barrido de `enviando` >10 min al arrancar, `must()` para errores de Supabase. Si falta la
+  migración 07, **fail-safe**: no se envía nada y la campaña queda programada con log claro.
+- **Persistencia**: `conversaciones.json` con escritura atómica `.tmp` + `rename`, `.bak`
+  cada 5 min y recuperación ante JSON corrupto; `flush()` en `SIGINT`/`SIGTERM`.
+- **Timeouts de WhatsApp** (`conTimeout`) en envíos, historial, chats, contactos y media;
+  watchdog de 2 min en la cola.
+- **Pagos** (`politicas.js`): efectivo es la única forma de cerrar la venta; Yape/Plin/
+  transferencia nunca se confirman → aviso al dueño + `derivacion` + **pausa de la IA del
+  chat** hasta que el dueño verifique y reanude. Comprobante → `comprobante_recibido`.
+- **Tests**: `bot/test/{politicas,campanas,eventos,mensajes}.test.mjs` → 43/43.
+
+### 3. Contrato nuevo (resumen)
+
+| Método | Ruta | Uso |
+| --- | --- | --- |
+| GET | `/api/stream?token=…` | SSE en vivo; sin `event:` con nombre, todo en `onmessage` |
+| GET | `/api/qr?sesion=N&token=…` | QR PNG (404 si no hay QR) |
+| GET | `/api/estado` | Estado sin QR; caché 2 s |
+| POST | `/api/ia/pausar` | Sigue igual; ahora el bot lo usa también al detectar pago digital |
+
+### 4. Orden de despliegue (producción/VPS)
+
+1. **Backup**: commit/tag de git, copia de `bot/data` y `pg_dump` de Supabase.
+2. **Supabase**: ejecutar `sql/07_envios_claim.sql` (idempotente). Verificar `wa_id/nota`,
+   el `check` con `'enviando'` y el índice `envios_campana_estado_idx`.
+3. **Bot**: actualizar archivos, reiniciar (`pm2 restart`, Docker restart o panel de
+   Pterodactyl). La sesión de WhatsApp persiste en `.wwebjs_auth`; el arranque hace el
+   barrido de `enviando` y el aviso de migración.
+4. **Panel**: desplegar `index.html` en Cloudflare Pages. Si el bot está en `http://` y el
+   panel en `https://`, SSE/fetch pueden bloquearse por mixed content: usa HTTPS/túnel o
+   proxy del mismo dominio.
+5. **Humo**: `/api/estado` sin `qr`, `/api/stream` recibe `retry` y eventos, abrir Bandeja
+   (lista + hilo), enviar un mensaje de prueba (MODO_PRUEBA) y comprobar que no hay errores
+   de consola en DevTools.
+
+**Rollback**: tag de git anterior + restaurar `bot/data`; `sql/07` es aditiva (columnas,
+índice y check más permisivo), no borra datos.
+
+### 5. Variables sensibles / seguridad
+
+- Si el bot se expone fuera de localhost, `BOT_TOKEN` **debe** estar configurado (SSE lo
+  pasa por query porque `EventSource` no envía cabeceras) y el origen debe ser HTTPS.
+- CORS del bot sigue abierto (`*`) por simplicidad local: restringirlo cuando haya dominio.
+- No hay `service_role` en el panel; las operaciones de servicio viven en el bot.
+
+
+
+## Anuncios y novedades de producción (2026-11-09)
+
+- **Bienvenida**: la primera respuesta de cada chat se envía en dos partes: (1) saludo por
+  hora de Lima + agradecimiento por elegir Perfumería Fina; (2) la respuesta al tema pedido.
+  Si el cliente pide el catálogo, el segundo mensaje explica los rangos de páginas y se
+  adjunta el PDF.
+- **Catálogo PDF**: docs/catalogo/catalogo-navidad-2026.pdf + catalogo-info.json
+  (rangos Diseñador 4–28, Árabes 30–35, Nicho 37–41). Se regenera con
+  `node scripts/catalogo/build.mjs` (antes: `python scripts/catalogo/optimizar-imagenes.py`).
+- **Anuncios** (`bot/src/anuncios.js`): mensaje único con filtros (todos / etiquetas /
+  números), persistido en `bot/data/anuncios.json`. API: `GET/POST /api/anuncios`,
+  `PATCH/DELETE /api/anuncios/:id`, `POST /api/anuncios/preview` (conteo) y
+  `POST /api/anuncios/:id/enviar` (encola el envío). Emite SSE `anuncio` con progreso.
+  Respeta consentimiento (salvo `incluirSinConsentimiento`), bajas, horario y límite diario.
+- **Pagos**: sin plantillas. `PAGO_YAPE_*`, `PAGO_PLIN_*`, `PAGO_TRANSFERENCIA_*` y el
+  administrador verifica el comprobante.
+- **Limpieza**: `cd bot && node scripts/limpiar-datos.mjs` respalda en
+  `bot/data/backups` y vacía clientes (Supabase) y datos locales.
+- **Despliegue**: ver `docs/DESPLIEGUE-PRODUCCION.md` (Docker Compose recomendado,
+  PM2 o Pterodactyl con egg propio).

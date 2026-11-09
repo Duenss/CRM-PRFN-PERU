@@ -1,8 +1,24 @@
 import pkg from 'whatsapp-web.js';
+import fs from 'node:fs';
 import QRCode from 'qrcode';
 import { config, normalizar } from './config.js';
 
 const { Client, LocalAuth, MessageMedia } = pkg;
+
+/**
+ * Techo de tiempo para cualquier operación que cruza Puppeteer/WhatsApp Web.
+ * `Promise.race` NO cancela la operación de Puppeteer (la deja en segundo
+ * plano), pero desbloquea el pipeline: el job falla visible, la cola sigue y el
+ * watchdog de queue.js evita que un cuelgue congele todo el bot.
+ */
+export function conTimeout(promesa, ms, etiqueta = 'operación de WhatsApp') {
+  let timer = null;
+  const reloj = new Promise((_, rechazar) => {
+    timer = setTimeout(() => rechazar(new Error(`Timeout ${etiqueta} (${ms} ms)`)), ms);
+    timer.unref?.();
+  });
+  return Promise.race([promesa, reloj]).finally(() => clearTimeout(timer));
+}
 
 /** id -> { id, estado, conectado, qr, qrDataUrl, numero, error, client, reintentos } */
 export const sesiones = new Map();
@@ -307,10 +323,10 @@ export async function enviar(telefono, texto, sesionId = null) {
   const s = sesionParaEnviar(sesionId);
   if (!s) throw new Error(sesionId ? `La sesión ${sesionId} no está conectada` : 'Ningún WhatsApp está conectado');
 
-  const id = await s.client.getNumberId(limpio);
+  const id = await conTimeout(s.client.getNumberId(limpio), 20000, 'getNumberId');
   if (!id) throw new Error(`El número +${limpio} no tiene WhatsApp`);
   recordarEnvio(texto);
-  const enviado = await s.client.sendMessage(id._serialized, texto);
+  const enviado = await conTimeout(s.client.sendMessage(id._serialized, texto), 60000, 'sendMessage');
   const waId = idMensaje(enviado);
   if (waId) {
     enviadosPorBot.add(waId);
@@ -336,9 +352,9 @@ export async function enviarImagen(telefono, media = {}, caption = '', sesionId 
   if (!s) throw new Error(sesionId ? `La sesión ${sesionId} no está conectada` : 'Ningún WhatsApp está conectado');
 
   // Asegura la compatibilidad con el WhatsApp Web actual antes de enviar media.
-  await parcharMsgKey(s.client, s);
+  await conTimeout(parcharMsgKey(s.client, s), 25000, 'compatibilidad multimedia');
 
-  const id = await s.client.getNumberId(limpio);
+  const id = await conTimeout(s.client.getNumberId(limpio), 20000, 'getNumberId');
   if (!id) throw new Error(`El número +${limpio} no tiene WhatsApp`);
 
   let mm;
@@ -347,10 +363,14 @@ export async function enviarImagen(telefono, media = {}, caption = '', sesionId 
   } else if (media.archivo) {
     mm = MessageMedia.fromFilePath(media.archivo);
   } else {
-    mm = await MessageMedia.fromUrl(media.url, { unsafeMime: true });
+    mm = await conTimeout(MessageMedia.fromUrl(media.url, { unsafeMime: true }), 30000, 'descargar imagen');
   }
   recordarEnvio(caption);
-  const enviado = await s.client.sendMessage(id._serialized, mm, caption ? { caption: String(caption).slice(0, 1000) } : {});
+  const enviado = await conTimeout(
+    s.client.sendMessage(id._serialized, mm, caption ? { caption: String(caption).slice(0, 1000) } : {}),
+    90000,
+    'sendMessage (imagen)'
+  );
   const waId = idMensaje(enviado);
   if (waId) {
     enviadosPorBot.add(waId);
@@ -359,7 +379,33 @@ export async function enviarImagen(telefono, media = {}, caption = '', sesionId 
   return { ok: true, sesion: s.id, waId };
 }
 
-/** Teléfono de un chat o contacto individual (solo dígitos), o '' si es grupo/sin número. */
+/** Envía un video/archivo local como documento de WhatsApp. */
+export async function enviarArchivo(telefono, archivo, mimetype = 'video/mp4', nombre = 'archivo.mp4', caption = '', sesionId = null) {
+  const limpio = String(telefono || '').replace(/\D/g, '');
+  if (!archivo || !fs.existsSync(archivo)) throw new Error('No se encontró el archivo para enviar.');
+  if (config.modoPrueba) {
+    logFn(`[PRUEBA${sesionId ? ' ' + sesionId : ''}] Archivo para +${limpio}: ${nombre}`);
+    return { simulado: true };
+  }
+  const s = sesionParaEnviar(sesionId);
+  if (!s) throw new Error(sesionId ? `La sesión ${sesionId} no está conectada` : 'Ningún WhatsApp está conectado');
+  await conTimeout(parcharMsgKey(s.client, s), 25000, 'compatibilidad multimedia');
+  const id = await conTimeout(s.client.getNumberId(limpio), 20000, 'getNumberId');
+  if (!id) throw new Error(`El número +${limpio} no tiene WhatsApp`);
+  const mm = MessageMedia.fromFilePath(archivo);
+  recordarEnvio(caption);
+  const enviado = await conTimeout(
+    s.client.sendMessage(id._serialized, mm, { caption: String(caption || '').slice(0, 1000), sendMediaAsDocument: true }),
+    120000,
+    'sendMessage (archivo)'
+  );
+  const waId = idMensaje(enviado);
+  if (waId) {
+    enviadosPorBot.add(waId);
+    if (enviadosPorBot.size > 800) enviadosPorBot.delete(enviadosPorBot.values().next().value);
+  }
+  return { ok: true, sesion: s.id, waId };
+}
 function telDe(item) {
   if (!item || item.isGroup) return '';
   const candidato = (item.id?.server === 'c.us' ? item.id?.user : '')
@@ -389,7 +435,7 @@ export async function resolverTelefonoWa(widSerializado, sesionId = null) {
   const s = sesionParaEnviar(sesionId) || [...sesiones.values()].find(x => x.client && x.client.pupPage);
   if (!s) return '';
   try {
-    const real = await s.client.pupPage.evaluate(async (wid) => {
+    const real = await conTimeout(s.client.pupPage.evaluate(async (wid) => {
       const W = window;
       try {
         const apiContact = W.require('WAWebApiContact');
@@ -405,7 +451,7 @@ export async function resolverTelefonoWa(widSerializado, sesionId = null) {
         }
       } catch (e) {}
       return '';
-    }, wid);
+    }, wid), 15000, 'resolver teléfono');
     return real ? normalizar(real) : '';
   } catch (e) {
     return '';
@@ -439,7 +485,7 @@ export async function listarChatsWa(sesionId = null) {
   let crudos;
   try {
     // Vía normal: el wrapper de whatsapp-web.js.
-    const chats = await s.client.getChats();
+    const chats = await conTimeout(s.client.getChats(), 45000, 'getChats');
     crudos = chats.map(c => {
       const esEmpresa = !!(c.contact?.isBusiness || c.contact?.isEnterprise || c.contact?.businessProfile);
       const nombreGuardado = c.contact?.name || '';
@@ -469,7 +515,7 @@ export async function listarChatsWa(sesionId = null) {
     // cuando un solo chat no se puede serializar. Leemos la colección directo,
     // toleramos chats problemáticos y resolvemos el número real de cada chat
     // (los chats nuevos usan identificadores @lid y no traen el teléfono).
-    crudos = await s.client.pupPage.evaluate(async () => {
+    crudos = await conTimeout(s.client.pupPage.evaluate(async () => {
       const out = [];
       const W = window;
       let apiContact, widFactory;
@@ -595,7 +641,7 @@ export async function listarChatsWa(sesionId = null) {
         }
       } catch (e) {}
       return out;
-    });
+    }), 45000, 'getChats (respaldo)');
   }
 
   const propio = normalizar(s.numero);
@@ -637,7 +683,7 @@ export async function listarChatsWa(sesionId = null) {
 export async function listarContactosWa(sesionId = null) {
   const s = sesionParaEnviar(sesionId);
   if (!s) throw new Error('Ningún WhatsApp está conectado');
-  const contactos = await s.client.getContacts();
+  const contactos = await conTimeout(s.client.getContacts(), 45000, 'getContacts');
   const propio = normalizar(s.numero);
   const porTel = new Map();
   for (const c of contactos) {
@@ -656,12 +702,12 @@ export async function historialWa(telefono, limite = 50, sesionId = null) {
   const s = sesionParaEnviar(sesionId);
   if (!s) throw new Error('Ningún WhatsApp está conectado');
   const limpio = String(telefono || '').replace(/\D/g, '');
-  const numId = await s.client.getNumberId(limpio);
+  const numId = await conTimeout(s.client.getNumberId(limpio), 20000, 'getNumberId');
   if (!numId) throw new Error(`El número +${limpio} no tiene WhatsApp`);
   const chatId = numId._serialized;
   // Se lee directo de la página y sin serializar: `getChatById`/`fetchMessages`
   // de whatsapp-web.js fallan ("r") al serializar chats en la versión actual.
-  const msgs = await s.client.pupPage.evaluate(async ({ chatId, limite }) => {
+  const msgs = await conTimeout(s.client.pupPage.evaluate(async ({ chatId, limite }) => {
     const W = window;
     const filtro = m => !m.isNotification;
     let chat = null;
@@ -708,7 +754,7 @@ export async function historialWa(telefono, limite = 50, sesionId = null) {
         };
       })
       .filter(Boolean);
-  }, { chatId, limite });
+  }, { chatId, limite }), 30000, 'historialWa');
   return msgs || [];
 }
 
@@ -814,7 +860,7 @@ export async function descargarMediaWa(msg, sesionId = null) {
     type: d.type || '',
     mimetype: d.mimetype || ''
   };
-  return await s.client.pupPage.evaluate(async ({ id: msgId, chatId, idRaw, ts, datos }) => {
+  return await conTimeout(s.client.pupPage.evaluate(async ({ id: msgId, chatId, idRaw, ts, datos }) => {
     const W = window;
     try {
       const col = W.require('WAWebCollections');
@@ -873,5 +919,5 @@ export async function descargarMediaWa(msg, sesionId = null) {
     } catch (e) {
       return { error: (e && (e.message || String(e))) || 'error al descargar', tipo: datos.type, hallado: false };
     }
-  }, { id, chatId, idRaw, ts, datos });
+  }, { id, chatId, idRaw, ts, datos }), 60000, 'descargar multimedia');
 }

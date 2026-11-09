@@ -1,37 +1,114 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { emitir } from './eventos.js';
 
 const dataDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data');
 const archivo = path.join(dataDir, 'conversaciones.json');
+// Copia de seguridad: se refresca cada 5 minutos con el último archivo bueno,
+// para poder recuperar la bandeja si el JSON principal queda corrupto (corte de
+// luz, disco lleno, proceso matado a mitad de escritura).
+const archivoBak = archivo + '.bak';
+const INTERVALO_BAK = 5 * 60 * 1000;
+let ultimoBak = 0;
 
 const MAX_CHATS = 400;
 const MAX_MENSAJES = 500;
 
-/** @type {Record<string, {telefono:string,nombre:string,clienteId:string|null,noLeidos:number,ultimoTexto:string,ultimoEn:string,mensajes:Array<any>}>} */
-let chats = cargar();
+/** Lee un JSON de conversaciones; devuelve null si no existe o está corrupto. */
+function leerJsonConversaciones(ruta) {
+  const j = JSON.parse(fs.readFileSync(ruta, 'utf8'));
+  if (!j || typeof j !== 'object' || Array.isArray(j)) return null;
+  return j;
+}
 
 function cargar() {
   try {
-    const j = JSON.parse(fs.readFileSync(archivo, 'utf8'));
-    return j && typeof j === 'object' ? j : {};
-  } catch {
-    return {};
+    const j = leerJsonConversaciones(archivo);
+    if (j) return j;
+  } catch (e) {
+    console.warn('[conversaciones] JSON corrupto, se intenta recuperar desde .bak:', e.message);
+  }
+  try {
+    const j = leerJsonConversaciones(archivoBak);
+    if (j) {
+      console.warn('[conversaciones] bandeja recuperada desde conversaciones.json.bak');
+      return j;
+    }
+  } catch {}
+  return {};
+}
+
+/** @type {Record<string, {telefono:string,nombre:string,clienteId:string|null,noLeidos:number,ultimoTexto:string,ultimoEn:string,mensajes:Array<any>}>} */
+let chats = cargar();
+
+/**
+ * Escritura atómica: se escribe un .tmp y se renombra encima del archivo real.
+ * `rename` es atómico en el mismo volumen (NTFS/ext4), así que un corte deja el
+ * archivo anterior intacto en vez de uno truncado.
+ */
+function escribirAtomico(datos) {
+  const tmp = archivo + '.tmp';
+  try {
+    fs.mkdirSync(dataDir, { recursive: true });
+    // Antes de pisar el archivo bueno, cada 5 min se guarda una copia .bak.
+    if (Date.now() - ultimoBak >= INTERVALO_BAK) {
+      try { fs.copyFileSync(archivo, archivoBak); ultimoBak = Date.now(); } catch {}
+    }
+    fs.writeFileSync(tmp, JSON.stringify(datos), 'utf8');
+    fs.renameSync(tmp, archivo);
+    return true;
+  } catch (e) {
+    console.warn('[conversaciones] no se pudo guardar:', e.message);
+    try { fs.unlinkSync(tmp); } catch {}
+    return false;
   }
 }
 
+// Debounce que NO descarta turnos: si llega otro cambio mientras el timer está
+// pendiente, se agrupa y se escribe una sola vez, sin perder la última foto.
 let guardando = null;
+let pendiente = false;
 function guardar() {
-  if (guardando) clearTimeout(guardando);
+  pendiente = true;
+  if (guardando) return;
   guardando = setTimeout(() => {
     guardando = null;
-    try {
-      fs.mkdirSync(dataDir, { recursive: true });
-      fs.writeFileSync(archivo, JSON.stringify(chats), 'utf8');
-    } catch (e) {
-      console.warn('[conversaciones] no se pudo guardar:', e.message);
-    }
+    if (!pendiente) return;
+    pendiente = false;
+    escribirAtomico(chats);
   }, 1200);
+}
+
+/**
+ * Vacía YA los cambios pendientes a disco (apagado ordenado, SIGINT/SIGTERM y
+ * pruebas). Devuelve true si había algo que escribir.
+ */
+export function flush() {
+  if (guardando) {
+    clearTimeout(guardando);
+    guardando = null;
+  }
+  if (!pendiente) return false;
+  pendiente = false;
+  return escribirAtomico(chats);
+}
+
+/** Avisa de un cambio de conversación a los suscriptores SSE (panel en vivo). */
+function emitirCambio(tipo, telefono, chat, mensaje = null) {
+  try {
+    emitir(tipo, {
+      telefono,
+      // Nombre visible del chat: si el panel aún no lo tiene en su lista (primer
+      // contacto), sin esto mostraría "+519…" hasta el siguiente refresco.
+      nombre: chat?.nombre || '',
+      nombreWa: chat?.nombreWa || '',
+      mensaje: mensaje ? { ...mensaje } : null,
+      noLeidos: chat?.noLeidos || 0,
+      ultimoTexto: chat?.ultimoTexto || '',
+      ultimoEn: chat?.ultimoEn || ''
+    });
+  } catch {}
 }
 
 const limpiarTel = t => String(t || '').replace(/\D/g, '');
@@ -127,6 +204,8 @@ export function registrar({ telefono, texto, direccion = 'entrante', nombre = ''
   chats[tel] = chat;
   recortar();
   guardar();
+  // Aviso en vivo al panel (SSE): mensaje nuevo con el estado del chat.
+  emitirCambio('mensaje', tel, chat, mensaje);
   return mensaje;
 }
 
@@ -144,6 +223,7 @@ export function actualizarAck(telefono, waId, ack) {
   if (!m || m.ack === n) return false;
   m.ack = n;
   guardar();
+  emitirCambio('ack', tel, chat, m);
   return true;
 }
 
@@ -189,8 +269,13 @@ export function registrarCabecera({ telefono, nombre = '', nombreWa = '', nombre
     chat.ultimoEn = ult ? ult.en : '';
     chat.ultimoTexto = ult ? ult.texto : '';
   } else if (ultimoEn) {
-    chat.ultimoEn = ultimoEn;
-    if (ultimoTexto) chat.ultimoTexto = String(ultimoTexto).slice(0, 300);
+    // No pisar un mensaje local más nuevo con una cabecera vieja de WhatsApp.
+    const nuevo = Date.parse(ultimoEn);
+    const actual = Date.parse(chat.ultimoEn);
+    if (!Number.isFinite(actual) || (Number.isFinite(nuevo) && nuevo >= actual)) {
+      chat.ultimoEn = ultimoEn;
+      if (ultimoTexto) chat.ultimoTexto = String(ultimoTexto).slice(0, 300);
+    }
   } else if (!chat.ultimoEn && ultimoTexto) {
     chat.ultimoTexto = String(ultimoTexto).slice(0, 300);
   }
@@ -318,6 +403,7 @@ export function marcarLeido(telefono) {
   if (!c) return null;
   c.noLeidos = 0;
   guardar();
+  emitirCambio('leido', c.telefono, c);
   return { ok: true };
 }
 

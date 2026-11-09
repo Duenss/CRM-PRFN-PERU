@@ -302,7 +302,8 @@ code{background:var(--s2);padding:.05rem .35rem;border-radius:5px;font-size:.85e
 .in-head-act{display:flex;gap:.5rem}
 .in-head-act button{min-height:34px;font-size:.78rem;padding:.35rem .75rem}
 .in-msgs{flex:1;min-height:0;overflow:auto;padding:1rem;display:flex;flex-direction:column;gap:.5rem;background-image:radial-gradient(circle at 20% 10%,rgba(221,183,95,.04),transparent 50%)}
-.msg{max-width:74%;padding:.55rem .75rem;border-radius:12px;font-size:.88rem;white-space:pre-wrap;word-break:break-word;position:relative;animation:fade .22s var(--ease-out)}
+.msg{max-width:74%;padding:.55rem .75rem;border-radius:12px;font-size:.88rem;white-space:pre-wrap;word-break:break-word;position:relative}
+.msg.nuevo{animation:fade .2s var(--ease-out)}
 .msg time{display:block;font-size:.62rem;opacity:.65;text-align:right;margin-top:.25rem}
 .msg.in{align-self:flex-start;background:var(--s2);border:1px solid var(--line);border-bottom-left-radius:3px}
 .msg.out{align-self:flex-end;background:#005C4B;border-bottom-right-radius:3px;color:#eafff6}
@@ -410,6 +411,7 @@ dialog::backdrop{background:rgba(3,4,8,.66);backdrop-filter:blur(8px)}
       <button data-tab="pedidos"><svg viewBox="0 0 24 24"><path d="M6 2h9l4 4v16H6z"/><path d="M9 8h6M9 12h6M9 16h4"/></svg><span class="nl">Pedidos</span><i class="nbadge" id="pedidos-badge" hidden>0</i></button>
       <button data-tab="analiticas"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span class="nl">Analíticas</span></button>
       <button data-tab="campanas"><svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg><span class="nl">Campañas</span></button>
+      <button data-tab="anuncios"><svg viewBox="0 0 24 24"><path d="M3 11v3a1 1 0 0 0 1 1h2l4 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M15 8a5 5 0 0 1 0 8M18 5a9 9 0 0 1 0 14"/></svg><span class="nl">Anuncios</span></button>
       <button data-tab="clientes"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6M17 4a4 4 0 0 1 0 8M22 21c0-3-2-5-5-5.7"/></svg><span class="nl">Clientes</span></button>
       <button data-tab="catalogo"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span class="nl">Catálogo</span></button>
       <button data-tab="calendario"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg><span class="nl">Calendario</span></button>
@@ -530,28 +532,10 @@ dialog::backdrop{background:rgba(3,4,8,.66);backdrop-filter:blur(8px)}
           <div class="acts"><button class="ghost" id="pe-cancel" type="button">Cancelar</button><button id="pe-save" type="button">Guardar pedido</button></div>
         </div>
       </div>
-      <div class="two">
+      <div>
         <div class="card">
           <div class="card-h"><b>Pedidos</b><span class="muted" id="pe-count">—</span></div>
           <div id="pe-list" style="padding:.4rem 1rem 1rem"><p class="empty">Cargando...</p></div>
-        </div>
-        <div class="card">
-          <div class="card-h"><b>Plantillas de pago</b><span class="muted">solo imágenes oficiales</span></div>
-          <div style="padding:1rem">
-            <p class="muted" style="margin-top:0;font-size:.8rem">Sube la captura oficial de tu Yape/Plin. El bot solo reenvía esa imagen; nunca inventa números ni datos de pago.</p>
-            <div id="pa-list"></div>
-            <div class="grid2">
-              <div><label for="pa-nombre">Nombre</label><input id="pa-nombre" maxlength="40" placeholder="Yape"></div>
-              <div><label for="pa-titular">Titular</label><input id="pa-titular" maxlength="80"></div>
-            </div>
-            <div class="grid2">
-              <div><label for="pa-numero">Número</label><input id="pa-numero" maxlength="20" placeholder="+51..."></div>
-              <div><label for="pa-nota">Nota</label><input id="pa-nota" maxlength="120" placeholder="Ej. solo Yape"></div>
-            </div>
-            <input type="file" id="pa-file" accept="image/*" hidden>
-            <div class="acts"><button class="ghost" id="pa-pick" type="button">Elegir imagen</button><button id="pa-save" type="button">Subir plantilla</button></div>
-            <p class="muted" id="pa-file-name"></p>
-          </div>
         </div>
       </div>
     </section>
@@ -658,6 +642,49 @@ dialog::backdrop{background:rgba(3,4,8,.66);backdrop-filter:blur(8px)}
       </div>
     </section>
 
+    <section class="tab" id="t-anuncios" hidden>
+      <div class="pagehead">
+        <div><h1>Anuncios</h1><p class="muted" id="anu-sub">Un mensaje para tus clientes, con filtros. Se envía solo cuando tú lo apruebas.</p></div>
+        <div class="bar" style="margin:0"><button class="ghost" id="anu-refresh" type="button">Actualizar</button></div>
+      </div>
+      <div class="dash2">
+        <div class="card">
+          <div class="card-h"><b>Nuevo anuncio</b><span class="muted">mensaje único</span></div>
+          <div style="padding:1rem">
+            <label for="anu-titulo">Título interno</label><input id="anu-titulo" maxlength="80" placeholder="Ej. Promo Navidad">
+            <label for="anu-texto">Mensaje</label><textarea id="anu-texto" maxlength="1200" rows="6" placeholder="Hola {nombre} 🎄 En Perfumería Fina tenemos..."></textarea>
+            <p class="muted" style="margin:.3rem 0 .8rem;font-size:.78rem">Usa <b>{nombre}</b> para personalizar. Formato WhatsApp: *negrita*, _cursiva_, viñetas con •.</p>
+            <div class="grid2">
+              <div>
+                <label for="anu-filtro">Destinatarios</label>
+                <select id="anu-filtro">
+                  <option value="todos">Todos los clientes</option>
+                  <option value="etiquetas">Por etiquetas</option>
+                  <option value="telefonos">Seleccionados (números)</option>
+                </select>
+              </div>
+              <div id="anu-tags-wrap" hidden><label for="anu-tags">Etiquetas (separadas por coma)</label><input id="anu-tags" placeholder="vip, lima"></div>
+            </div>
+            <div id="anu-tels-wrap" hidden>
+              <label for="anu-tels">Números (uno por línea o separados por coma)</label>
+              <textarea id="anu-tels" rows="3" placeholder="51933221690, 51987654321"></textarea>
+            </div>
+            <label style="display:flex;gap:.5rem;align-items:center;margin:.7rem 0 .3rem"><input type="checkbox" id="anu-sin-consent" style="width:auto"> <span class="muted">Incluir clientes sin consentimiento (no recomendado)</span></label>
+            <p class="muted" id="anu-preview">—</p>
+            <div class="acts"><button class="ghost" id="anu-guardar" type="button">Guardar borrador</button><button id="anu-enviar" type="button">Enviar ahora</button></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-h"><b>Vista previa</b><span class="muted">como lo verá el cliente</span></div>
+          <div style="padding:1rem"><div class="msg out" id="anu-vista" style="max-width:100%">Escribe el mensaje…</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-h"><b>Anuncios</b><span class="muted" id="anu-count">—</span></div>
+        <div id="anu-list" style="padding:.4rem 1rem 1rem"><p class="empty">Cargando...</p></div>
+      </div>
+    </section>
+
     <section class="tab" id="t-clientes" hidden>
       <div class="bar"><input id="cq" type="search" placeholder="Buscar por nombre, teléfono o etiqueta"><button id="c-new">Nuevo cliente</button><button class="ghost" id="c-sync" type="button">Recaudar contactos del WhatsApp</button><button class="ghost" id="c-imp">Importar CSV</button></div>
       <input type="file" id="c-file" accept=".csv,text/csv,.txt" hidden>
@@ -693,12 +720,21 @@ dialog::backdrop{background:rgba(3,4,8,.66);backdrop-filter:blur(8px)}
         <p id="b-status" class="muted" style="margin-top:1rem">Sin comprobar.</p>
       </div>
       <div class="box">
+        <h2>Envío manual (botón WhatsApp)</h2>
+        <p class="muted">Cuando uses <b>Enviar por WhatsApp</b> en Campañas, elige dónde abrirlo. En <b>Web</b> se abre en una pestaña de este mismo navegador: si ya iniciaste sesión de WhatsApp Web no te pedirá QR (solo la primera vez). En <b>App</b> se abre la aplicación de escritorio si la tienes instalada.</p>
+        <label for="b-wa">Abrir en</label>
+        <select id="b-wa">
+          <option value="web">WhatsApp Web (una pestaña de este navegador)</option>
+          <option value="app">App de escritorio de WhatsApp</option>
+        </select>
+      </div>
+      <div class="box">
         <h2>Conectar WhatsApp (QR)</h2>
         <div id="qr-estado"><p class="muted">Comprobando estado del bot…</p></div>
         <div id="qr-wrap" hidden style="text-align:center;margin-top:.9rem">
           <img id="qr-img" alt="QR de WhatsApp" style="width:min(320px,82%);background:#fff;padding:12px;border-radius:12px;display:block;margin:0 auto">
           <p class="muted" style="margin-top:.6rem">WhatsApp → <b>Dispositivos vinculados</b> → <b>Vincular dispositivo</b></p>
-          <p class="muted" style="margin-top:.35rem">El QR rota cada pocos segundos: escanéalo rápido. Si aún falla, escanea el QR que aparece en la ventana de Chrome del bot (es el mismo).</p>
+          <p class="muted" style="margin-top:.35rem">El QR se muestra solo aquí y se renueva cada pocos segundos: escanéalo rápido. El bot corre sin ventana de Chrome (HEADLESS=true); si lo arrancaste con HEADLESS=false, verás la misma imagen en esa ventana.</p>
         </div>
         <div class="acts" style="justify-content:flex-start">
           <button class="ghost" id="qr-refresh" type="button">Generar / reiniciar QR</button>
@@ -731,8 +767,8 @@ dialog::backdrop{background:rgba(3,4,8,.66);backdrop-filter:blur(8px)}
       <div class="box">
         <h2>Cómo funciona</h2>
         <ol class="muted" style="padding-left:1.2rem;line-height:1.9">
-          <li>Enciendes el bot en la PC o servidor donde se ejecuta.</li>
-          <li>En esta misma pantalla, en <b>Conectar WhatsApp (QR)</b>, escaneas el QR con el WhatsApp de la tienda. Solo se hace una vez.</li>
+          <li>Enciendes el bot en la PC o servidor donde se ejecuta (sin ventana de Chrome si usas <code>HEADLESS=true</code>).</li>
+          <li>En esta misma pantalla, en <b>Conectar WhatsApp (QR)</b>, escaneas el QR con el WhatsApp de la tienda. Solo se hace una vez; luego la sesión queda guardada en <code>bot/.wwebjs_auth</code>.</li>
           <li>En Campañas eliges fecha y pulsas <b>Programar con el bot</b>.</li>
           <li>El bot envía de a un cliente cada 25-40 segundos, solo a quienes dieron consentimiento.</li>
           <li>Si un cliente responde BAJA, el bot lo marca y no le vuelve a escribir.</li>
@@ -779,6 +815,15 @@ const SUPABASE_KEY='sb_publishable_UHjFrmSZodpuHDpDSh4zWg_pVfhseeS';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+/* Formato de WhatsApp (*negrita*, _cursiva_, ~tachado~) para mostrar en el panel. */
+function waHTML(t){return esc(String(t??''))
+  .replace(/\*([^*\n]+)\*/g,'<b>$1</b>')
+  .replace(/(^|[\s(>])_([^_\n]+)_/g,'$1<i>$2</i>')
+  .replace(/~([^~\n]+)~/g,'<s>$1</s>')}
+function waPlano(t){return String(t??'')
+  .replace(/\*([^*\n]+)\*/g,'$1')
+  .replace(/_([^_\n]+)_/g,'$1')
+  .replace(/~([^~\n]+)~/g,'$1')}
 const BAJA='\n\nSi no quieres recibir más mensajes, responde BAJA.';
 const MESES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 
@@ -791,12 +836,13 @@ function hoyISO(){return localISO(new Date())}
 function parseISO(s){const [y,m,d]=String(s).split('-').map(Number);return new Date(y,(m||1)-1,d||1)}
 function fmtDia(s){return s?parseISO(s).toLocaleDateString('es-PE',{day:'2-digit',month:'short',year:'numeric'}):''}
 function fmtFechaHora(v){if(!v)return'';const d=new Date(v);return isNaN(d)?'':d.toLocaleString('es-PE',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}
+function horaTxt(h){const m=String(h||'').match(/^(\d{1,2}):(\d{2})/);if(!m)return String(h||'');let hh=Number(m[1]);const suf=hh>=12?'p. m.':'a. m.';hh=hh%12||12;return `${hh}:${m[2]} ${suf}`}
 function addDays(s,n){const d=parseISO(s);d.setDate(d.getDate()+n);return localISO(d)}
 function diffDays(a,b){return Math.round((parseISO(b)-parseISO(a))/864e5)}
 function norm(t){let d=String(t||'').replace(/\D/g,'');if(d.startsWith('00'))d=d.slice(2);if(d.length===11&&d.startsWith('51'))return d;if(d.length===9&&d[0]==='9')return '51'+d;return d}
 const tagsOf=s=>Array.isArray(s)?s.map(x=>String(x).trim().toLowerCase()).filter(Boolean):String(s||'').split(',').map(x=>x.trim().toLowerCase()).filter(Boolean);
 /* ---------- sonido de interfaz (como portafolio-v4) ---------- */
-let audioCtx=null,soundOn=localStorage.getItem('ui_sound')==='1';
+let audioCtx=null,soundOn=localStorage.getItem('ui_sound')!=='0';
 const soundToggle=$('#soundToggle');
 function playTone(freq,duration,volume){
   if(!soundOn||!audioCtx)return;
@@ -812,10 +858,27 @@ function playTone(freq,duration,volume){
   }catch(err){/* el audio es opcional */}
 }
 function sonido(tipo){
+  if(!soundOn)return;
   if(tipo==='ok'){playTone(660,0.08,0.028);setTimeout(()=>playTone(990,0.09,0.02),80);}
   else if(tipo==='error'){playTone(240,0.14,0.03);setTimeout(()=>playTone(170,0.17,0.028),110);}
   else if(tipo==='toggle'){playTone(620,0.07,0.03);setTimeout(()=>playTone(820,0.06,0.022),70);}
   else playTone(480,0.045,0.018);
+}
+/* Aviso sonoro de mensaje entrante (aunque el chat no esté abierto). */
+function sonidoEntrante(){
+  if(!soundOn)return;
+  asegurarAudio();
+  tonoAviso(880,0,0.12,0.055);
+  tonoAviso(1180,0.15,0.15,0.045);
+}
+/* Confirmación de envío: solo si estás viendo ese chat. */
+function sonidoEnvio(){
+  if(!soundOn)return;
+  asegurarAudio();
+  playTone(760,0.055,0.018);
+}
+function enChatActual(tel){
+  return tabActual==='bandeja'&&inTel===String(tel)&&$('#in-thread')&&!$('#in-thread').hidden;
 }
 function refrescarSonido(){
   if(!soundToggle)return;
@@ -861,7 +924,6 @@ function fantasma(cont,html,force){
   const aplicar=()=>{
     cont.innerHTML=html;
     if(guardarScroll)cont.scrollTop=abajo?cont.scrollHeight:teniaScroll;
-    try{cont.animate([{opacity:.45,transform:'translateY(3px)'},{opacity:1,transform:'translateY(0)'}],{duration:240,easing:'cubic-bezier(.22,1,.36,1)'});}catch(e){}
   };
   if(!cont.firstChild){aplicar();return;}
   requestAnimationFrame(aplicar);
@@ -873,6 +935,44 @@ function fantasmaValor(el,valor){
   el.textContent=v;
   try{el.animate([{opacity:.35},{opacity:1}],{duration:220,easing:'cubic-bezier(.22,1,.36,1)'});}catch(e){}
 }
+
+/* ---------- scheduler único: un solo timer, sin doble polling ---------- */
+const TAREAS=new Map();
+function tarea(nombre,fn,ms){TAREAS.set(nombre,{fn,ms,at:0,corriendo:null,activa:false})}
+function activar(nombre,on=true){const t=TAREAS.get(nombre);if(t)t.activa=!!on}
+function activarSolo(nombres){for(const [k,t] of TAREAS)t.activa=nombres.includes(k)}
+let _sched=null;
+function iniciarScheduler(){
+  if(_sched)return;
+  _sched=setInterval(()=>{
+    if(document.hidden)return;                       // pestaña de fondo: cero peticiones
+    const ahora=Date.now();
+    for(const t of TAREAS.values()){
+      if(!t.activa||t.corriendo||ahora-t.at<t.ms)continue;
+      t.at=ahora;
+      t.corriendo=Promise.resolve().then(t.fn).catch(e=>console.warn('[tarea]',e)).finally(()=>{t.corriendo=null});
+    }
+  },1000);
+  document.addEventListener('visibilitychange',()=>{
+    if(document.hidden)return;
+    for(const t of TAREAS.values())if(t.activa)t.at=0;   // refresco inmediato al volver
+  });
+}
+/* Último dato bueno en memoria: si la red/bot falla, NO se borra la pantalla. */
+const ULTIMO=new Map();
+const guardarUltimo=(k,v)=>ULTIMO.set(k,{t:Date.now(),v});
+const leerUltimo=k=>ULTIMO.get(k)||null;
+function debounce(fn,ms){let h=null;return(...a)=>{clearTimeout(h);h=setTimeout(()=>fn(...a),ms)}}
+function avisoStale(sub,ts){
+  if(!sub)return;
+  sub.textContent=`⚠ Sin conexión con el bot · datos de ${ts?new Date(ts).toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'}):'antes'}`;
+  sub.style.color='var(--warn)';
+}
+function limpiarStale(sub,texto){
+  if(!sub)return;
+  sub.textContent=texto;
+  sub.style.color='';
+}
 const puede=c=>c.activo!==false&&!!c.consentimiento&&!c.baja;
 const imgURL=p=>p.imagen_ruta? (String(p.imagen_ruta).startsWith('http')?p.imagen_ruta:'https://perfumeriafinaperu.com/'+p.imagen_ruta):'';
 
@@ -881,13 +981,40 @@ async function boot(){
   try{
     const{data:{session}}=await sb.auth.getSession();
     await show(!!session);
-    sb.auth.onAuthStateChange((_e,s)=>show(!!s));
+    // Solo cargamos la app cuando hay un login real, no en cada refresco de token
+    // (TOKEN_REFRESHED/INITIAL_SESSION) ni al volver a la pestaña.
+    sb.auth.onAuthStateChange((evento,s)=>{
+      if(evento==='INITIAL_SESSION'||evento==='TOKEN_REFRESHED')return;
+      show(!!s);
+    });
   }catch(e){$('#login').hidden=false;toast('No se pudo conectar con Supabase')}
 }
+let cargandoApp=null;
+function cargarAppUnaVez(){
+  if(cargandoApp)return cargandoApp;
+  cargandoApp=load().catch(e=>{toast('Error al cargar: '+e.message)}).finally(()=>{cargandoApp=null});
+  return cargandoApp;
+}
+let appVisible=false;
 async function show(on){
+  // Si la app ya está abierta, un evento de auth (SIGNED_IN/TOKEN_REFRESHED/…)
+  // no debe recargar ni volver a pedir las 4 tablas a Supabase.
+  if(on&&appVisible)return;
   $('#login').hidden=on;$('#app').hidden=!on;
-  if(on){try{await load()}catch(e){toast('Error al cargar: '+e.message)}}
-  else{clientes=[];productos=[];plantillas=[];campanas=[]}
+  if(on){
+    await cargarAppUnaVez();
+    appVisible=true;
+    iniciarScheduler();
+    arrancarTareasBase();
+    refrescarChip();
+    conectarSSE();
+    if(!window.__pfExtras){window.__pfExtras=true;setTimeout(()=>{cargarPedidos();actualizarBotonAvisos()},600)}
+  }else{
+    appVisible=false;
+    desconectarSSE();
+    activarSolo([]);
+    clientes=[];productos=[];plantillas=[];campanas=[];
+  }
 }
 $('#lform').onsubmit=async e=>{
   e.preventDefault();$('#l-err').textContent='';$('#l-btn').disabled=true;$('#l-btn').textContent='Entrando…';
@@ -919,20 +1046,39 @@ async function load(){
 }
 
 /* ---------- pestañas ---------- */
-const CRUMBS={inicio:['Inicio','Resumen'],bandeja:['Bandeja','WhatsApp'],pedidos:['Pedidos','Ventas y pagos'],analiticas:['Analíticas','Consultas y ventas'],campanas:['Campañas','Envíos'],clientes:['Clientes','Base de datos'],catalogo:['Catálogo','Perfumes'],calendario:['Calendario','Agenda'],ia:['Asistente IA','Automático'],bot:['Ajustes','Conexión']};
+const CRUMBS={inicio:['Inicio','Resumen'],bandeja:['Bandeja','WhatsApp'],pedidos:['Pedidos','Ventas y pagos'],analiticas:['Analíticas','Consultas y ventas'],campanas:['Campañas','Envíos'],anuncios:['Anuncios','Mensajes masivos'],clientes:['Clientes','Base de datos'],catalogo:['Catálogo','Perfumes'],calendario:['Calendario','Agenda'],ia:['Asistente IA','Automático'],bot:['Ajustes','Conexión']};
+let tabActual='inicio';
+function arrancarTareasBase(){
+  if(!TAREAS.size){
+    tarea('estado',refrescarChip,30000);
+    tarea('eventos',pollEventos,15000);
+    tarea('bandeja',cargarBandeja,15000);
+    tarea('hilo',refrescarHiloAbierto,30000);
+    tarea('qr',refrescarQR,15000);
+    tarea('logs',cargarLogs,8000);
+    tarea('pedidos',cargarPedidos,30000);
+  }
+  activarSolo(['estado','eventos'].concat(
+    tabActual==='bandeja'?['bandeja'].concat(inTel?['hilo']:[]):
+    tabActual==='bot'?['qr','logs']:
+    tabActual==='pedidos'?['pedidos']:[]));
+}
 function irTab(name){
+  tabActual=name;
   document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x.dataset.tab===name));
   document.querySelectorAll('.tab').forEach(x=>x.hidden=x.id!=='t-'+name);
   const c=CRUMBS[name]||['',''];
   if($('#crumb'))$('#crumb').textContent=c[0];
   if($('#crumb-sub'))$('#crumb-sub').textContent=c[1];
-  pararQr();pararLogs();pararBandeja();
-  if(name==='bandeja'){cargarBandeja();inListTimer=setInterval(()=>{if(!document.hidden)cargarBandeja()},12000);alertasNuevas=0;actualizarAlertBadge();}
+  arrancarTareasBase();
+  if(name==='bandeja'){cargarBandeja();alertasNuevas=0;actualizarAlertBadge();}
   else if(name==='pedidos')cargarPedidos();
+  else if(name==='anuncios')cargarAnuncios();
+  else if(name==='calendario'){if(!pedidosCache.length)cargarPedidos().finally(renderCalendario);else renderCalendario();}
   else if(name==='analiticas')cargarAnaliticas();
   else if(name==='ia')cargarIA();
   else if(name==='inicio')renderInicio();
-  else if(name==='bot'){arrancarQr();arrancarLogs();}
+  else if(name==='bot'){refrescarQR();cargarLogs();}
   window.scrollTo({top:0,behavior:'smooth'});
 }
 $('#tabs').onclick=e=>{const b=e.target.closest('button');if(b)irTab(b.dataset.tab)};
@@ -1066,7 +1212,8 @@ function renderCatalogo(){
   $('#p-list').innerHTML=l.slice(0,pLimit).map(p=>`<div class="pc"><img loading="lazy" src="${esc(imgURL(p))}" alt="${esc(p.nombre)}" onerror="this.style.visibility='hidden'"><b>${esc(p.nombre)}</b><small>${esc(p.casa_inspirada||'')} · ${esc(p.genero||'')}</small><span>S/ ${p.precio_50ml??'—'} · S/ ${p.precio_100ml??'—'}</span></div>`).join('')||'<p class="empty">No hay perfumes con ese filtro.</p>';
   $('#p-more').hidden=l.length<=pLimit;
 }
-['#pq','#p-cat','#p-gen'].forEach(s=>$(s).oninput=()=>{pLimit=60;renderCatalogo()});
+['#p-cat','#p-gen'].forEach(s=>$(s).oninput=()=>{pLimit=60;renderCatalogo()});
+$('#pq').oninput=debounce(()=>{pLimit=60;renderCatalogo()},160);
 $('#p-more').onclick=()=>{pLimit+=60;renderCatalogo()};
 
 /* ---------- campañas ---------- */
@@ -1123,7 +1270,12 @@ async function crearCampana(estado){
     const{data:k,error}=await sb.from('campanas').insert({titulo:tit,mensaje_final:msg+($('#k-baja').checked?BAJA:''),segmento:tagsOf($('#k-seg').value),fecha_programada:fecha,estado,numero_emisor:$('#k-num').value}).select().single();
     if(error)throw error;
     const{error:e2}=await sb.from('envios').insert(dest.map(c=>({campana_id:k.id,cliente_id:c.id})));
-    if(e2)throw e2;
+    if(e2){
+      // Sin transacción en el cliente: si fallan los destinatarios, se retira la
+      // campaña huérfana para no dejar una campaña "programada" vacía.
+      try{await sb.from('campanas').delete().eq('id',k.id)}catch(_){}
+      throw e2;
+    }
     toast(estado==='programada'?`Programada para ${fmtFechaHora(fecha)}`:'Campaña lista para envío manual');
     await load();abrirCampana(k.id);
   }catch(e){alert(e.message)}finally{sending=false}
@@ -1140,7 +1292,7 @@ function renderCampanas(){
 }
 $('#k-list').onclick=e=>{const b=e.target.closest('[data-k]');if(b)abrirCampana(b.dataset.k)};
 
-async function abrirCampana(id){
+async function abrirCampana(id,opts={}){
   openK=campanas.find(x=>x.id===id);if(!openK)return;
   const{data:ev,error}=await sb.from('envios').select('id,estado,cliente_id').eq('campana_id',id);
   if(error)return alert(error.message);
@@ -1171,7 +1323,7 @@ async function abrirCampana(id){
     if(error)return alert(error.message);
     toast('Programación cancelada');await load();abrirCampana(openK.id);
   };
-  box.scrollIntoView({behavior:'smooth',block:'start'});
+  if(!opts.noScroll)box.scrollIntoView({behavior:'smooth',block:'start'});
 }
 $('#k-send').onclick=async e=>{
   const w=e.target.closest('[data-wa]'),o=e.target.closest('[data-om]');
@@ -1180,7 +1332,7 @@ $('#k-send').onclick=async e=>{
   if(w){
     const c=clientes.find(x=>x.id===w.dataset.c);
     const txt=openK.mensaje_final.replaceAll('{nombre}',c.nombre.trim().split(' ')[0]);
-    window.open(`https://wa.me/${c.telefono}?text=${encodeURIComponent(txt)}`,'_blank','noopener,noreferrer');
+    abrirWhatsApp(c.telefono,txt);
   }
   btn.disabled=true;
   const id=w?w.dataset.wa:o.dataset.om;
@@ -1224,7 +1376,7 @@ async function renderInicio(){
     kpi('warn','Campañas programadas',pend,`${camMes} creadas este mes`,ico.cal)+
     kpi('green','Mensajes enviados hoy',st?.enviadosHoy??0,`límite ${st?.maxPorDia??'—'}/día`,ico.send));
   if(st&&st.dias&&st.dias.length)pintarChart(st.dias,st.totalEntrantes||0,st.totalSalientes||0);
-  else $('#i-chart').innerHTML='<p class="empty" style="padding:1rem">Sin datos del bot. Enciéndelo para ver el gráfico.</p>';
+  else if($('#i-chart')&&$('#i-chart').dataset.hay!=='1'){if($('#i-chart'))$('#i-chart').dataset.sig='';$('#i-chart').innerHTML='<p class="empty" style="padding:1rem">Sin datos del bot. Enciéndelo para ver el gráfico.</p>';}
   pintarCola(cvs?.conversaciones||[]);
   $('#i-cum').innerHTML=cum.slice(0,5).map(x=>`<div class="lrow"><div class="lt"><b>${esc(x.c.nombre)}</b><small>${x.dias===0?'Hoy':'En '+x.dias+' días'} · ${esc(fmtDia(x.c.fecha_cumpleanos))}</small></div><span class="le">🎂</span></div>`).join('')||'<p class="empty">Sin cumpleaños próximos.</p>';
   const recientes=campanas.slice().sort((a,b)=>String(b.creado_en||'').localeCompare(String(a.creado_en||''))).slice(0,5);
@@ -1237,6 +1389,10 @@ async function renderInicio(){
 }
 function pintarChart(dias,totIn,totOut){
   const cont=$('#i-chart');if(!cont)return;
+  // Si los datos no cambiaron, no se reconstruye el gráfico (sin re-animación).
+  const sig=dias.map(d=>`${d.fecha}:${d.entrantes}:${d.salientes}`).join('|')+`|${totIn}|${totOut}`;
+  if(cont.dataset.sig===sig)return;
+  cont.dataset.sig=sig;cont.dataset.hay='1';
   const max=Math.max(1,...dias.flatMap(d=>[d.entrantes,d.salientes]));
   const hoy=hoyISO();
   cont.innerHTML=dias.map((d,i)=>{
@@ -1293,6 +1449,18 @@ function eventosDelMes(y,m){
     }
   }
   for(const f of festivos(y))if(f.mes===m+1)add(`${y}-${String(m+1).padStart(2,'0')}-${String(f.dia).padStart(2,'0')}`,{tipo:'fes',titulo:f.nombre,sub:'Fecha especial'});
+  // Entregas/recojos agendados desde el bot.
+  for(const p of pedidosCache){
+    if(!p.fechaEntrega)continue;
+    const d=parseISO(p.fechaEntrega);
+    if(d.getFullYear()===y&&d.getMonth()===m){
+      add(p.fechaEntrega,{
+        tipo:'ent',
+        titulo:`Entrega ${p.id} · ${p.nombre||('+'+p.telefono)}`,
+        sub:`${horaTxt(p.horaEntrega)} ${p.entrega==='estacion'?'Recojo: '+(p.estacion||'estación'):'Delivery'}`
+      });
+    }
+  }
   return map;
 }
 function renderCalendario(){
@@ -1317,7 +1485,7 @@ function renderCalendario(){
     const iso=addDays(hoyD,i);const d=parseISO(iso);const list=eventosDelMes(d.getFullYear(),d.getMonth())[iso]||[];
     for(const e of list)up.push({iso,e});
   }
-  $('#cal-up').innerHTML=up.slice(0,12).map(x=>`<div class="row"><div><b>${esc(x.e.titulo)}</b><small>${esc(fmtDia(x.iso))} · ${esc(x.e.sub)}</small></div><i class="tag ${x.e.tipo==='cum'?'':x.e.tipo==='rec'?'ok':x.e.tipo==='fes'?'warn':''}">${x.e.tipo==='cam'?'Campaña':x.e.tipo==='cum'?'Cumpleaños':x.e.tipo==='rec'?'Recompra':'Especial'}</i></div>`).join('')||'<p class="empty">Sin recordatorios en los próximos 45 días.</p>';
+  $('#cal-up').innerHTML=up.slice(0,12).map(x=>`<div class="row"><div><b>${esc(x.e.titulo)}</b><small>${esc(fmtDia(x.iso))} · ${esc(x.e.sub)}</small></div><i class="tag ${x.e.tipo==='cum'?'':x.e.tipo==='rec'?'ok':x.e.tipo==='ent'?'ok':x.e.tipo==='fes'?'warn':''}">${x.e.tipo==='cam'?'Campaña':x.e.tipo==='cum'?'Cumpleaños':x.e.tipo==='rec'?'Recompra':x.e.tipo==='ent'?'Entrega':'Especial'}</i></div>`).join('')||'<p class="empty">Sin recordatorios en los próximos 45 días.</p>';
 }
 $('#cal-grid').onclick=e=>{const d=e.target.closest('[data-d]');if(d){calSel=d.dataset.d;renderCalendario()}};
 $('#cal-prev').onclick=()=>{calCursor=new Date(calCursor.getFullYear(),calCursor.getMonth()-1,1);renderCalendario()};
@@ -1328,12 +1496,141 @@ $('#cal-today').onclick=()=>{calCursor=new Date();calSel=hoyISO();renderCalendar
 let botURL=localStorage.getItem('bot_url')||'http://localhost:3000';
 let botToken=localStorage.getItem('bot_token')||'';
 $('#b-url').value=botURL;$('#b-token').value=botToken;
-function guardarBot(){botURL=$('#b-url').value.trim().replace(/\/$/,'');botToken=$('#b-token').value.trim();localStorage.setItem('bot_url',botURL);localStorage.setItem('bot_token',botToken)}
+function guardarBot(){botURL=$('#b-url').value.trim().replace(/\/$/,'');botToken=$('#b-token').value.trim();localStorage.setItem('bot_url',botURL);localStorage.setItem('bot_token',botToken);conectarSSE()}
+/* Preferencia del envío manual: WhatsApp Web en este navegador o app de escritorio. */
+if($('#b-wa')){
+  $('#b-wa').value=localStorage.getItem('wa_modo')==='app'?'app':'web';
+  $('#b-wa').addEventListener('change',e=>localStorage.setItem('wa_modo',e.target.value));
+}
+function abrirWhatsApp(tel,texto){
+  const modo=localStorage.getItem('wa_modo')==='app'?'app':'web';
+  const t=encodeURIComponent(String(texto||''));
+  if(modo==='app'){
+    // Abre la app de escritorio si está instalada; si no, no navega a otra web.
+    window.location.href=`whatsapp://send?phone=${encodeURIComponent(tel)}&text=${t}`;
+    return;
+  }
+  // web.whatsapp.com usa la sesión de ESTE navegador (Brave): una sola vez el QR.
+  window.open(`https://web.whatsapp.com/send?phone=${encodeURIComponent(tel)}&text=${t}`,'_blank','noopener,noreferrer');
+}
 async function botFetch(path,opts={}){
-  const r=await fetch(botURL+path,{cache:'no-store',...opts,headers:{...(opts.headers||{}),...(botToken?{'x-bot-token':botToken}:{})}});
-  const j=await r.json().catch(()=>({error:'Respuesta inválida del bot'}));
-  if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
-  return j;
+  // Toda petición al bot tiene deadline: un cuelgue nunca deja la UI esperando.
+  // `timeoutMs` permite dar más margen a operaciones lentas (sync, envío, IA).
+  const {timeoutMs=12000,...rest}=opts;
+  const ctl=rest.signal?null:new AbortController();
+  const timer=ctl?setTimeout(()=>ctl.abort(),timeoutMs):null;
+  try{
+    const r=await fetch(botURL+path,{cache:'no-store',...rest,signal:rest.signal||ctl.signal,headers:{...(rest.headers||{}),...(botToken?{'x-bot-token':botToken}:{})}});
+    const j=await r.json().catch(()=>({error:'Respuesta inválida del bot'}));
+    if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
+    return j;
+  }finally{if(timer)clearTimeout(timer)}
+}
+/* ---------- tiempo real (SSE) con respaldo de polling ---------- */
+let esFuente=null,SSE_ABIERTO=false,sseReintento=null,sseIntentos=0,campanaRefreshTimer=null;
+function desconectarSSE(){
+  clearTimeout(sseReintento);sseReintento=null;
+  if(esFuente){try{esFuente.close()}catch(e){}esFuente=null}
+  SSE_ABIERTO=false;
+}
+function conectarSSE(){
+  if(typeof EventSource==='undefined'||!botURL)return;
+  desconectarSSE();
+  try{
+    esFuente=new EventSource(botURL+'/api/stream?token='+encodeURIComponent(botToken));
+    esFuente.onopen=()=>{SSE_ABIERTO=true;sseIntentos=0};
+    esFuente.onmessage=ev=>{
+      let d=null;try{d=JSON.parse(ev.data)}catch(e){return}
+      if(!d||!d.tipo)return;
+      if(typeof d.id==='number'&&(evUltimo===null||d.id>evUltimo))evUltimo=d.id;
+      aplicarEventoSSE(d);
+    };
+    esFuente.onerror=()=>{
+      SSE_ABIERTO=false;
+      try{esFuente.close()}catch(e){}esFuente=null;
+      clearTimeout(sseReintento);
+      // Reconexión con espera creciente (2 s → 30 s); el polling sigue de respaldo.
+      sseIntentos=Math.min(sseIntentos+1,5);
+      const espera=Math.min(30000,2000*Math.pow(2,sseIntentos-1));
+      sseReintento=setTimeout(conectarSSE,espera);
+    };
+  }catch(e){SSE_ABIERTO=false}
+}
+function aplicarMensajeSSE(d){
+  const tel=String(d.telefono||'');if(!tel)return;
+  const m=d.mensaje||{};
+  let c=inChats.find(x=>x.telefono===tel);
+  if(!c){c={telefono:tel,nombreWa:d.nombreWa||d.nombre||('+'+tel),nombre:d.nombre||'',noLeidos:0,ultimoTexto:'',ultimoEn:''};inChats.push(c)}
+  if(d.nombreWa)c.nombreWa=d.nombreWa;
+  if(d.nombre)c.nombre=d.nombre;
+  if(m.texto)c.ultimoTexto=m.texto;
+  if(m.en)c.ultimoEn=m.en;
+  if(typeof d.noLeidos==='number')c.noLeidos=d.noLeidos;
+  else if(m.direccion==='entrante')c.noLeidos=(c.noLeidos||0)+1;
+  else c.noLeidos=0;
+  inChats.sort((a,b)=>(b.pin?1:0)-(a.pin?1:0)||String(b.ultimoEn||'').localeCompare(String(a.ultimoEn||'')));
+  // Sonidos: entrante SIEMPRE (aunque el chat esté cerrado); envío solo si
+  // estás viendo ese chat. El maestro es el botón de sonido de la barra.
+  if(m.direccion==='entrante')sonidoEntrante();
+  else if(enChatActual(tel))sonidoEnvio();
+  pintarLista();
+  actualizarBadge(inChats.reduce((n,x)=>n+(x.noLeidos||0),0));
+  if(inTel===tel&&m.texto){
+    agregarMensajes([m],true);
+    if(m.direccion==='entrante'&&(document.hidden||tabActual!=='bandeja')){
+      alertasNuevas++;actualizarAlertBadge();
+    }
+  }
+}
+function aplicarEventoSSE(d){
+  if(d.tipo==='sync'){ // el bot trajo chats nuevos/actualizados de WhatsApp
+    if(tabActual==='bandeja')cargarBandeja();
+    else if(tabActual==='inicio')renderInicio();
+    return;
+  }
+  if(d.tipo==='mensaje'){aplicarMensajeSSE(d);return}
+  if(d.tipo==='ack'){
+    const m=d.mensaje||{};
+    actualizarAckUI({waId:m.waId||d.waId,ack:typeof d.ack==='number'?d.ack:m.ack});
+    return;
+  }
+  if(d.tipo==='leido'){
+    const c=inChats.find(x=>x.telefono===d.telefono);
+    if(c){c.noLeidos=0;pintarLista();actualizarBadge(inChats.reduce((n,x)=>n+(x.noLeidos||0),0))}
+    return;
+  }
+  if(d.tipo==='campana'){
+    if(openK&&d.campanaId===openK.id){
+      clearTimeout(campanaRefreshTimer);
+      campanaRefreshTimer=setTimeout(()=>{if(openK)abrirCampana(openK.id,{noScroll:true})},500);
+    }
+    return;
+  }
+  if(d.tipo==='ia'){
+    if(d.accion==='pausar'&&d.telefono){
+      if(d.pausado)inPausados.add(d.telefono);else inPausados.delete(d.telefono);
+      pintarLista();
+    }
+    if(typeof d.activa==='boolean')inIAactiva=d.activa;
+    if(typeof d.activa==='boolean'&&$('#ia-activa'))$('#ia-activa').checked=d.activa;
+    actualizarPausa();actualizarOrbe();return;
+  }
+  if(d.tipo==='anuncio'){
+    const i=anunciosCache.findIndex(x=>String(x.id)===String(d.id));
+    if(i>=0){
+      anunciosCache[i]={...anunciosCache[i],estado:d.estado||anunciosCache[i].estado,stats:{...(anunciosCache[i].stats||{}),total:d.total,enviados:d.enviados,errores:d.errores}};
+      renderAnuncios();
+    }
+    if(d.estado==='enviado')toast(`Anuncio enviado: ${d.enviados}/${d.total}`);
+    else if(d.motivo)toast('Anuncio pausado: '+d.motivo,'error');
+    return;
+  }
+  if(d.tipo==='pedido'){
+    if($('#t-pedidos')&&!$('#t-pedidos').hidden)cargarPedidos();
+    manejarEvento(d);return;
+  }
+  if(d.tipo==='hola')return;
+  manejarEvento(d); // derivacion / comprobante / seguimiento
 }
 $('#b-test').onclick=async()=>{
   guardarBot();
@@ -1349,21 +1646,22 @@ $('#b-test').onclick=async()=>{
 $('#b-open').onclick=()=>{guardarBot();toast('Conexión guardada')};
 
 /* ---------- registro del bot ---------- */
-let logsTimer=null;
 async function cargarLogs(){
   const c=$('#b-logs');if(!c)return;
   try{
-    const j=await botFetch('/api/logs',{signal:AbortSignal.timeout?AbortSignal.timeout(6000):undefined});
+    const j=await botFetch('/api/logs');
     const logs=(j.logs||[]).slice(-60);
     const html=logs.map(l=>{
       const esError=/error|no se|inválid|falló|no pudo|desconect/i.test(l);
       return `<div class="${esError?'er':''}">${esc(l)}</div>`;
     }).join('');
+    c.dataset.hay='1';
     fantasma(c,html||'Sin actividad todavía.');
-  }catch(e){fantasma(c,'<span class="er">Bot apagado o sin conexión.</span>');}
+  }catch(e){
+    // Conserva el último registro bueno; solo muestra el aviso si nunca hubo datos.
+    if(c.dataset.hay!=='1')fantasma(c,'<span class="er">Bot apagado o sin conexión.</span>');
+  }
 }
-function arrancarLogs(){cargarLogs();pararLogs();logsTimer=setInterval(cargarLogs,6000)}
-function pararLogs(){if(logsTimer){clearInterval(logsTimer);logsTimer=null}}
 $('#b-logs-refresh')?.addEventListener('click',cargarLogs);
 $('#b-prueba-send')?.addEventListener('click',async()=>{
   const tel=$('#b-prueba-tel').value.trim();
@@ -1378,41 +1676,41 @@ $('#b-prueba-send')?.addEventListener('click',async()=>{
 });
 
 /* ---------- conectar WhatsApp (QR) desde el dashboard ---------- */
-let qrTimer=null;
-function pararQr(){if(qrTimer){clearInterval(qrTimer);qrTimer=null}}
 async function refrescarQR(){
   const est=$('#qr-estado');if(!est)return;
   try{
-    const j=await botFetch('/api/estado?t='+Date.now());
+    const j=await botFetch('/api/estado');
     const ses=j.sesiones||[];
     const con=ses.find(s=>s.conectado);
-    const qrSes=ses.find(s=>s.estado==='qr'&&s.qr);
+    const qrSes=ses.find(s=>s.estado==='qr');
     if(con){
-      pararQr();
+      activar('qr',false);                      // ya conectado: no seguir pidiendo estado
       fantasma(est,`<div class="status"><span class="dot on"></span>Conectado${con.numero?' · +'+esc(con.numero):''}</div><p class="muted" style="margin:.6rem 0 0">El bot ya está vinculado. No necesitas escanear nada.</p>`);
       $('#qr-wrap').hidden=true;
     }else if(qrSes){
       fantasma(est,'<div class="status"><span class="dot" style="background:var(--gold)"></span>Escanea el QR con el WhatsApp de la tienda</div>');
-      const img=$('#qr-img');if(img.getAttribute('src')!==qrSes.qr)img.src=qrSes.qr;
+      const img=$('#qr-img');
+      // El QR se sirve como imagen (no viaja en /api/estado); se refresca cada 15 s.
+      const src=botURL+'/api/qr?sesion='+encodeURIComponent(qrSes.id||'1')+'&token='+encodeURIComponent(botToken)+'&t='+Math.floor(Date.now()/15000);
+      if(img.getAttribute('src')!==src)img.src=src;
       $('#qr-wrap').hidden=false;
     }else{
       fantasma(est,'<div class="status"><span class="dot"></span>Iniciando o esperando QR…</div>');
       $('#qr-wrap').hidden=true;
     }
   }catch(e){
-    pararQr();
+    activar('qr',false);
     fantasma(est,'<div class="status"><span class="dot off"></span>Bot apagado o sin conexión</div>');
     $('#qr-wrap').hidden=true;
   }
 }
-function arrancarQr(){refrescarQR();pararQr();qrTimer=setInterval(refrescarQR,2500)}
 $('#qr-refresh')?.addEventListener('click',async()=>{
   if(!confirm('¿Reiniciar la conexión del bot? Si ya está vinculado se reconectará; para vincular otro número primero cierra la sesión.'))return;
-  try{await botFetch('/api/sesion/reiniciar',{method:'POST'});toast('Reiniciando…');arrancarQr()}catch(e){toast('Error: '+e.message)}
+  try{await botFetch('/api/sesion/reiniciar',{method:'POST'});toast('Reiniciando…');activar('qr',true);refrescarQR()}catch(e){toast('Error: '+e.message)}
 });
 $('#qr-logout')?.addEventListener('click',async()=>{
   if(!confirm('¿Cerrar la sesión de WhatsApp del bot? Tendrás que volver a escanear el QR.'))return;
-  try{await botFetch('/api/logout',{method:'POST'});await botFetch('/api/sesion/reiniciar',{method:'POST'});toast('Sesión cerrada. Escanea el nuevo QR.');arrancarQr()}catch(e){toast('Error: '+e.message)}
+  try{await botFetch('/api/logout',{method:'POST'});await botFetch('/api/sesion/reiniciar',{method:'POST'});toast('Sesión cerrada. Escanea el nuevo QR.');activar('qr',true);refrescarQR()}catch(e){toast('Error: '+e.message)}
 });
 
 /* ---------- sincronizar chats y contactos desde WhatsApp ---------- */
@@ -1426,7 +1724,8 @@ async function sincronizar(opts = {}) {
     const j = await botFetch('/api/sincronizar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chats, contactos })
+      body: JSON.stringify({ chats, contactos }),
+      timeoutMs: 120000
     });
     const partes = [];
     if (chats) partes.push(`${j.chats} chats en la Bandeja`);
@@ -1451,7 +1750,9 @@ $('#c-sync')?.addEventListener('click', e => sincronizar({ chats: false, contact
 /* ---------- vista previa ---------- */
 function prev(){
   const m=$('#k-msg').value.trim();
-  $('#k-prev').textContent=m?m.replaceAll('{nombre}','María')+($('#k-baja').checked?BAJA:''):'Escribe el mensaje y aquí verás cómo le llega al cliente.';
+  const texto=m?m.replaceAll('{nombre}','María')+($('#k-baja').checked?BAJA:'') : '';
+  if(m)$('#k-prev').innerHTML=waHTML(texto);
+  else $('#k-prev').innerHTML='<span class="muted">Escribe el mensaje y aquí verás cómo le llega al cliente.</span>';
 }
 ['#k-msg','#k-baja'].forEach(s=>$(s).addEventListener('input',prev));
 $('#k-baja').addEventListener('change',prev);
@@ -1476,39 +1777,172 @@ async function refrescarChip(){
 $('#wa-chip')?.addEventListener('click',()=>irTab('bot'));
 
 /* ---------- bandeja de entrada ---------- */
-let inChats=[],inTel=null,inPausados=new Set(),inIAactiva=true;
+let inChats=[],inTel=null,inPausados=new Set(),inIAactiva=true,bandejaCargada=false;
 function actualizarBadge(n){const b=$('#unread-badge');if(!b)return;b.hidden=!n;b.textContent=n>99?'99+':n}
 async function cargarBandeja(){
   const l=$('#in-list');if(!l)return;
+  const prev = bandejaCargada ? new Map(inChats.map(c=>[String(c.telefono),{no:c.noLeidos||0}])) : null;
   try{
     const j=await botFetch('/api/conversaciones?limite=80');
     inChats=j.conversaciones||[];inPausados=new Set((j.ia?.pausados||[]).map(p=>p.telefono));
     inIAactiva=j.ia?.activa!==false;
+    guardarUltimo('bandeja',j);
+    // Respaldo si el SSE estuviera caído: detecta no leídos nuevos por polling.
+    if(prev&&!SSE_ABIERTO){
+      const hayNuevo=(j.conversaciones||[]).some(c=>{
+        const p=prev.get(String(c.telefono));
+        return p ? (c.noLeidos||0)>p.no : (c.noLeidos||0)>0;
+      });
+      if(hayNuevo)sonidoEntrante();
+    }
+    bandejaCargada=true;
     pintarLista();actualizarPausa();actualizarBadge(j.resumen?.noLeidos||0);
-    if($('#in-sub'))$('#in-sub').textContent=`${j.resumen?.chats||0} conversaciones · ${j.resumen?.mensajesHoy||0} mensajes hoy`;
-  }catch(e){l.innerHTML='<p class="empty" style="padding:1rem">No se pudo cargar. Revisa que el bot esté encendido.</p>';}
+    limpiarStale($('#in-sub'),`${j.resumen?.chats||0} conversaciones · ${j.resumen?.mensajesHoy||0} mensajes hoy`);
+  }catch(e){
+    // Si ya había datos, se conservan (sin parpadeo ni pérdida de scroll).
+    const prev=leerUltimo('bandeja');
+    if(prev?.v){
+      if(!inChats.length){
+        inChats=prev.v.conversaciones||[];
+        inPausados=new Set((prev.v.ia?.pausados||[]).map(p=>p.telefono));
+        inIAactiva=prev.v.ia?.activa!==false;
+        pintarLista();actualizarBadge(prev.v.resumen?.noLeidos||0);
+      }
+      avisoStale($('#in-sub'),prev.t);
+    }else if(!inChats.length){
+      l.innerHTML='<p class="empty" style="padding:1rem">No se pudo cargar. Revisa que el bot esté encendido.</p>';
+    }
+  }
 }
+function innerFilaChat(c){
+  const nom=c.nombreWa||c.nombre||('+'+c.telefono);
+  const tipo=c.tipo==='empresa'?'<span class="tipo emp">Empresa</span>':c.tipo==='persona'?'<span class="tipo per">Persona</span>':'';
+  const ets=(c.etiquetas||[]).map(e=>`<i class="etag ${esc(e.tipo||'')}">${esc(e.texto)}</i>`).join('');
+  return `<div class="ava">${esc(iniciales(nom))}</div><div class="ib"><b>${esc(nom)}${tipo}</b><small>${esc(waPlano((c.ultimoTexto||'').slice(0,44))||'—')}</small>${ets?`<div class="itags">${ets}</div>`:''}</div><div class="imeta"><time>${esc(horaWa(c.ultimoEn))}</time>${inPausados.has(c.telefono)?'<span class="paused">IA off</span>':''}${c.seguimiento?'<span class="paused" style="color:var(--success);border-color:rgba(61,214,140,.5)">Seg</span>':''}${c.noLeidos?`<span class="unread">${c.noLeidos}</span>`:''}</div>`;
+}
+function filaChatHTML(c){
+  const on=c.telefono===inTel?' on':'';
+  return `<div class="in-item${on}" data-tel="${esc(c.telefono)}">${innerFilaChat(c)}</div>`;
+}
+/**
+ * Lista de la Bandeja con actualización por clave (teléfono): si un chat no
+ * cambió, su nodo se conserva; si cambió, se actualiza el contenido sin
+ * reemplazar el nodo. Evita el repintado completo que causaba "parpadeos".
+ */
 function pintarLista(){
+  const cont=$('#in-list');if(!cont)return;
   const q=($('#in-q')?.value||'').toLowerCase().trim();
   const l=inChats.filter(c=>!q||[c.nombreWa,c.nombre,c.telefono,c.ultimoTexto].join(' ').toLowerCase().includes(q));
-  fantasma($('#in-list'),l.map(c=>{
-    const on=c.telefono===inTel?' on':'';
-    const nom=c.nombreWa||c.nombre||('+'+c.telefono);
-    const tipo=c.tipo==='empresa'?'<span class="tipo emp">Empresa</span>':c.tipo==='persona'?'<span class="tipo per">Persona</span>':'';
-    const ets=(c.etiquetas||[]).map(e=>`<i class="etag ${esc(e.tipo||'')}">${esc(e.texto)}</i>`).join('');
-    return `<div class="in-item${on}" data-tel="${esc(c.telefono)}"><div class="ava">${esc(iniciales(nom))}</div><div class="ib"><b>${esc(nom)}${tipo}</b><small>${esc((c.ultimoTexto||'').slice(0,44)||'—')}</small>${ets?`<div class="itags">${ets}</div>`:''}</div><div class="imeta"><time>${esc(horaWa(c.ultimoEn))}</time>${inPausados.has(c.telefono)?'<span class="paused">IA off</span>':''}${c.seguimiento?'<span class="paused" style="color:var(--success);border-color:rgba(61,214,140,.5)">Seg</span>':''}${c.noLeidos?`<span class="unread">${c.noLeidos}</span>`:''}</div></div>`;
-  }).join('')||'<p class="empty" style="padding:1rem">Sin conversaciones todavía.</p>');
+  const html=l.map(filaChatHTML).join('')||'<p class="empty" style="padding:1rem">Sin conversaciones todavía.</p>';
+  if(cont.dataset.sig===html)return;          // nada cambió: no se toca el DOM
+  cont.dataset.sig=html;
+  if(!l.length){cont.innerHTML=html;return}
+  const vacio=cont.querySelector(':scope > .empty');if(vacio)vacio.remove();
+  const existentes=new Map([...cont.querySelectorAll(':scope > [data-tel]')].map(el=>[el.dataset.tel,el]));
+  let previo=null;
+  for(const c of l){
+    let el=existentes.get(String(c.telefono));
+    if(el){
+      existentes.delete(String(c.telefono));
+      const inner=innerFilaChat(c);
+      if(el.innerHTML!==inner)el.innerHTML=inner;
+      const cls='in-item'+(c.telefono===inTel?' on':'');
+      if(el.className!==cls)el.className=cls;
+    }else{
+      el=document.createElement('div');
+      el.className='in-item'+(c.telefono===inTel?' on':'');
+      el.dataset.tel=String(c.telefono);
+      el.innerHTML=innerFilaChat(c);
+    }
+    if(previo){if(previo.nextElementSibling!==el)cont.insertBefore(el,previo.nextSibling)}
+    else if(cont.firstElementChild!==el)cont.insertBefore(el,cont.firstElementChild);
+    previo=el;
+  }
+  for(const el of existentes.values())el.remove();
+}
+let hiloTel=null,hiloIds=new Set();
+function claveMensaje(m){return m.waId||m.id||((m.en||'')+'|'+(m.direccion||'')+'|'+String(m.texto||'').slice(0,120))}
+function nodoMensaje(m){
+  const out=m.direccion!=='entrante';
+  const cls=m.origen==='sistema'?'sys':out?'out':'in';
+  const who=cls==='in'?'':(m.origen==='ia'?'IA':m.origen==='bot'?'Bot':m.origen==='panel'?'Tú':m.origen==='anuncio'?'Anuncio':m.origen==='campana'?'Campaña':'');
+  const marca=out&&cls!=='sys'?marcaEntrega(m.ack):'';
+  const el=document.createElement('div');
+  el.className='msg '+cls;
+  el.dataset.k=claveMensaje(m);
+  el.innerHTML=`${who?`<span class="who">${who}</span>`:''}${waHTML(m.texto)}${marca}<time>${esc(new Date(m.en).toLocaleString('es-PE',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}))}</time>`;
+  return el;
+}
+function pintarHilo(msgs){
+  const c=$('#in-msgs');if(!c)return;
+  c.innerHTML='';hiloIds=new Set();
+  if(!msgs?.length){c.innerHTML='<p class="empty">Sin mensajes.</p>';c.dataset.iniciado='1';return}
+  const frag=document.createDocumentFragment();
+  for(const m of msgs){
+    const k=claveMensaje(m);
+    if(hiloIds.has(k))continue;
+    hiloIds.add(k);frag.appendChild(nodoMensaje(m));
+  }
+  c.appendChild(frag);
+  c.dataset.iniciado='1';
+  c.scrollTop=c.scrollHeight;
+}
+/** Agrega solo los mensajes nuevos (nunca reemplaza el hilo completo). */
+function agregarMensajes(msgs,nuevo){
+  const c=$('#in-msgs');if(!c||!msgs?.length)return 0;
+  const alFinal=c.scrollHeight-c.scrollTop-c.clientHeight<48;
+  const frag=document.createDocumentFragment();let n=0;
+  for(const m of msgs){
+    const k=claveMensaje(m);
+    if(hiloIds.has(k))continue;
+    hiloIds.add(k);
+    const el=nodoMensaje(m);
+    if(nuevo)el.classList.add('nuevo');
+    frag.appendChild(el);n++;
+  }
+  if(!n)return 0;
+  const vacio=c.querySelector(':scope > .empty');if(vacio)vacio.remove();
+  c.appendChild(frag);
+  if($('#in-msgs').dataset.iniciado!=='1'||alFinal)c.scrollTop=c.scrollHeight;
+  c.dataset.iniciado='1';
+  return n;
+}
+/** Actualiza las palomitas de un mensaje ya pintado, sin re-renderizar el hilo. */
+function actualizarAckUI(m){
+  const c=$('#in-msgs');if(!c||!m?.waId)return;
+  let el=null;
+  try{el=c.querySelector(`[data-k="${CSS.escape(String(m.waId))}"]`)}catch(e){}
+  if(!el)return;
+  const marca=marcaEntrega(m.ack);
+  const tick=el.querySelector('.tick');
+  if(!marca){if(tick)tick.remove();return}
+  if(tick){tick.outerHTML=marca;return}
+  const time=el.querySelector('time');
+  if(time)time.insertAdjacentHTML('beforebegin',marca);else el.insertAdjacentHTML('beforeend',marca);
 }
 async function importarHilo(tel){
   try{
-    await botFetch('/api/conversaciones/'+tel+'/importar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({limite:60})});
+    await botFetch('/api/conversaciones/'+tel+'/importar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({limite:60}),timeoutMs:45000});
     if(inTel!==tel)return;
     const c=await botFetch('/api/conversaciones/'+tel);
-    pintarHilo(c.mensajes||[]);
+    if(inTel!==tel)return;
+    // Solo se repinta si el historial de WhatsApp aportó mensajes nuevos
+    // (una vez al abrir el chat; ya no se reimporta cada 20 s).
+    if((c.mensajes||[]).length>(hiloIds.size||0))pintarHilo(c.mensajes||[]);
+  }catch(e){console.warn('No se pudo importar el historial de +'+tel,e)}
+}
+async function refrescarHiloAbierto(){
+  if(!inTel)return;
+  try{
+    const tel=inTel;
+    const c=await botFetch('/api/conversaciones/'+tel);
+    if(inTel!==tel)return;
+    agregarMensajes(c.mensajes||[],true);
   }catch(e){}
 }
 async function abrirChat(tel){
-  inTel=tel;
+  const mismo=hiloTel===tel&&$('#in-msgs')?.dataset.iniciado==='1';
+  inTel=tel;hiloTel=tel;
   const item=inChats.find(c=>c.telefono===tel);
   $('#in-empty').hidden=true;$('#in-thread').hidden=false;
   const nom=item?.nombreWa||item?.nombre||('+'+tel);
@@ -1516,25 +1950,25 @@ async function abrirChat(tel){
   const tipo=item?.tipo==='empresa'?' · Empresa':item?.tipo==='persona'?' · Persona':'';
   $('#in-tel').textContent='+'+tel+tipo;
   $('#in-ava').textContent=iniciales(nom);
-  $('#in-msgs').innerHTML='<p class="empty">Cargando mensajes…</p>';
-  arrancarRefrescoHilo();
+  if(!mismo){
+    $('#in-msgs').innerHTML='<p class="empty">Cargando mensajes…</p>';
+    $('#in-msgs').dataset.iniciado='';
+    hiloIds=new Set();
+  }
+  if(tabActual==='bandeja')activar('hilo',true);
   try{
     const c=await botFetch('/api/conversaciones/'+tel);
+    if(inTel!==tel)return;
     if(c.pausado)inPausados.add(tel);else inPausados.delete(tel);
     inSegActivo=!!c.seguimiento?.activo;actualizarBotonSeg();
-    pintarHilo(c.mensajes||[]);actualizarPausa();
+    if(mismo)agregarMensajes(c.mensajes||[],false);else pintarHilo(c.mensajes||[]);
+    actualizarPausa();
     botFetch('/api/conversaciones/'+tel+'/leido',{method:'POST'}).catch(()=>{});
     const i=inChats.find(x=>x.telefono===tel);if(i)i.noLeidos=0;
     pintarLista();actualizarBadge(inChats.reduce((n,x)=>n+(x.noLeidos||0),0));
-    // Completa y ordena con el historial real de WhatsApp (incluye tus propios envíos).
-    if(c.wa) importarHilo(tel);
-  }catch(e){$('#in-msgs').innerHTML='<p class="empty">No se pudo abrir la conversación.</p>';}
+    if(c.wa)importarHilo(tel);
+  }catch(e){if(!mismo)$('#in-msgs').innerHTML='<p class="empty">No se pudo abrir la conversación.</p>'}
 }
-let inHiloTimer=null;
-function arrancarRefrescoHilo(){pararRefrescoHilo();inHiloTimer=setInterval(()=>{if(inTel&&!document.hidden)importarHilo(inTel)},20000)}
-function pararRefrescoHilo(){if(inHiloTimer){clearInterval(inHiloTimer);inHiloTimer=null}}
-let inListTimer=null;
-function pararBandeja(){if(inListTimer){clearInterval(inListTimer);inListTimer=null}pararRefrescoHilo()}
 function marcaEntrega(a){
   if(a===null||a===undefined||a==='')return '';
   const n=Number(a);if(!Number.isFinite(n))return '';
@@ -1542,17 +1976,6 @@ function marcaEntrega(a){
   if(n===2)return '<span class="tick" title="Entregado">✓✓</span>';
   if(n===1)return '<span class="tick" title="Enviado">✓</span>';
   return '<span class="tick" title="Enviando">⏳</span>';
-}
-function pintarHilo(msgs){
-  const c=$('#in-msgs');
-  c.innerHTML=msgs.map(m=>{
-    const out=m.direccion!=='entrante';
-    const cls=m.origen==='sistema'?'sys':out?'out':'in';
-    const who=cls==='in'?'':(m.origen==='ia'?'IA':m.origen==='bot'?'Bot':m.origen==='panel'?'Tú':'');
-    const marca=out&&cls!=='sys'?marcaEntrega(m.ack):'';
-    return `<div class="msg ${cls}">${who?`<span class="who">${who}</span>`:''}${esc(m.texto)}${marca}<time>${esc(new Date(m.en).toLocaleString('es-PE',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}))}</time></div>`;
-  }).join('')||'<p class="empty">Sin mensajes.</p>';
-  c.scrollTop=c.scrollHeight;
 }
 function actualizarPausa(){
   const b=$('#in-pause');if(!b)return;
@@ -1588,8 +2011,8 @@ $('#in-form')?.addEventListener('submit',async e=>{
   const t=$('#in-text');const texto=t.value.trim();if(!texto||!inTel)return;
   const b=$('#in-send');b.disabled=true;
   try{
-    await botFetch('/api/conversaciones/'+inTel+'/enviar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({texto})});
-    t.value='';await abrirChat(inTel);toast('Mensaje enviado');
+    await botFetch('/api/conversaciones/'+inTel+'/enviar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({texto}),timeoutMs:60000});
+    t.value='';await refrescarHiloAbierto();toast('Mensaje enviado');
   }catch(err){toast('No se envió: '+err.message)}
   b.disabled=false;
 });
@@ -1597,7 +2020,7 @@ $('#in-text')?.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e
 $('#in-text')?.addEventListener('input',e=>{e.target.style.height='auto';e.target.style.height=Math.min(130,e.target.scrollHeight)+'px'});
 
 /* ---------- pedidos, plantillas de pago y seguimiento ---------- */
-let pedidosCache=[],pagosCache=[],inSegActivo=false,paImagen='',alertasNuevas=0,evUltimo=null;
+let pedidosCache=[],inSegActivo=false,alertasNuevas=0,evUltimo=null;
 const ESTADO_TXT={borrador:'Borrador',esperando_pago:'Esperando pago',comprobante_recibido:'Comprobante recibido',por_entregar:'Por entregar',entregado:'Entregado',cancelado:'Cancelado'};
 const ESTADO_TAG={borrador:'',esperando_pago:'warn',comprobante_recibido:'warn',por_entregar:'ok',entregado:'ok',cancelado:'bad'};
 const metodoTxt=m=>({yape:'Yape',plin:'Plin',transferencia:'Transferencia',efectivo:'Efectivo',otro:'Otro'})[m]||'Por definir';
@@ -1608,8 +2031,13 @@ function actualizarBadgePedidos(){const n=pedidosCache.filter(p=>['esperando_pag
 async function cargarPedidos(){
   try{
     const j=await botFetch('/api/pedidos?limite=200');
-    pedidosCache=j.pedidos||[];renderPedidos(j);actualizarBadgePedidos();
-  }catch(e){if($('#pe-list'))$('#pe-list').innerHTML='<p class="empty">No se pudo cargar. Revisa que el bot esté encendido.</p>'}
+    pedidosCache=j.pedidos||[];guardarUltimo('pedidos',j);renderPedidos(j);actualizarBadgePedidos();
+    if(tabActual==='calendario')renderCalendario();
+  }catch(e){
+    // Si ya había pedidos cargados, se mantienen en pantalla.
+    if(pedidosCache.length){renderPedidos({});avisoStale($('#pe-sub'),leerUltimo('pedidos')?.t)}
+    else if($('#pe-list'))$('#pe-list').innerHTML='<p class="empty">No se pudo cargar. Revisa que el bot esté encendido.</p>';
+  }
 }
 function renderPedidos(j){
   const ps=pedidosCache;
@@ -1624,6 +2052,7 @@ function renderPedidos(j){
         <b>${esc(p.id)} · ${esc(p.nombre||('+'+p.telefono))} <i class="tag ${ESTADO_TAG[p.estado]||''}">${esc(ESTADO_TXT[p.estado]||p.estado)}</i></b>
         <small>+${esc(p.telefono)} · ${esc(items||'Sin productos')}</small>
         <small>Total S/ ${p.total}${p.adelanto?` · Adelanto S/ ${p.adelanto}`:''} · Saldo S/ ${p.saldo} · ${metodoTxt(p.metodo)}</small>
+        ${p.entrega?`<small>${p.entrega==='estacion'?`Recojo: ${esc(p.estacion||'estación')}`:'Delivery'}${p.fechaEntrega?` · ${esc(p.fechaEntrega)} ${esc(horaTxt(p.horaEntrega))}`:''}${p.refExterna?` · Ref. ${esc(p.refExterna)}`:''}</small>`:''}
         <small>${esc(fmtFechaHora(p.actualizado))}${p.notas?' · '+esc(p.notas):''}</small>
       </div>
       <div class="acts" style="justify-content:flex-end;flex-wrap:wrap">
@@ -1690,17 +2119,6 @@ async function cambiarEstadoPedido(id,estado,mensaje){
     toast(mensaje||'Pedido actualizado');
     await cargarPedidos();
   }catch(e){toast('No se actualizó: '+e.message,'error')}
-}
-function cargarPagos(){
-  return botFetch('/api/pagos').then(j=>{pagosCache=j.plantillas||[];renderPagos()}).catch(()=>{});
-}
-function renderPagos(){
-  const cont=$('#pa-list');if(!cont)return;
-  cont.innerHTML=pagosCache.map(p=>`<div class="lrow">
-      <div class="lt"><b>${esc(p.nombre)}</b><small>${esc(p.numero||'Sin número')}${p.titular?' · '+esc(p.titular):''}${p.nota?' · '+esc(p.nota):''}</small></div>
-      ${p.imagen?`<img src="${p.imagen}" alt="${esc(p.nombre)}" style="height:48px;width:auto;border-radius:6px;border:1px solid var(--line)">`:''}
-      <button class="ghost" data-pa-del="${esc(p.id)}" type="button">Quitar</button>
-    </div>`).join('')||'<p class="empty">Aún no hay plantillas. Sube la de Yape o Plin.</p>';
 }
 function actualizarBotonSeg(){
   const b=$('#in-seg');if(!b)return;
@@ -1779,17 +2197,13 @@ function manejarEvento(ev){
   }
 }
 async function pollEventos(){
+  if(SSE_ABIERTO)return;                    // con SSE conectado no hace falta polling
   try{
     const j=await botFetch('/api/eventos?desde='+(evUltimo??0));
     if(evUltimo===null){evUltimo=j.ultimo;return;}
     if(j.eventos?.length){evUltimo=j.ultimo;for(const ev of j.eventos)manejarEvento(ev);}
     else evUltimo=j.ultimo;
   }catch(e){}
-}
-function iniciarEventos(){
-  if(window.__pfEventos)return;window.__pfEventos=true;
-  setInterval(pollEventos,8000);
-  setTimeout(pollEventos,2000);
 }
 document.addEventListener('pointerdown',()=>asegurarAudio(),{once:true});
 $('#in-notify')?.addEventListener('click',activarAvisos);
@@ -1822,41 +2236,160 @@ $('#pe-list')?.addEventListener('change',async e=>{
   catch(err){toast('No se actualizó: '+err.message,'error')}
   s.disabled=false;
 });
-$('#pa-pick')?.addEventListener('click',()=>$('#pa-file').click());
-$('#pa-file')?.addEventListener('change',e=>{
-  const f=e.target.files?.[0];if(!f)return;
-  if(f.size>6*1024*1024)return toast('La imagen supera 6 MB.','error');
-  const r=new FileReader();
-  r.onload=()=>{paImagen=String(r.result||'');$('#pa-file-name').textContent='Imagen lista: '+f.name;};
-  r.readAsDataURL(f);
-});
-$('#pa-save')?.addEventListener('click',async()=>{
-  const nombre=$('#pa-nombre').value.trim();
-  if(!nombre)return toast('Ponle nombre (Yape, Plin...).','error');
-  if(!paImagen)return toast('Elige la imagen oficial.','error');
-  const b=$('#pa-save');b.disabled=true;
+/* ---------- anuncios ---------- */
+let anunciosCache=[],anuEditId=null,anuPreviewTimer=null;
+const ESTADO_ANU={borrador:'Borrador',enviando:'Enviando',enviado:'Enviado',cancelado:'Cancelado'};
+function filtroAnuncioForm(){
+  const tipo=$('#anu-filtro')?.value||'todos';
+  return {
+    tipo,
+    etiquetas:($('#anu-tags')?.value||'').split(',').map(s=>s.trim()).filter(Boolean),
+    telefonos:($('#anu-tels')?.value||'').split(/[\s,;]+/).map(s=>s.trim()).filter(Boolean)
+  };
+}
+function actualizarWrapsAnuncio(){
+  const tipo=$('#anu-filtro')?.value||'todos';
+  if($('#anu-tags-wrap'))$('#anu-tags-wrap').hidden=tipo!=='etiquetas';
+  if($('#anu-tels-wrap'))$('#anu-tels-wrap').hidden=tipo!=='telefonos';
+  pedirPreviewAnuncio();
+}
+function vistaAnuncio(){
+  const v=$('#anu-vista');if(!v)return;
+  const t=($('#anu-texto')?.value||'').replace(/\{nombre\}/g,'Cliente');
+  v.innerHTML=t.trim()?waHTML(t):'Escribe el mensaje…';
+}
+function pedirPreviewAnuncio(){
+  clearTimeout(anuPreviewTimer);
+  anuPreviewTimer=setTimeout(async()=>{
+    const p=$('#anu-preview');if(!p)return;
+    try{
+      const r=await botFetch('/api/anuncios/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filtro:filtroAnuncioForm(),incluirSinConsentimiento:!!$('#anu-sin-consent')?.checked})});
+      p.textContent=`Llegará a ${r.total} cliente(s)${r.sinConsentimiento?` · ${r.sinConsentimiento} sin consentimiento quedan fuera`:''}.`;
+    }catch(e){p.textContent='No se pudo calcular los destinatarios.'}
+  },350);
+}
+async function cargarAnuncios(){
   try{
-    await botFetch('/api/pagos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre,titular:$('#pa-titular').value.trim(),numero:$('#pa-numero').value.trim(),nota:$('#pa-nota').value.trim(),imagen:paImagen})});
-    paImagen='';$('#pa-file').value='';$('#pa-file-name').textContent='';$('#pa-nombre').value='';$('#pa-titular').value='';$('#pa-numero').value='';$('#pa-nota').value='';
-    toast('Plantilla guardada');await cargarPagos();
-  }catch(e){toast('No se guardó: '+e.message,'error')}
+    const j=await botFetch('/api/anuncios');
+    anunciosCache=j.anuncios||[];
+    if($('#anu-count'))$('#anu-count').textContent=`${anunciosCache.length} anuncios · ${j.resumen?.mensajesEnviados||0} mensajes enviados`;
+    renderAnuncios();
+  }catch(e){
+    if($('#anu-list')&&!anunciosCache.length)$('#anu-list').innerHTML='<p class="empty">No se pudo cargar. Revisa que el bot esté encendido.</p>';
+  }
+}
+function renderAnuncios(){
+  const l=$('#anu-list');if(!l)return;
+  l.innerHTML=anunciosCache.map(a=>{
+    const s=a.stats||{};
+    const pct=s.total?Math.round((s.enviados||0)/s.total*100):0;
+    const seg=a.filtro?.tipo==='etiquetas'?`Etiquetas: ${esc((a.filtro.etiquetas||[]).join(', ')||'—')}`:a.filtro?.tipo==='telefonos'?`${(a.filtro.telefonos||[]).length} números`:'Todos los clientes';
+    return `<div class="lrow"><div class="lt">
+      <b>${esc(a.id)} · ${esc(a.titulo)} <i class="tag ${a.estado==='enviado'?'ok':a.estado==='enviando'?'warn':''}">${ESTADO_ANU[a.estado]||a.estado}</i></b>
+      <small>${seg} · ${s.enviados||0}/${s.total||0} enviados${s.errores?` · ${s.errores} errores`:''}${a.incluirSinConsentimiento?' · incluye sin consentimiento':''}</small>
+      <small>${esc(fmtFechaHora(a.actualizado))}</small>
+      ${s.total?`<div class="an-track" style="margin-top:.35rem"><i style="width:${Math.max(2,pct)}%"></i></div>`:''}
+      <small class="muted" style="display:block;white-space:pre-wrap;margin-top:.3rem">${esc(String(a.texto||'').slice(0,160))}</small>
+    </div>
+    <div class="acts" style="justify-content:flex-end;flex-wrap:wrap">
+      ${a.estado!=='enviando'?`<button data-anu-send="${esc(a.id)}" type="button">Enviar</button>`:''}
+      <button class="ghost" data-anu-cargar="${esc(a.id)}" type="button">Editar</button>
+      <button class="ghost" data-anu-del="${esc(a.id)}" type="button">Borrar</button>
+    </div></div>`;
+  }).join('')||'<p class="empty">Aún no hay anuncios. Escribe uno y pulsa "Guardar borrador".</p>';
+}
+function datosAnuncioForm(){
+  return {
+    titulo:($('#anu-titulo')?.value||'').trim(),
+    texto:($('#anu-texto')?.value||'').trim(),
+    filtro:filtroAnuncioForm(),
+    incluirSinConsentimiento:!!$('#anu-sin-consent')?.checked
+  };
+}
+function limpiarFormAnuncio(){
+  anuEditId=null;
+  if($('#anu-titulo'))$('#anu-titulo').value='';
+  if($('#anu-texto'))$('#anu-texto').value='';
+  if($('#anu-tags'))$('#anu-tags').value='';
+  if($('#anu-tels'))$('#anu-tels').value='';
+  if($('#anu-sin-consent'))$('#anu-sin-consent').checked=false;
+  if($('#anu-filtro'))$('#anu-filtro').value='todos';
+  actualizarWrapsAnuncio();vistaAnuncio();
+}
+async function guardarAnuncio(){
+  const d=datosAnuncioForm();
+  if(!d.titulo)return toast('Ponle un título al anuncio.','error');
+  if(!d.texto)return toast('Escribe el mensaje del anuncio.','error');
+  try{
+    if(anuEditId){
+      const r=await botFetch('/api/anuncios/'+anuEditId,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
+      toast('Anuncio actualizado');anuEditId=r.anuncio?.id||anuEditId;
+    }else{
+      const r=await botFetch('/api/anuncios',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
+      anuEditId=r.anuncio?.id||null;toast('Anuncio guardado como borrador');
+    }
+    await cargarAnuncios();
+    return anuEditId;
+  }catch(e){toast('No se guardó: '+e.message,'error');return null}
+}
+$('#anu-refresh')?.addEventListener('click',cargarAnuncios);
+$('#anu-filtro')?.addEventListener('change',actualizarWrapsAnuncio);
+$('#anu-tags')?.addEventListener('input',pedirPreviewAnuncio);
+$('#anu-tels')?.addEventListener('input',pedirPreviewAnuncio);
+$('#anu-sin-consent')?.addEventListener('change',pedirPreviewAnuncio);
+$('#anu-texto')?.addEventListener('input',()=>{vistaAnuncio()});
+$('#anu-guardar')?.addEventListener('click',()=>guardarAnuncio());
+$('#anu-enviar')?.addEventListener('click',async()=>{
+  const b=$('#anu-enviar');b.disabled=true;
+  try{
+    const id=await guardarAnuncio();
+    if(!id)return;
+    await botFetch('/api/anuncios/'+id+'/enviar',{method:'POST'});
+    toast('Anuncio en cola de envío');
+    await cargarAnuncios();
+  }catch(e){toast('No se pudo enviar: '+e.message,'error')}
   b.disabled=false;
 });
-$('#pa-list')?.addEventListener('click',async e=>{
-  const b=e.target.closest('[data-pa-del]');if(!b)return;
-  b.disabled=true;
-  try{await botFetch('/api/pagos/'+b.dataset.paDel,{method:'DELETE'});toast('Plantilla eliminada');await cargarPagos();}
-  catch(err){toast('No se eliminó: '+err.message,'error');b.disabled=false}
+$('#anu-list')?.addEventListener('click',async e=>{
+  const send=e.target.closest('[data-anu-send]');
+  const cargar=e.target.closest('[data-anu-cargar]');
+  const del=e.target.closest('[data-anu-del]');
+  if(send){
+    send.disabled=true;
+    try{await botFetch('/api/anuncios/'+send.dataset.anuSend+'/enviar',{method:'POST'});toast('Anuncio en cola de envío');await cargarAnuncios();}
+    catch(err){toast('No se pudo enviar: '+err.message,'error');send.disabled=false}
+    return;
+  }
+  if(cargar){
+    const a=anunciosCache.find(x=>String(x.id)===String(cargar.dataset.anuCargar));
+    if(!a)return;
+    $('#anu-titulo').value=a.titulo||'';
+    $('#anu-texto').value=a.texto||'';
+    $('#anu-filtro').value=a.filtro?.tipo||'todos';
+    $('#anu-tags').value=(a.filtro?.etiquetas||[]).join(', ');
+    $('#anu-tels').value=(a.filtro?.telefonos||[]).join(', ');
+    $('#anu-sin-consent').checked=!!a.incluirSinConsentimiento;
+    anuEditId=a.id;
+    actualizarWrapsAnuncio();vistaAnuncio();
+    toast('Anuncio cargado en el formulario');
+    return;
+  }
+  if(del){
+    del.disabled=true;
+    try{await botFetch('/api/anuncios/'+del.dataset.anuDel,{method:'DELETE'});toast('Anuncio borrado');await cargarAnuncios();}
+    catch(err){toast('No se borró: '+err.message,'error');del.disabled=false}
+  }
 });
-setTimeout(()=>{cargarPedidos();cargarPagos();actualizarBotonAvisos();iniciarEventos();},2600);
 
 /* ---------- analíticas ---------- */
 let anData=null;
 async function cargarAnaliticas(){
   try{
-    anData=await botFetch('/api/analiticas');
+    anData=await botFetch('/api/analiticas',{timeoutMs:60000});
     renderAnaliticas();
   }catch(e){
+    // Conserva la última analítica buena; solo muestra error si nunca hubo datos.
+    if(anData){renderAnaliticas();return}
     const c=$('#an-consultas');
     if(c)c.innerHTML='<p class="empty">No se pudo cargar. Revisa que el bot esté encendido.</p>';
   }
@@ -1904,6 +2437,7 @@ $('#an-refresh')?.addEventListener('click',cargarAnaliticas);
 /* ---------- asistente IA ---------- */
 async function cargarIA(){
   try{
+    ['ia-activa','ia-auto','ia-max','ia-prompt','ia-save'].forEach(id=>{const el=$('#'+id);if(el)el.disabled=false});
     const st=await botFetch('/api/estado');pintarConexion(st);
     const j=await botFetch('/api/ia');
     if($('#ia-activa'))$('#ia-activa').checked=!!j.activa;
@@ -1948,8 +2482,7 @@ $('#ia-chats')?.addEventListener('click',async e=>{
   catch(err){toast('Error: '+err.message);b.disabled=false;}
 });
 
-refrescarChip();setInterval(refrescarChip,20000);
-setInterval(()=>{const b=$('#t-bandeja');if(b&&!b.hidden)cargarBandeja()},15000);
+iniciarScheduler();
 boot();
 </script>
 </body>

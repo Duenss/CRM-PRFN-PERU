@@ -45,6 +45,12 @@ export const config = {
   anthropicKey: String(process.env.ANTHROPIC_API_KEY || '').trim(),
   aiModel: String(process.env.AI_MODEL || '').trim(),
 
+  // Respaldo gratuito para IA/audio cuando Gemini no tiene cuota.
+  // Groq tiene capa gratuita (API compatible con OpenAI) y Whisper para audios.
+  groqKey: String(process.env.GROQ_API_KEY || '').trim(),
+  groqModel: String(process.env.GROQ_MODEL || 'llama-3.3-70b-versatile').trim(),
+  groqAudioModel: String(process.env.GROQ_AUDIO_MODEL || 'whisper-large-v3-turbo').trim(),
+
   // URL pública desde donde el bot arma los enlaces de las fotos de producto.
   // Por defecto usa la web de la tienda; puede ser también el panel en Cloudflare.
   panelUrl: String(process.env.PANEL_URL || process.env.SITIO_URL || 'https://perfumeriafinaperu.com').replace(/\/+$/, ''),

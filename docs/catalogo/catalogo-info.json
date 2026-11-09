@@ -1,0 +1,38 @@
+{
+  "archivo": "docs/catalogo/catalogo-navidad-2026.pdf",
+  "titulo": "Catálogo Navidad 2026 · Perfumería Fina Perú",
+  "paginas": 41,
+  "generado": "2026-11-09T15:09:26.603Z",
+  "secciones": [
+    {
+      "nombre": "Diseñador",
+      "desde": 3,
+      "hasta": 28,
+      "productosDesde": 4,
+      "productosHasta": 28,
+      "paginas": 26,
+      "paginasProductos": 25,
+      "total": 146
+    },
+    {
+      "nombre": "Árabes",
+      "desde": 29,
+      "hasta": 35,
+      "productosDesde": 30,
+      "productosHasta": 35,
+      "paginas": 7,
+      "paginasProductos": 6,
+      "total": 31
+    },
+    {
+      "nombre": "Nicho",
+      "desde": 36,
+      "hasta": 41,
+      "productosDesde": 37,
+      "productosHasta": 41,
+      "paginas": 6,
+      "paginasProductos": 5,
+      "total": 25
+    }
+  ]
+}
