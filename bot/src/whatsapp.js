@@ -1,5 +1,6 @@
 import pkg from 'whatsapp-web.js';
 import fs from 'node:fs';
+import path from 'node:path';
 import QRCode from 'qrcode';
 import { config, normalizar } from './config.js';
 
@@ -22,6 +23,9 @@ export function conTimeout(promesa, ms, etiqueta = 'operación de WhatsApp') {
 
 /** id -> { id, estado, conectado, qr, qrDataUrl, numero, error, client, reintentos } */
 export const sesiones = new Map();
+
+/** Avisa una sola vez en el log qué Chromium se va a usar. */
+let chromiumLogeado = false;
 
 /** Ids de mensajes que envió el propio bot (para no duplicarlos en 'message_create'). */
 const enviadosPorBot = new Set();
@@ -153,6 +157,62 @@ async function parcharMsgKey(client, s) {
   }
 }
 
+function esArchivo(p) {  try {
+    return !!p && fs.existsSync(p) && fs.statSync(p).isFile();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Encuentra un Chromium usable. Orden:
+ *   1) CHROME_PATH (variables de entorno del servidor)
+ *   2) PUPPETEER_EXECUTABLE_PATH
+ *   3) Chromium del sistema (Debian/Ubuntu/Alpine/snap)
+ *   4) Chromium incluido en la imagen (Playwright / caché de Puppeteer)
+ * Si no encuentra ninguno devuelve '' y Puppeteer usa su propia resolución.
+ * Esto hace que el bot arranque igual en Docker, en VPS o en Pterodactyl.
+ */
+export function buscarChromium() {
+  const directos = [
+    config.chromePath,
+    process.env.PUPPETEER_EXECUTABLE_PATH,
+    '/usr/bin/chromium',
+    '/usr/bin/chromium-browser',
+    '/usr/bin/google-chrome',
+    '/usr/bin/google-chrome-stable',
+    '/snap/bin/chromium'
+  ];
+  for (const c of directos) if (esArchivo(c)) return c;
+
+  const raices = [
+    '/ms-playwright',
+    path.join(process.env.HOME || '/root', '.cache', 'puppeteer'),
+    '/home/container/.cache/puppeteer'
+  ];
+  const relativos = [
+    'chrome-linux/chrome',
+    'chrome-linux64/chrome',
+    'chrome-headless-shell-linux64/chrome-headless-shell',
+    'chrome-win64/chrome.exe',
+    'chrome-win32/chrome.exe'
+  ];
+  for (const raiz of raices) {
+    try {
+      if (!fs.existsSync(raiz)) continue;
+      for (const dir of fs.readdirSync(raiz)) {
+        for (const rel of relativos) {
+          const cand = path.join(raiz, dir, rel);
+          if (esArchivo(cand)) return cand;
+        }
+      }
+    } catch {
+      /* carpeta ilegible: se prueba la siguiente */
+    }
+  }
+  return '';
+}
+
 async function crearSesion(id, { onMensaje, onMensajePropio, onAck, log }) {
   const s = sesiones.get(id);
   const opciones = {
@@ -163,7 +223,12 @@ async function crearSesion(id, { onMensaje, onMensajePropio, onAck, log }) {
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
     }
   };
-  if (config.chromePath) opciones.puppeteer.executablePath = config.chromePath;
+  const chromium = buscarChromium();
+  if (chromium) opciones.puppeteer.executablePath = chromium;
+  if (!chromiumLogeado) {
+    chromiumLogeado = true;
+    logFn(`Chromium: ${chromium || 'el que resuelva Puppeteer por defecto'}`);
+  }
 
   const client = new Client(opciones);
   s.client = client;

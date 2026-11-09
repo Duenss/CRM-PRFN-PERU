@@ -1,0 +1,273 @@
+{
+  "name": "PF Bot WhatsApp (Chromium + Node)",
+  "description": "Bot de WhatsApp del CRM de Perfumería Fina (whatsapp-web.js + Express). Usa la imagen de Playwright porque incluye Chromium y Node; los eggs normales de Node.js no traen Chromium y el bot no arrancaría.",
+  "docker_images": {
+    "Playwright Jammy (Chromium + Node 20)": "mcr.microsoft.com/playwright:v1.49.0-jammy"
+  },
+  "startup": "cd /home/container/bot 2>/dev/null || cd /mnt/server/bot; if [ ! -d node_modules/express ]; then export PUPPETEER_SKIP_DOWNLOAD=1; npm install --omit=dev --no-audit --no-fund; fi; exec node src/server.js",
+  "config": {
+    "files": {},
+    "startup": { "done": "Panel del bot" },
+    "logs": {},
+    "stop": "^C"
+  },
+  "scripts": {
+    "installation": {
+      "script": "#!/bin/bash\ncd /mnt/server\nif [ -f bot/package.json ]; then\n  cd bot\n  export PUPPETEER_SKIP_DOWNLOAD=1\n  npm install --omit=dev --no-audit --no-fund\n  echo \"[PF] Dependencias instaladas.\"\nelse\n  echo \"[PF] Falta bot/package.json: sube el codigo por SFTP (carpetas bot/ y docs/catalogo/).\"\nfi\n",
+      "container": "node:22-bookworm",
+      "entrypoint": "bash"
+    }
+  },
+  "variables": [
+    {
+      "name": "Supabase URL",
+      "description": "URL del proyecto Supabase",
+      "env_variable": "SUPABASE_URL",
+      "default_value": "https://pcesvmsewfpvmqmfmswn.supabase.co",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string",
+      "field_type": "text"
+    },
+    {
+      "name": "Supabase service_role",
+      "description": "Clave service_role (secreta, solo servidor)",
+      "env_variable": "SUPABASE_SERVICE_ROLE_KEY",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string",
+      "field_type": "text"
+    },
+    {
+      "name": "Numero del dueno",
+      "description": "Recibe los avisos del bot (formato 51910418951)",
+      "env_variable": "OWNER_NUMBER",
+      "default_value": "51910418951",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string",
+      "field_type": "text"
+    },
+    {
+      "name": "Token del panel",
+      "description": "Protege el panel y la API del bot",
+      "env_variable": "BOT_TOKEN",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "nullable|string",
+      "field_type": "text"
+    },
+    {
+      "name": "Gemini API Key",
+      "description": "IA principal (API con facturacion)",
+      "env_variable": "GEMINI_API_KEY",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "nullable|string",
+      "field_type": "text"
+    },
+    {
+      "name": "Groq API Key",
+      "description": "Respaldo gratuito de IA y transcripcion de audios",
+      "env_variable": "GROQ_API_KEY",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "nullable|string",
+      "field_type": "text"
+    },
+    {
+      "name": "Modo prueba",
+      "description": "true = no envia mensajes reales",
+      "env_variable": "MODO_PRUEBA",
+      "default_value": "false",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|in:true,false",
+      "field_type": "text"
+    },
+    {
+      "name": "Auto respuesta",
+      "description": "Responder automaticamente con IA",
+      "env_variable": "AUTO_RESPUESTA",
+      "default_value": "true",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|in:true,false",
+      "field_type": "text"
+    },
+    {
+      "name": "Headless",
+      "description": "true = sin ventana de Chrome (obligatorio en servidor)",
+      "env_variable": "HEADLESS",
+      "default_value": "true",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|in:true,false",
+      "field_type": "text"
+    },
+    {
+      "name": "Chromium",
+      "description": "Ruta del binario. Vacio = deteccion automatica",
+      "env_variable": "CHROME_PATH",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "nullable|string",
+      "field_type": "text"
+    },
+    {
+      "name": "Puerto",
+      "description": "Puerto asignado por el panel para la API del bot",
+      "env_variable": "PORT",
+      "default_value": "3000",
+      "user_viewable": true,
+      "user_editable": false,
+      "rules": "required|integer",
+      "field_type": "text"
+    },
+    {
+      "name": "Sesiones WhatsApp",
+      "description": "Cuantos numeros de WhatsApp (1 por defecto)",
+      "env_variable": "SESIONES",
+      "default_value": "1",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string",
+      "field_type": "text"
+    },
+    {
+      "name": "Limite por dia",
+      "description": "Maximo de mensajes enviados por dia",
+      "env_variable": "MAX_POR_DIA",
+      "default_value": "80",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|integer",
+      "field_type": "text"
+    },
+    {
+      "name": "Retraso minimo",
+      "description": "Segundos minimos entre mensajes",
+      "env_variable": "DELAY_MIN",
+      "default_value": "25",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|integer",
+      "field_type": "text"
+    },
+    {
+      "name": "Retraso maximo",
+      "description": "Segundos maximos entre mensajes",
+      "env_variable": "DELAY_MAX",
+      "default_value": "40",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|integer",
+      "field_type": "text"
+    },
+    {
+      "name": "Hora inicio",
+      "description": "Hora de inicio de atencion (Lima)",
+      "env_variable": "HORA_INICIO",
+      "default_value": "9",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|integer",
+      "field_type": "text"
+    },
+    {
+      "name": "Hora fin",
+      "description": "Hora de fin de atencion (Lima)",
+      "env_variable": "HORA_FIN",
+      "default_value": "20",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|integer",
+      "field_type": "text"
+    },
+    {
+      "name": "Cupos por estacion",
+      "description": "Recojos por hora y estacion",
+      "env_variable": "CUPOS_ESTACION",
+      "default_value": "2",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|integer",
+      "field_type": "text"
+    },
+    {
+      "name": "Yape numero",
+      "description": "Numero de Yape para el mensaje de pago",
+      "env_variable": "PAGO_YAPE_NUMERO",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "nullable|string",
+      "field_type": "text"
+    },
+    {
+      "name": "Yape titular",
+      "description": "Nombre del titular de Yape",
+      "env_variable": "PAGO_YAPE_TITULAR",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "nullable|string",
+      "field_type": "text"
+    },
+    {
+      "name": "Plin numero",
+      "description": "Numero de Plin",
+      "env_variable": "PAGO_PLIN_NUMERO",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "nullable|string",
+      "field_type": "text"
+    },
+    {
+      "name": "Plin titular",
+      "description": "Nombre del titular de Plin",
+      "env_variable": "PAGO_PLIN_TITULAR",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "nullable|string",
+      "field_type": "text"
+    },
+    {
+      "name": "Transferencia numero",
+      "description": "Cuenta para transferencia",
+      "env_variable": "PAGO_TRANSFERENCIA_NUMERO",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "nullable|string",
+      "field_type": "text"
+    },
+    {
+      "name": "Transferencia titular",
+      "description": "Titular de la cuenta",
+      "env_variable": "PAGO_TRANSFERENCIA_TITULAR",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "nullable|string",
+      "field_type": "text"
+    },
+    {
+      "name": "Simular entrantes",
+      "description": "Dejar en false en produccion",
+      "env_variable": "SIMULAR_ENTRANTES",
+      "default_value": "false",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|in:true,false",
+      "field_type": "text"
+    }
+  ]
+}

@@ -1,0 +1,84 @@
+[
+  {
+    "id": "delina",
+    "nombre": "Delina",
+    "casa": "Parfums de Marly",
+    "estado": "sin_resultado",
+    "fuente": null,
+    "archivo": null,
+    "dimensiones": null,
+    "hash": null
+  },
+  {
+    "id": "baccarat-rouge-540",
+    "nombre": "Baccarat Rouge 540",
+    "casa": "Maison Francis Kurkdjian",
+    "estado": "sin_resultado",
+    "fuente": null,
+    "archivo": null,
+    "dimensiones": null,
+    "hash": null
+  },
+  {
+    "id": "khamrah",
+    "nombre": "Khamrah",
+    "casa": "Lattafa Perfumes",
+    "estado": "ok",
+    "fuente": "https://fimgs.net/mdimg/perfume/o.75805.jpg",
+    "archivo": "khamrah.jpg",
+    "dimensiones": "500x500",
+    "hash": "1706d74b002fec0b2a3b7430ff5125a3",
+    "titulo": "Khamrah Lattafa Perfumes fragancia - una nuevo fragancia para Hombres y ..."
+  },
+  {
+    "id": "yara",
+    "nombre": "Yara",
+    "casa": "Lattafa Perfumes",
+    "estado": "sin_resultado",
+    "fuente": null,
+    "archivo": null,
+    "dimensiones": null,
+    "hash": null
+  },
+  {
+    "id": "asad",
+    "nombre": "Asad",
+    "casa": "Lattafa Perfumes",
+    "estado": "sin_resultado",
+    "fuente": null,
+    "archivo": null,
+    "dimensiones": null,
+    "hash": null
+  },
+  {
+    "id": "9pm",
+    "nombre": "9PM",
+    "casa": "Afnan",
+    "estado": "ok",
+    "fuente": "https://www.clearchemist.co.uk/media/catalog/product/cache/bfcd86b03aec8a27b2dafb348b9e72b9/1/0/10041702.jpg",
+    "archivo": "9pm.jpg",
+    "dimensiones": "1000x1000",
+    "hash": "3ae3995bda0a3a142069dd669a001032",
+    "titulo": "Afnan 9pm Eau De Parfum 100ml | Clear Chemist"
+  },
+  {
+    "id": "aventus",
+    "nombre": "Aventus",
+    "casa": "Creed",
+    "estado": "sin_resultado",
+    "fuente": null,
+    "archivo": null,
+    "dimensiones": null,
+    "hash": null
+  },
+  {
+    "id": "sauvage",
+    "nombre": "Sauvage",
+    "casa": "Dior",
+    "estado": "sin_resultado",
+    "fuente": null,
+    "archivo": null,
+    "dimensiones": null,
+    "hash": null
+  }
+]
