@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config, validarConfig, esNumeroPeru, normalizar } from './config.js';
 import { sb, getCliente, getClientes, getProductos, logMensaje, historial, marcarBaja, importarClientes } from './supabase.js';
-import { iniciarWhatsApp, enviar, enviarImagen, enviarArchivo, estadoWa, cerrarSesion, reiniciarSesion, hayConexion, sesionDisponible, listarChatsWa, listarContactosWa, historialWa, resolverTelefonoWa, idMensaje, descargarMediaWa, conTimeout } from './whatsapp.js';
+import { iniciarWhatsApp, enviar, enviarImagen, enviarVideo, enviarArchivo, estadoWa, cerrarSesion, reiniciarSesion, hayConexion, sesionDisponible, listarChatsWa, listarContactosWa, historialWa, resolverTelefonoWa, idMensaje, descargarMediaWa, conTimeout } from './whatsapp.js';
 import { redactarRespuesta, transcribirAudio, redactarBorradores, redactarAnuncio, productoPorId, productoMencionado } from './ai.js';
 import { Cola, dormir, esperaEntreEnvios } from './queue.js';
 import { estadoIA, actualizarIA, pausarIA, estaPausado, promptIA, resumenIA } from './ia.js';
@@ -454,14 +454,14 @@ async function enviarCatalogo({ tel, nombre, clienteId, sesionId }) {
     const video = archivoPersonalizado('video') || path.join(raizProyecto, 'docs', 'entrega', 'experiencia-perfumeria.mp4');
     if (fs.existsSync(video)) {
       try {
-        const envV = await enviarArchivo(tel, video, 'video/mp4', 'Perfumeria-Fina-Peru.mp4', '🎬 Así es *Perfumería Fina Perú*', sesionId);
+        const envV = await enviarVideo(tel, video, '🎬 Así es *Perfumería Fina Perú*', sesionId);
         registrar({ telefono: tel, texto: '🎬 Video de Perfumería Fina', direccion: 'saliente', nombre, clienteId, origen: 'ia', waId: envV?.waId || '' });
         log(`Video enviado a +${tel}.`);
       } catch (e) {
         log('No se pudo enviar el video: ' + e.message);
       }
     } else {
-      log('Video del CRM no encontrado en el servidor; se omite.');
+      log('Video de Perfumería Fina no encontrado en el servidor; se omite.');
     }
   }
   return true;
@@ -919,8 +919,8 @@ function adjuntosAnuncio() {
     video: {
       ruta: archivoPersonalizado('video') || path.join(raizProyecto, 'docs', 'entrega', 'experiencia-perfumeria.mp4'),
       mimetype: 'video/mp4',
-      nombre: 'Perfumeria-Fina-CRM.mp4',
-      caption: '🎬 Así funciona *Perfumería Fina CRM*'
+      nombre: 'Perfumeria-Fina-Peru.mp4',
+      caption: '🎬 Así es *Perfumería Fina Perú*'
     }
   };
 }
@@ -935,7 +935,9 @@ async function enviarAdjuntosAnuncio(anuncio, destino) {
       continue;
     }
     try {
-      const env = await enviarArchivo(destino.telefono, adj.ruta, adj.mimetype, adj.nombre, adj.caption);
+      const env = String(adj.mimetype || '').startsWith('video/')
+        ? await enviarVideo(destino.telefono, adj.ruta, adj.caption)
+        : await enviarArchivo(destino.telefono, adj.ruta, adj.mimetype, adj.nombre, adj.caption);
       registrar({
         telefono: destino.telefono,
         texto: '📎 ' + adj.nombre,
@@ -2383,14 +2385,14 @@ app.post('/api/prueba-video', auth, async (req, res) => {
   if (!config.modoPrueba && permitidos.size && !permitidos.has(tel)) {
     return res.status(403).json({ error: 'En modo real solo puedes probar con OWNER_NUMBER o NUMEROS_PRUEBA.' });
   }
-  const archivo = path.join(raizProyecto, 'docs', 'auditoria', 'video-crm', 'perfumeria-fina-crm.mp4');
+  const archivo = archivoPersonalizado('video') || path.join(raizProyecto, 'docs', 'entrega', 'experiencia-perfumeria.mp4');
   if (!fs.existsSync(archivo)) return res.status(404).json({ error: 'No existe el video.' });
   try {
-    const caption = String(req.body?.texto || '🎬 Te comparto el video de *Perfumería Fina CRM*: rápido, claro y sin humo.').slice(0, 300);
-    const env = await enviarArchivo(tel, archivo, 'video/mp4', 'Perfumeria-Fina-CRM.mp4', caption, req.body?.sesion || null);
+    const caption = String(req.body?.texto || '🎬 Así es *Perfumería Fina Perú*').slice(0, 300);
+    const env = await enviarVideo(tel, archivo, caption, req.body?.sesion || null);
     await logMensaje({ telefono: tel, direccion: 'saliente', texto: '🎬 ' + caption, origen: 'prueba' });
     registrar({ telefono: tel, texto: '🎬 ' + caption, direccion: 'saliente', nombre: '', origen: 'prueba', waId: env?.waId || '' });
-    res.json({ ok: true });
+    res.json({ ok: true, tipo: env?.tipo || 'video' });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

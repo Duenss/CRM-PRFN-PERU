@@ -444,6 +444,37 @@ export async function enviarImagen(telefono, media = {}, caption = '', sesionId 
   return { ok: true, sesion: s.id, waId };
 }
 
+/**
+ * Envía un video REPRODUCIBLE (con miniatura y botón de play), no como
+ * documento. Usa solo { caption } para que WhatsApp lo trate como video.
+ */
+export async function enviarVideo(telefono, archivo, caption = '', sesionId = null) {
+  const limpio = String(telefono || '').replace(/\D/g, '');
+  if (!archivo || !fs.existsSync(archivo)) throw new Error('No se encontró el video para enviar.');
+  if (config.modoPrueba) {
+    logFn(`[PRUEBA${sesionId ? ' ' + sesionId : ''}] Video para +${limpio}: ${String(caption || '').slice(0, 120)}`);
+    return { simulado: true, tipo: 'video' };
+  }
+  const s = sesionParaEnviar(sesionId);
+  if (!s) throw new Error(sesionId ? `La sesión ${sesionId} no está conectada` : 'Ningún WhatsApp está conectado');
+  await conTimeout(parcharMsgKey(s.client, s), 25000, 'compatibilidad multimedia');
+  const id = await conTimeout(s.client.getNumberId(limpio), 20000, 'getNumberId');
+  if (!id) throw new Error(`El número +${limpio} no tiene WhatsApp`);
+  const mm = MessageMedia.fromFilePath(archivo);
+  recordarEnvio(caption);
+  const enviado = await conTimeout(
+    s.client.sendMessage(id._serialized, mm, { caption: String(caption || '').slice(0, 1000) }),
+    120000,
+    'sendMessage (video)'
+  );
+  const waId = idMensaje(enviado);
+  if (waId) {
+    enviadosPorBot.add(waId);
+    if (enviadosPorBot.size > 800) enviadosPorBot.delete(enviadosPorBot.values().next().value);
+  }
+  return { ok: true, sesion: s.id, waId, tipo: String((enviado && enviado.type) || 'video') };
+}
+
 /** Envía un video/archivo local como documento de WhatsApp. */
 export async function enviarArchivo(telefono, archivo, mimetype = 'video/mp4', nombre = 'archivo.mp4', caption = '', sesionId = null) {
   const limpio = String(telefono || '').replace(/\D/g, '');
