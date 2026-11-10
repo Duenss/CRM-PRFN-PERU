@@ -13,7 +13,9 @@ de prueba).
 | **Crear cliente** desde el diálogo "Nuevo cliente" | Aparece en la lista y en Supabase (`consentimiento: true`) ✅ |
 | **Importar CSV** con 1 contacto | «1 teléfonos válidos: 1 nuevos… 1 dieron consentimiento» e importado en Supabase ✅ |
 | **Crear pedido** desde "Nuevo pedido" | Total calculado S/ 56.00, aparece en la lista y el bot lo registra como `P-0001` en `por_entregar` ✅ |
-| **Campañas** | Aviso de autodiagnóstico visible con el SQL a ejecutar (constraint viejo) ⚠️ |
+| **Comprobante de pago** | Pedido creado → subida de imagen → estado `comprobante_recibido` → imagen abierta por el proxy con la sesión (200, image/png) ✅ |
+| **Campaña (envío manual)** | Creada desde la UI como `aprobada` + 1 envío `pendiente` para el cliente ✅ |
+| **Campañas programadas** | Aviso de autodiagnóstico visible con el SQL a ejecutar (constraint viejo) ⚠️ |
 | **Envío masivo** (anuncio simulado) | Texto con `{nombre}` + PDF + video, estado `enviado` 1/1, 0 errores ✅ |
 | **Calendario** | enero 2027: Año Nuevo y Bajada de Reyes; diciembre: Inmaculada, Nochebuena, Navidad, Fin de Año ✅ |
 | **Panel con el bot apagado** | Carga en ~4 s con 202 productos y 11 plantillas; 0 errores JS ✅ |
