@@ -1128,7 +1128,7 @@ $('#qr-refresh')?.addEventListener('click',async()=>{
 });
 $('#qr-logout')?.addEventListener('click',async()=>{
   if(!confirm('¿Cerrar la sesión de WhatsApp del bot? Tendrás que volver a escanear el QR.'))return;
-  try{await botFetch('/api/logout',{method:'POST'});await botFetch('/api/sesion/reiniciar',{method:'POST'});toast('Sesión cerrada. Escanea el nuevo QR.');activar('qr',true);refrescarQR()}catch(e){toast('Error: '+e.message)}
+  try{await botFetch('/api/logout',{method:'POST'});await botFetch('/api/sesion/reiniciar',{method:'POST'});toast('Sesión cerrada. Escanea el nuevo QR.');activar('qr',true);refrescarQR();cancelarAvisoDesconexion();alDesconectarWhatsApp()}catch(e){toast('Error: '+e.message)}
 });
 
 /* ---------- sincronizar chats y contactos desde WhatsApp ---------- */
@@ -1214,6 +1214,15 @@ $('#dl-todo')?.addEventListener('click',()=>{$('#dlgLimpieza')?.close();accionLi
 $('#dl-nada')?.addEventListener('click',()=>{$('#dlgLimpieza')?.close();toast('No se limpió la Bandeja')});
 
 let conexionPrevia=null;
+let avisoDesconexion=null;
+/** Espera 45 s antes de preguntar por la limpieza: evita avisos por reinicios. */
+function programarAvisoDesconexion(){
+  if(avisoDesconexion)return;
+  avisoDesconexion=setTimeout(()=>{avisoDesconexion=null;alDesconectarWhatsApp()},45000);
+}
+function cancelarAvisoDesconexion(){
+  if(avisoDesconexion){clearTimeout(avisoDesconexion);avisoDesconexion=null}
+}
 async function refrescarChip(){
   const chip=$('#wa-chip');if(!chip)return;const t=$('#wa-chip-t');
   try{
@@ -1224,7 +1233,7 @@ async function refrescarChip(){
     const s=(j.sesiones||[]).find(x=>x.conectado)||(j.sesiones||[])[0]||{};
     chip.classList.remove('on','qr','off');
     if(s.conectado){
-      conexionPrevia=true;
+      conexionPrevia=true;cancelarAvisoDesconexion();
       chip.classList.add('on');
       // Mostrar el número vinculado: evita confusiones cuando se cambia de WhatsApp.
       const n=String(s.numero||'').replace(/\D/g,'');
@@ -1233,8 +1242,8 @@ async function refrescarChip(){
       t.textContent=s.numero?(angosto?'WhatsApp conectado':'WhatsApp · '+lindo):'WhatsApp conectado';
       chip.title=s.numero?(lindo+' · '+(j.modoPrueba?'modo prueba':'modo real')+' · '+(j.enviadosHoy??0)+(j.maxPorDia?'/'+j.maxPorDia:'')+' hoy'):'WhatsApp conectado';
     }
-    else if(s.estado==='qr'){chip.classList.add('qr');t.textContent='Escanear QR';chip.title='Abre Ajustes para ver el QR';if(conexionPrevia===true){conexionPrevia=false;alDesconectarWhatsApp();}}
-    else{chip.classList.add('off');t.textContent='Bot sin conexión';if(conexionPrevia===true){conexionPrevia=false;alDesconectarWhatsApp();}}
+    else if(s.estado==='qr'){chip.classList.add('qr');t.textContent='Escanear QR';chip.title='Abre Ajustes para ver el QR';if(conexionPrevia===true){conexionPrevia=false;programarAvisoDesconexion();}}
+    else{chip.classList.add('off');t.textContent='Bot sin conexión';if(conexionPrevia===true){conexionPrevia=false;programarAvisoDesconexion();}}
   }catch(e){chip.classList.remove('on','qr');chip.classList.add('off');t.textContent='Bot apagado';chip.title='Enciende el bot en la PC';}
 }
 $('#wa-chip')?.addEventListener('click',()=>irTab('bot'));

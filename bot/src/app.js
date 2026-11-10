@@ -425,7 +425,7 @@ async function enviarCatalogo({ tel, nombre, clienteId, sesionId }) {
     try {
       const env = await enviarArchivo(tel, pdfRuta, 'application/pdf', 'Catalogo-Perfumeria-Fina.pdf', '📕 Catálogo *Perfumería Fina* · Perfumería Fina Perú', sesionId);
       await logMensaje({ clienteId, telefono: tel, direccion: 'saliente', texto: '📕 [catálogo PDF enviado]', origen: 'ia' });
-      registrar({ telefono: tel, texto: '📕 Catálogo Navidad 2026 (PDF)', direccion: 'saliente', nombre, clienteId, origen: 'ia', waId: env?.waId || '' });
+      registrar({ telefono: tel, texto: '📕 Catálogo Perfumería Fina (PDF)', direccion: 'saliente', nombre, clienteId, origen: 'ia', waId: env?.waId || '' });
       log(`Catálogo PDF enviado a +${tel}.`);
     } catch (e) {
       log('No se pudo enviar el catálogo PDF: ' + e.message);
@@ -507,7 +507,20 @@ async function responderProductoDirecto({ tel, nombre, clienteId, texto, sesionI
       }
     }
     if (pidePrecio) {
-      const msg = `${saludo ? saludo + '. ' : ''}Precios de *${prod.nombre}*:\n\n• 50 ml — *S/ ${p50}*\n• 100 ml — *S/ ${p100}*\n\n¿Cuál prefieres? 😊`;
+      // Si preguntan el precio sin pedir foto, igual enviamos la foto con la ficha
+      // (notas, ocasión y estilo), como pide el dueño.
+      if (!pideImagen) {
+        const media = mediaProducto(prod);
+        if (media) {
+          try {
+            const caption = `${saludo ? saludo + '. ' : ''}Aquí tienes *${prod.nombre}*${casa} 📸\n\n${fichaProducto(prod)}`;
+            const envF = await enviarImagen(tel, media, caption, sesionId);
+            await logMensaje({ clienteId, telefono: tel, direccion: 'saliente', texto: '📷 ' + caption, origen: 'bot' });
+            registrar({ telefono: tel, texto: '📷 ' + caption, direccion: 'saliente', nombre, clienteId, origen: 'bot', waId: envF?.waId || '' });
+          } catch { /* si la foto falla, el precio sí se manda */ }
+        }
+      }
+      const msg = `Precios de *${prod.nombre}*:\n\n• 50 ml — *S/ ${p50}*\n• 100 ml — *S/ ${p100}*\n\n¿Cuál prefieres? 😊`;
       await enviarRegistrado({ tel, texto: msg, nombre, clienteId, sesionId });
     }
     log(`Respuesta directa de producto ${prod.nombre} a +${tel} (${pideImagen ? 'imagen' : ''}${pideImagen && pidePrecio ? '+' : ''}${pidePrecio ? 'precio' : ''}).`);
@@ -1622,11 +1635,16 @@ async function manejarMensaje(msg, sesionId = null) {
     if (!yaRespondio || esResumenCompra) {
       const nom = /^\+/.test(String(nombreChat || '')) ? '' : primerNombre(nombreChat);
       let cuerpo = String(ai.texto || '').trim();
-      const yaSaluda = /^[¡!¿\s]*(buenos|buenas|hola|qu[eé] tal|hey)/i.test(cuerpo);
-      if (yaSaluda) {
-        cuerpo = cuerpo.replace(/^[¡!¿\s]*(buenos d[ií]as|buenas tardes|buenas noches|hola|qu[eé] tal|hey)[,!. ]*/i, '').trim();
+      // Quita el saludo y el "Bienvenido a ..." del texto de la IA: la bienvenida
+      // ya los dijo, así no se repiten ("Buenas tardes" x2).
+      cuerpo = cuerpo.replace(/^[¡!¿\s]*(buenos d[ií]as|buenas tardes|buenas noches|hola|qu[eé] tal|hey)[,!. ]*/i, '').trim();
+      cuerpo = cuerpo.replace(/^bienvenid[oa](\s+a\s+[^.!?\n]{0,60})?[.!]\s*/i, '').trim();
+      if (cuerpo) {
+        const saludo = saludoONada(tel, nombreChat);
+        ai.texto = saludo
+          ? `${saludoHora()}${nom ? ', ' + nom : ''}. ${cuerpo}`
+          : cuerpo.charAt(0).toUpperCase() + cuerpo.slice(1);
       }
-      if (cuerpo) ai.texto = `${saludoHora()}${nom ? ', ' + nom : ''}. ${cuerpo}`;
     }
     // Si la IA detectó una compra, el pedido queda registrado en el módulo.
     // Nunca se confirma el pago: solo se prepara para que el dueño lo revise.
