@@ -570,8 +570,8 @@ export async function listarChatsWa(sesionId = null) {
         ultimoTexto: c.lastMessage?.body || '',
         ts: c.timestamp || c.lastMessage?.timestamp || c.lastMessage?.t || 0,
         tsReal: 0,
-        pin: !!c.pinned,
-        archived: !!c.archived,
+        pin: !!(c.pinned || c.isPinned),
+        archived: !!(c.archived || c.isArchived || c.archive),
         real: true,
         noLeidos: c.unreadCount || 0
       };
