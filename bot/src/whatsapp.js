@@ -558,7 +558,8 @@ export async function listarChatsWa(sesionId = null) {
       const verifiedName = c.contact?.verifiedName || c.contact?.businessProfile?.name || '';
       const nombreWa = nombreMostradoWa({ titulo: c.formattedTitle || c.name || '', pushname, verifiedName, nombreGuardado, esEmpresa });
       return {
-        tel: c.id?.server === 'c.us' ? c.id?.user : (c.contact?.number || ''),
+        tel: c.id?.server === 'c.us' ? c.id?.user : (c.contact?.number || c.contact?.phoneNumber?._serialized?.split('@')[0] || ''),
+        lid: c.id?.server === 'lid' ? String(c.id?.user || '') : '',
         esGrupo: !!c.isGroup,
         nombre: nombreWa,
         nombreWa,
@@ -687,6 +688,7 @@ export async function listarChatsWa(sesionId = null) {
 
             out.push({
               tel,
+              lid: server === 'lid' ? String((c.id && c.id.user) || '') : '',
               esGrupo,
               nombre: String(nombre || ''),
               nombreWa: String(nombre || ''),
@@ -707,6 +709,18 @@ export async function listarChatsWa(sesionId = null) {
       } catch (e) {}
       return out;
     }), 45000, 'getChats (respaldo)');
+  }
+
+  // Chats con identificador @lid (número oculto en el chat): se resuelve el
+  // teléfono real para que la Bandeja los pueda importar.
+  const sinTel = crudos.filter(c => !c.esGrupo && !c.tel && c.lid);
+  if (sinTel.length) {
+    await Promise.all(sinTel.map(async c => {
+      try {
+        const tel = await resolverTelefonoWa(`${c.lid}@lid`, sesionId);
+        if (tel) c.tel = tel;
+      } catch { /* se queda sin número y se omite */ }
+    }));
   }
 
   const propio = normalizar(s.numero);

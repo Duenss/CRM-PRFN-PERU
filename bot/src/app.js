@@ -2043,9 +2043,10 @@ app.get('/api/estadisticas', auth, (req, res) => {
 async function sincronizarChatsDesdeWhatsApp(sesionId = null) {
   const lista = await conTimeout(listarChatsWa(sesionId), 90000, 'listar chats de WhatsApp');
   const propios = estadoWa().map(s => String(s.numero || '')).filter(Boolean);
-  let chats = 0;
+  let chats = 0, grupos = 0, sinNumero = 0;
   for (const c of lista) {
-    if (c.esGrupo || !/^\d{8,15}$/.test(c.telefono)) continue;
+    if (c.esGrupo) { grupos++; continue; }
+    if (!/^\d{8,15}$/.test(c.telefono)) { sinNumero++; continue; }
     // El chat con el propio número del bot no va a la Bandeja.
     if (propios.includes(String(c.telefono))) continue;
     registrarCabecera({
@@ -2064,7 +2065,10 @@ async function sincronizarChatsDesdeWhatsApp(sesionId = null) {
     });
     chats++;
   }
-  return { lista, chats };
+  if (grupos || sinNumero) {
+    log(`Sincronización de chats: ${chats} importados de ${lista.length} (${grupos} grupos, ${sinNumero} sin número visible).`);
+  }
+  return { lista, chats, grupos, sinNumero };
 }
 
 app.post('/api/sincronizar', auth, async (req, res) => {
@@ -2079,6 +2083,8 @@ app.post('/api/sincronizar', auth, async (req, res) => {
       const r = await sincronizarChatsDesdeWhatsApp(req.body?.sesion || null);
       salida.chatsTotal = r.lista.length;
       salida.chats = r.chats;
+      salida.grupos = r.grupos || 0;
+      salida.sinNumero = r.sinNumero || 0;
       if (req.body?.diagnostico) {
         salida.detalle = r.lista.map(c => ({
           telefono: c.telefono,
