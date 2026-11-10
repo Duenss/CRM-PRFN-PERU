@@ -1484,6 +1484,19 @@ $('#tg-quick')?.addEventListener('click',e=>{
 $('#tg-cancel')?.addEventListener('click',()=>$('#dlgTags')?.close());
 $('#tg-save')?.addEventListener('click',guardarEtiquetasChat);
 
+function cerrarChat(){
+  inTel='';hiloTel='';
+  const thread=$('#in-thread');if(thread)thread.hidden=true;
+  const vacio=$('#in-empty');if(vacio)vacio.hidden=false;
+  const msgs=$('#in-msgs');if(msgs){msgs.innerHTML='';msgs.dataset.iniciado=''}
+  const tags=$('#in-tags');if(tags)tags.innerHTML='';
+  pintarLista();
+}
+$('#in-close')?.addEventListener('click',cerrarChat);
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape' && $('#in-thread') && !$('#in-thread').hidden) cerrarChat();
+});
+
 async function abrirChat(tel){
   const mismo=hiloTel===tel&&$('#in-msgs')?.dataset.iniciado==='1';
   inTel=tel;hiloTel=tel;

@@ -2078,9 +2078,11 @@ async function sincronizarChatsDesdeWhatsApp(sesionId = null) {
   }
   const lista = await conTimeout(listarChatsWa(sesionId), 90000, 'listar chats de WhatsApp');
   const propios = estadoWa().map(s => String(s.numero || '')).filter(Boolean);
-  let chats = 0, grupos = 0, sinNumero = 0;
+  let chats = 0, grupos = 0, sinNumero = 0, archivados = 0;
   for (const c of lista) {
     if (c.esGrupo) { grupos++; continue; }
+    // Chats archivados en WhatsApp: el dueño los escondió, no van a la Bandeja.
+    if (c.archived) { archivados++; continue; }
     if (!/^\d{8,15}$/.test(c.telefono)) { sinNumero++; continue; }
     // El chat con el propio número del bot no va a la Bandeja.
     if (propios.includes(String(c.telefono))) continue;
@@ -2102,9 +2104,9 @@ async function sincronizarChatsDesdeWhatsApp(sesionId = null) {
     chats++;
   }
   if (grupos || sinNumero) {
-    log(`Sincronización de chats: ${chats} importados de ${lista.length} (${grupos} grupos, ${sinNumero} sin número visible).`);
+    log(`Sincronización de chats: ${chats} importados de ${lista.length} (${grupos} grupos, ${sinNumero} sin número visible, ${archivados} archivados).`);
   }
-  return { lista, chats, grupos, sinNumero };
+  return { lista, chats, grupos, sinNumero, archivados };
 }
 
 app.post('/api/sincronizar', auth, async (req, res) => {
@@ -2124,6 +2126,7 @@ app.post('/api/sincronizar', auth, async (req, res) => {
       if (salida.chats > 0) setTimeout(() => { actualizarHistorialesConocidos().catch(() => {}); }, 1200);
       salida.grupos = r.grupos || 0;
       salida.sinNumero = r.sinNumero || 0;
+      salida.archivados = r.archivados || 0;
       if (req.body?.diagnostico) {
         salida.detalle = r.lista.map(c => ({
           telefono: c.telefono,
