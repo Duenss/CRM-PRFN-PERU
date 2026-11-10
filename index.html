@@ -844,7 +844,7 @@ dialog::backdrop{background:rgba(3,4,8,.66);backdrop-filter:blur(8px)}
 
 <div id="toast" role="status" aria-live="polite"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="assets/vendor/supabase-2.45.4.min.js"></script>
 <script>
 const SUPABASE_URL='https://pcesvmsewfpvmqmfmswn.supabase.co';
 const SUPABASE_KEY='sb_publishable_UHjFrmSZodpuHDpDSh4zWg_pVfhseeS';
@@ -1561,6 +1561,21 @@ function abrirWhatsApp(tel,texto){
   // web.whatsapp.com usa la sesión de ESTE navegador (Brave): una sola vez el QR.
   window.open(`https://web.whatsapp.com/send?phone=${encodeURIComponent(tel)}&text=${t}`,'_blank','noopener,noreferrer');
 }
+/* Token JWT de la sesión de Supabase (el proxy de Pages lo valida). */
+let sbTokenCache='',sbTokenExp=0;
+async function tokenSupabase(){
+  if(sbTokenCache&&Date.now()<sbTokenExp-60000)return sbTokenCache;
+  try{
+    const {data:{session}}=await sb.auth.getSession();
+    if(!session)return '';
+    if(session.expires_at&&Date.now()>session.expires_at*1000-60000){
+      const r=await sb.auth.refreshSession();
+      if(r&&r.data&&r.data.session){sbTokenCache=r.data.session.access_token||'';sbTokenExp=(r.data.session.expires_at||0)*1000;return sbTokenCache}
+    }
+    sbTokenCache=session.access_token||'';sbTokenExp=(session.expires_at||0)*1000;
+  }catch(e){}
+  return sbTokenCache;
+}
 async function botFetch(path,opts={}){
   // Toda petición al bot tiene deadline: un cuelgue nunca deja la UI esperando.
   // `timeoutMs` permite dar más margen a operaciones lentas (sync, envío, IA).
@@ -1568,41 +1583,60 @@ async function botFetch(path,opts={}){
   const ctl=rest.signal?null:new AbortController();
   const timer=ctl?setTimeout(()=>ctl.abort(),timeoutMs):null;
   try{
-    const r=await fetch(botURL+path,{cache:'no-store',...rest,signal:rest.signal||ctl.signal,headers:{...(rest.headers||{}),...(botToken?{'x-bot-token':botToken}:{})}});
+    const jwt=await tokenSupabase();
+    const cabeceras={...(rest.headers||{}),...(jwt?{Authorization:'Bearer '+jwt}:{}),...(botToken?{'x-bot-token':botToken}:{})};
+    const r=await fetch(botURL+path,{cache:'no-store',...rest,signal:rest.signal||ctl.signal,headers:cabeceras});
     const j=await r.json().catch(()=>({error:'Respuesta inválida del bot'}));
     if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
     return j;
   }finally{if(timer)clearTimeout(timer)}
 }
 /* ---------- tiempo real (SSE) con respaldo de polling ---------- */
-let esFuente=null,SSE_ABIERTO=false,sseReintento=null,sseIntentos=0,campanaRefreshTimer=null;
+let sseCtrl=null,SSE_ABIERTO=false,sseReintento=null,sseIntentos=0,campanaRefreshTimer=null;
 function desconectarSSE(){
   clearTimeout(sseReintento);sseReintento=null;
-  if(esFuente){try{esFuente.close()}catch(e){}esFuente=null}
+  if(sseCtrl){try{sseCtrl.abort()}catch(e){}sseCtrl=null}
   SSE_ABIERTO=false;
 }
-function conectarSSE(){
-  if(typeof EventSource==='undefined'||!botURL)return;
+// Streaming con fetch + cabecera Authorization (el token NUNCA va en la URL).
+async function conectarSSE(){
+  if(typeof fetch==='undefined')return;
   desconectarSSE();
+  const ctl=new AbortController();sseCtrl=ctl;
   try{
-    esFuente=new EventSource(botURL+'/api/stream?token='+encodeURIComponent(botToken));
-    esFuente.onopen=()=>{SSE_ABIERTO=true;sseIntentos=0};
-    esFuente.onmessage=ev=>{
-      let d=null;try{d=JSON.parse(ev.data)}catch(e){return}
-      if(!d||!d.tipo)return;
-      if(typeof d.id==='number'&&(evUltimo===null||d.id>evUltimo))evUltimo=d.id;
-      aplicarEventoSSE(d);
-    };
-    esFuente.onerror=()=>{
-      SSE_ABIERTO=false;
-      try{esFuente.close()}catch(e){}esFuente=null;
-      clearTimeout(sseReintento);
-      // Reconexión con espera creciente (2 s → 30 s); el polling sigue de respaldo.
-      sseIntentos=Math.min(sseIntentos+1,5);
-      const espera=Math.min(30000,2000*Math.pow(2,sseIntentos-1));
-      sseReintento=setTimeout(conectarSSE,espera);
-    };
-  }catch(e){SSE_ABIERTO=false}
+    const jwt=await tokenSupabase();
+    const cabeceras={...(jwt?{Authorization:'Bearer '+jwt}:{}),...(botToken?{'x-bot-token':botToken}:{}),Accept:'text/event-stream'};
+    const r=await fetch(botURL+'/api/stream',{headers:cabeceras,signal:ctl.signal,cache:'no-store'});
+    if(!r.ok||!r.body)throw new Error('HTTP '+r.status);
+    SSE_ABIERTO=true;sseIntentos=0;
+    const lector=r.body.getReader();const dec=new TextDecoder();let buf='';
+    while(true){
+      const {done,value}=await lector.read();
+      if(done)break;
+      buf+=dec.decode(value,{stream:true});
+      let idx;
+      while((idx=buf.indexOf('\n\n'))>=0){
+        const bloque=buf.slice(0,idx);buf=buf.slice(idx+2);
+        let data='';
+        for(const l of bloque.split('\n')){if(l.startsWith('data:'))data+=l.slice(5).trim();}
+        if(!data)continue;
+        let d=null;try{d=JSON.parse(data)}catch(e){continue}
+        if(!d||!d.tipo)continue;
+        if(typeof d.id==='number'&&(evUltimo===null||d.id>evUltimo))evUltimo=d.id;
+        aplicarEventoSSE(d);
+      }
+    }
+    if(ctl.signal.aborted)return;
+    throw new Error('stream cerrado');
+  }catch(e){
+    if(ctl.signal.aborted)return;
+    SSE_ABIERTO=false;
+    clearTimeout(sseReintento);
+    // Reconexión con espera creciente (2 s → 30 s); el polling sigue de respaldo.
+    sseIntentos=Math.min(sseIntentos+1,5);
+    const espera=Math.min(30000,2000*Math.pow(2,sseIntentos-1));
+    sseReintento=setTimeout(conectarSSE,espera);
+  }
 }
 function aplicarMensajeSSE(d){
   const tel=String(d.telefono||'');if(!tel)return;

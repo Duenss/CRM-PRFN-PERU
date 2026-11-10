@@ -20,6 +20,11 @@ function normalizar(n) {
 export const config = {
   port: num(process.env.PORT, 3000),
   botToken: String(process.env.BOT_TOKEN || '').trim(),
+  // Orígenes permitidos para CORS (panel en Pages y panel local).
+  panelOrigins: String(process.env.PANEL_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean),
+  // Basic Auth opcional para /panel y /qr.
+  panelUser: String(process.env.PANEL_USER || '').trim(),
+  panelPass: String(process.env.PANEL_PASS || '').trim(),
 
   supabaseUrl: process.env.SUPABASE_URL || 'https://pcesvmsewfpvmqmfmswn.supabase.co',
   supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',

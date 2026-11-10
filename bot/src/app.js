@@ -14,6 +14,7 @@ import * as pedidos from './pedidos.js';
 import * as anuncios from './anuncios.js';
 // (Las plantillas de pago se eliminaron: las billeteras digitales las verifica el admin.)
 import * as seguimiento from './seguimiento.js';
+import { crearAuth, crearAuthPanel, crearLimitador } from './auth.js';
 import { emitir, desde as eventosDesde, ultimoId as ultimoEventoId, suscribir, lineaSSE } from './eventos.js';
 import { reclamarEnvioCon, marcarEnvioCon, cerrarCampanaSiCompleta, barrerEnviosColgados, verificarMigracionEnviosCon, esErrorDeMigracion, mensajeErrorMigracion } from './campanas.js';
 import { esEfectivo, decidirEstadoPedidoIA, debeDerivarPago, textoAvisoPagoDigital, corregirEstadoPedidoIA } from './politicas.js';
@@ -1681,28 +1682,42 @@ async function manejarMensaje(msg, sesionId = null) {
 }
 
 /* ---------------- API ---------------- */
-function auth(req, res, next) {
-  if (!config.botToken) return next();
-  const t = req.get('x-bot-token') || req.query.token || '';
-  if (t === config.botToken) return next();
-  res.status(401).json({ error: 'Token del bot inválido' });
-}
+// Falla cerrado: sin BOT_TOKEN configurado en modo real, el bot no atiende
+// peticiones (solo /api/health). Con token, comparación en tiempo constante.
+const auth = crearAuth({
+  token: config.botToken,
+  produccion: !config.modoPrueba,
+  excepto: ['/api/health']
+});
+// /panel y /qr muestran el QR de vinculación de WhatsApp: Basic Auth o 404.
+const authPanel = crearAuthPanel({ usuario: config.panelUser, clave: config.panelPass });
 
+// CORS solo para los orígenes del panel (Pages y local). Si el panel llama al
+// mismo origen (proxy), no se necesita CORS.
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-bot-token');
+  const origen = String(req.get('origin') || '');
+  const permitidos = config.panelOrigins;
+  if (origen && permitidos.includes(origen)) {
+    res.setHeader('Access-Control-Allow-Origin', origen);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-bot-token, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
 });
 
-app.get('/', (_req, res) => res.redirect('/panel'));
-app.get('/panel', (_req, res) => res.sendFile(panelPath));
+// Límite de peticiones para la API (sin dependencias externas).
+app.use('/api/', crearLimitador({ max: 240, ventanaMs: 60000 }));
+
+app.get('/', authPanel, (_req, res) => res.redirect('/panel'));
+app.get('/panel', authPanel, (_req, res) => res.sendFile(panelPath));
 app.use('/media/comprobantes', express.static(comprobantesDir, { fallthrough: true, maxAge: '1h' }));
 app.use('/media/productos', express.static(path.join(raizProyecto, 'assets', 'img', 'products'), { fallthrough: true, maxAge: '1d' }));
 
 // Página mínima: solo el QR, grande y autorefrescante.
-app.get('/qr', (_req, res) => {
+app.get('/qr', authPanel, (_req, res) => {
   res.type('html').send(`<!doctype html><html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
 <title>QR WhatsApp · Perfumería Fina</title>

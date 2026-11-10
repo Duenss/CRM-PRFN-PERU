@@ -731,6 +731,16 @@ function createPanelServer() {
   const server = http.createServer((req, res) => {
     const u = new URL(req.url, PANEL_BASE);
     if (u.pathname === '/favicon.ico') { res.writeHead(204); res.end(); return; }
+    // Archivos locales del panel (vendor, imágenes, etc.)
+    const rutaLocal = path.join(ROOT, decodeURIComponent(u.pathname));
+    if (u.pathname !== '/' && u.pathname !== '/index.html' && fs.existsSync(rutaLocal) && fs.statSync(rutaLocal).isFile() && rutaLocal.startsWith(ROOT)) {
+      const ext = path.extname(rutaLocal).toLowerCase();
+      const tipos = { '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.woff2': 'font/woff2' };
+      const buf = fs.readFileSync(rutaLocal);
+      res.writeHead(200, { 'Content-Type': tipos[ext] || 'application/octet-stream', 'Cache-Control': 'no-store', 'Content-Length': String(buf.length) });
+      res.end(buf);
+      return;
+    }
     if (u.pathname === '/' || u.pathname === '/index.html') {
       let buf;
       try { buf = fs.readFileSync(PANEL_FILE); } catch (e) {
@@ -963,6 +973,34 @@ const INIT_SCRIPT = ({ storageKey, sessionJson, botUrl }) => {
       };
     }
   } catch (e) { NS.sse.instrumentError = String(e && e.message || e); }
+
+  // 2b) Instrumentar SSE por fetch (el panel ya no usa EventSource: manda el JWT
+  // en la cabecera Authorization y lee el stream con ReadableStream).
+  try {
+    const nativeFetch = window.fetch.bind(window);
+    window.fetch = async function (input, init) {
+      const url = typeof input === 'string' ? input : (input && input.url) || '';
+      const esStream = url.includes('/api/stream');
+      if (esStream) { try { NS.sse.urls.push(String(url)); NS.sse.opened++; } catch { /* noop */ } }
+      const respuesta = await nativeFetch(input, init);
+      if (!esStream || !respuesta.body) return respuesta;
+      try {
+        const lector = respuesta.body.getReader();
+        const stream = new ReadableStream({
+          async pull(ctrl) {
+            const { done, value } = await lector.read();
+            if (done) { ctrl.close(); return; }
+            NS.sse.messages++;
+            ctrl.enqueue(value);
+          }
+        });
+        return new Response(stream, { status: respuesta.status, headers: respuesta.headers });
+      } catch (e) {
+        NS.sse.instrumentError = String(e && e.message || e);
+        return respuesta;
+      }
+    };
+  } catch (e) { NS.sse.instrumentFetchError = String(e && e.message || e); }
 
   // 3) Observadores de mutaciones por contenedor (#in-list, #in-msgs).
   const countIn = (node, itemSel) => {
