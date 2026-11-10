@@ -148,7 +148,7 @@ export function actualizar(id, cambios = {}) {
 }
 
 /** Marca progreso de envío (lo llama el servidor mientras recorre clientes). */
-export function progreso(id, { total, enviados, omitidos, errores, estado } = {}) {
+export function progreso(id, { total, enviados, omitidos, errores, estado, enviadosA } = {}) {
   const a = anuncios.find(x => String(x.id) === String(id));
   if (!a) return null;
   a.stats = {
@@ -157,6 +157,8 @@ export function progreso(id, { total, enviados, omitidos, errores, estado } = {}
     omitidos: Math.max(0, Number(omitidos ?? a.stats.omitidos) || 0),
     errores: Math.max(0, Number(errores ?? a.stats.errores) || 0)
   };
+  // Memoria de a quién ya se le envió, para poder reanudar sin duplicar.
+  if (Array.isArray(enviadosA)) a.enviadosA = enviadosA.slice(-5000);
   if (estado && ESTADOS.includes(String(estado))) a.estado = String(estado);
   if (a.estado === 'enviado' && !a.enviadoEn) a.enviadoEn = ahora();
   a.actualizado = ahora();

@@ -232,8 +232,12 @@ async function enviarMovimiento(tipo, dato, dx, dy) {
     if (!r.ok) throw new Error(d.error || "Error");
     actualizarHistorial(d);
     pintarEstado("Movido ✓", "ok");
+    const esperado = [
+      dato.bbox[0] + dx, dato.bbox[1] + dy,
+      dato.bbox[2] + dx, dato.bbox[3] + dy,
+    ];
     await cargarPagina(paginaActual, true);
-    reabrirSeleccion(tipo);
+    reabrirSeleccion(tipo, esperado);
   } catch (e) { pintarEstado("Error", "err"); logEl.textContent = e.message; }
 }
 
@@ -289,7 +293,7 @@ async function enviarRedimension(tipo, dato, dx, dy) {
     }
     pintarEstado("Listo ✓", "ok");
     await cargarPagina(paginaActual, true);
-    reabrirSeleccion(tipo);
+    reabrirSeleccion(tipo, nuevo);
   } catch (e) { pintarEstado("Error", "err"); logEl.textContent = e.message; }
 }
 
@@ -302,11 +306,29 @@ function seleccionar(tipo, dato, i, el) {
   else panelImagen(dato);
 }
 
-function reabrirSeleccion(tipo) {
-  const el = hoja.querySelector(`.caja[data-tipo="${tipo}"]`);
-  if (el) el.classList.add("sel");
-  const dato = tipo === "texto" ? (capa.textos.find((t) => t.bbox) || capa.textos[0]) : capa.imagenes[0];
-  if (dato) seleccionar(tipo, dato, 0, el);
+function masCercano(lista, bbox) {
+  if (!lista || !lista.length) return null;
+  const cx = (bbox[0] + bbox[2]) / 2;
+  const cy = (bbox[1] + bbox[3]) / 2;
+  let mejor = null;
+  let mejorDist = Infinity;
+  lista.forEach((el, i) => {
+    if (!el.bbox) return;
+    const ex = (el.bbox[0] + el.bbox[2]) / 2;
+    const ey = (el.bbox[1] + el.bbox[3]) / 2;
+    const d = Math.hypot(ex - cx, ey - cy);
+    if (d < mejorDist) { mejorDist = d; mejor = { el, i, d }; }
+  });
+  return mejor;
+}
+
+/* Mantiene seleccionado el elemento que se acaba de editar (busca por posición). */
+function reabrirSeleccion(tipo, bboxEsperado) {
+  const lista = tipo === "texto" ? capa.textos : capa.imagenes;
+  const encontrado = masCercano(lista, bboxEsperado || [0, 0, 0, 0]);
+  if (!encontrado) return;
+  const caja = hoja.querySelector(`.caja[data-tipo="${tipo}"][data-i="${encontrado.i}"]`);
+  seleccionar(tipo, encontrado.el, encontrado.i, caja);
 }
 
 function controlesMover() {
@@ -407,8 +429,9 @@ async function enviarImagen(extra, textoEstado) {
     if (!r.ok) throw new Error(d.error || "Error");
     actualizarHistorial(d);
     pintarEstado("Foto lista ✓", "ok");
+    const esperadoImagen = seleccion.dato.bbox;
     await cargarPagina(paginaActual, true);
-    reabrirSeleccion("imagen");
+    reabrirSeleccion("imagen", esperadoImagen);
   } catch (e) { pintarEstado("Error", "err"); alert(e.message); }
 }
 
@@ -428,8 +451,9 @@ async function aplicarTexto() {
     if (!r.ok) throw new Error(d.error || "Error");
     actualizarHistorial(d);
     pintarEstado("Texto cambiado ✓", "ok");
+    const esperadoTexto = seleccion.dato.bbox;
     await cargarPagina(paginaActual, true);
-    reabrirSeleccion("texto");
+    reabrirSeleccion("texto", esperadoTexto);
   } catch (e) { pintarEstado("Error", "err"); alert(e.message); }
 }
 
@@ -495,7 +519,7 @@ function abrirEtiqueta(t) {
       actualizarHistorial(d);
       pintarEstado("Cápsula lista ✓", "ok");
       await cargarPagina(paginaActual, true);
-      reabrirSeleccion("texto");
+      reabrirSeleccion("texto", t.bbox);
     } catch (e) { pintarEstado("Error", "err"); alert(e.message); }
   });
 }
