@@ -48,3 +48,6 @@ docs/auditoria/capturas/responsive/
 
 # imagenes generadas del catalogo
 docs/catalogo/preview-*.png
+
+# respaldos locales del bot
+backups/

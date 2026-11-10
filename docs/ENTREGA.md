@@ -66,6 +66,12 @@ node scripts/e2e-panel.mjs
 node scripts/smoke.mjs --token <BOT_TOKEN> --supabase <URL> --key <SERVICE_ROLE>
 
 # Pruebas de chat simuladas
+node scripts/backup-bot.mjs --server 1938d04a --key <CLAVE_CLIENTE>
+
+# Copia de seguridad de los datos del bot
+node scripts/backup-bot.mjs --server <ID> --key <CLAVE_CLIENTE>
+
+# Pruebas de chat simuladas
 node scripts/probar-chat.mjs --url http://node.sakurasmp.xyz:25577 --token <BOT_TOKEN> --tel 51XXXXXXXXX
 ```
 
