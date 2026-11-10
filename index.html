@@ -767,6 +767,19 @@ dialog::backdrop{background:rgba(3,4,8,.66);backdrop-filter:blur(8px)}
         </div>
       </div>
       <div class="box">
+        <h2>Sonidos y avisos</h2>
+        <p class="muted" style="font-size:.8rem;margin-top:0">Volumen y eventos. Los sonidos se activan con el botón de bocina de la barra superior.</p>
+        <label for="snd-vol">Volumen</label>
+        <input id="snd-vol" type="range" min="0" max="100" step="5" style="width:100%">
+        <div class="grid2" style="margin-top:.6rem">
+          <label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" id="snd-entrante" style="width:auto"> <span>Mensaje entrante</span></label>
+          <label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" id="snd-derivacion" style="width:auto"> <span>Derivación al dueño</span></label>
+          <label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" id="snd-envio" style="width:auto"> <span>Envío correcto</span></label>
+          <label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" id="snd-error" style="width:auto"> <span>Error</span></label>
+        </div>
+        <div class="acts"><button class="ghost" id="snd-test" type="button">Probar sonido</button></div>
+      </div>
+      <div class="box">
         <h2>Envío manual (botón WhatsApp)</h2>
         <p class="muted">Cuando uses <b>Enviar por WhatsApp</b> en Campañas, elige dónde abrirlo. En <b>Web</b> se abre en una pestaña de este mismo navegador: si ya iniciaste sesión de WhatsApp Web no te pedirá QR (solo la primera vez). En <b>App</b> se abre la aplicación de escritorio si la tienes instalada.</p>
         <label for="b-wa">Abrir en</label>
@@ -897,7 +910,21 @@ function diffDays(a,b){return Math.round((parseISO(b)-parseISO(a))/864e5)}
 function norm(t){let d=String(t||'').replace(/\D/g,'');if(d.startsWith('00'))d=d.slice(2);if(d.length===11&&d.startsWith('51'))return d;if(d.length===9&&d[0]==='9')return '51'+d;return d}
 const tagsOf=s=>Array.isArray(s)?s.map(x=>String(x).trim().toLowerCase()).filter(Boolean):String(s||'').split(',').map(x=>x.trim().toLowerCase()).filter(Boolean);
 /* ---------- sonido de interfaz (como portafolio-v4) ---------- */
-let audioCtx=null,soundOn=localStorage.getItem('ui_sound')!=='0';
+// Por defecto el sonido está APAGADO: solo suena cuando el usuario lo activa.
+let audioCtx=null,soundOn=localStorage.getItem('ui_sound')==='1';
+/* Preferencias de sonido: volumen y qué eventos suenan. */
+const SOUND_KEY='pf_sound_cfg';
+const SOUND_BASE={vol:0.6,ev:{entrante:true,derivacion:true,envio:true,error:true,ok:false,clic:true}};
+function leerSoundCfg(){
+  try{
+    const j=JSON.parse(localStorage.getItem(SOUND_KEY)||'{}');
+    return {vol:Math.min(1,Math.max(0,Number(j.vol ?? SOUND_BASE.vol))),ev:{...SOUND_BASE.ev,...(j.ev||{})}};
+  }catch(e){return {vol:SOUND_BASE.vol,ev:{...SOUND_BASE.ev}}}
+}
+function guardarSoundCfg(c){try{localStorage.setItem(SOUND_KEY,JSON.stringify(c))}catch(e){}}
+let soundCfg=leerSoundCfg();
+const volumen=()=>Math.max(0,Math.min(1,soundCfg.vol));
+const suenaEvento=ev=>!!(soundCfg.ev&&soundCfg.ev[ev]);
 const soundToggle=$('#soundToggle');
 function playTone(freq,duration,volume){
   if(!soundOn||!audioCtx)return;
@@ -906,7 +933,7 @@ function playTone(freq,duration,volume){
     osc.type='sine';osc.frequency.value=freq;
     const t=audioCtx.currentTime;
     gain.gain.setValueAtTime(0.0001,t);
-    gain.gain.linearRampToValueAtTime(volume,t+0.008);
+    gain.gain.linearRampToValueAtTime(volume*volumen(),t+0.008);
     gain.gain.exponentialRampToValueAtTime(0.0001,t+duration);
     osc.connect(gain);gain.connect(audioCtx.destination);
     osc.start(t);osc.stop(t+duration+0.02);
@@ -914,21 +941,31 @@ function playTone(freq,duration,volume){
 }
 function sonido(tipo){
   if(!soundOn)return;
-  if(tipo==='ok'){playTone(660,0.08,0.028);setTimeout(()=>playTone(990,0.09,0.02),80);}
-  else if(tipo==='error'){playTone(240,0.14,0.03);setTimeout(()=>playTone(170,0.17,0.028),110);}
+  if(tipo==='ok'){
+    if(!suenaEvento('ok'))return;
+    playTone(660,0.08,0.028);setTimeout(()=>playTone(990,0.09,0.02),80);
+  }
+  else if(tipo==='error'){
+    if(!suenaEvento('error'))return;
+    playTone(240,0.14,0.03);setTimeout(()=>playTone(170,0.17,0.028),110);
+  }
   else if(tipo==='toggle'){playTone(620,0.07,0.03);setTimeout(()=>playTone(820,0.06,0.022),70);}
-  else playTone(480,0.045,0.018);
+  else if(suenaEvento('clic')) playTone(480,0.045,0.018);
 }
 /* Aviso sonoro de mensaje entrante (aunque el chat no esté abierto). */
+let ultimoSonidoEntrante=0;
 function sonidoEntrante(){
-  if(!soundOn)return;
+  if(!soundOn||!suenaEvento('entrante'))return;
+  // Una ráfaga de mensajes suena una sola vez.
+  if(Date.now()-ultimoSonidoEntrante<1500)return;
+  ultimoSonidoEntrante=Date.now();
   asegurarAudio();
   tonoAviso(880,0,0.12,0.055);
   tonoAviso(1180,0.15,0.15,0.045);
 }
 /* Confirmación de envío: solo si estás viendo ese chat. */
 function sonidoEnvio(){
-  if(!soundOn)return;
+  if(!soundOn||!suenaEvento('envio'))return;
   asegurarAudio();
   playTone(760,0.055,0.018);
 }
@@ -960,6 +997,41 @@ document.addEventListener('click',e=>{
   if(e.target.closest('a, button, .in-item, .lrow, [data-go], [data-chat]'))playTone(480,0.045,0.018);
 },true);
 refrescarSonido();
+
+/* UI de preferencias de sonido (Ajustes) */
+function pintarPreferenciasSonido(){
+  if($('#snd-vol'))$('#snd-vol').value=Math.round(volumen()*100);
+  if($('#snd-entrante'))$('#snd-entrante').checked=suenaEvento('entrante');
+  if($('#snd-derivacion'))$('#snd-derivacion').checked=suenaEvento('derivacion');
+  if($('#snd-envio'))$('#snd-envio').checked=suenaEvento('envio');
+  if($('#snd-error'))$('#snd-error').checked=suenaEvento('error');
+}
+function guardarPreferenciasSonido(){
+  soundCfg={
+    vol:Math.min(1,Math.max(0,(Number($('#snd-vol')?.value)||0)/100)),
+    ev:{
+      ...(soundCfg.ev||{}),
+      entrante:!!$('#snd-entrante')?.checked,
+      derivacion:!!$('#snd-derivacion')?.checked,
+      envio:!!$('#snd-envio')?.checked,
+      error:!!$('#snd-error')?.checked
+    }
+  };
+  guardarSoundCfg(soundCfg);
+}
+$('#snd-vol')?.addEventListener('input',guardarPreferenciasSonido);
+$('#snd-entrante')?.addEventListener('change',guardarPreferenciasSonido);
+$('#snd-derivacion')?.addEventListener('change',guardarPreferenciasSonido);
+$('#snd-envio')?.addEventListener('change',guardarPreferenciasSonido);
+$('#snd-error')?.addEventListener('change',guardarPreferenciasSonido);
+$('#snd-test')?.addEventListener('click',()=>{
+  asegurarAudio();
+  if(!soundOn){soundOn=true;localStorage.setItem('ui_sound','1');refrescarSonido();}
+  tonoAviso(880,0,0.12,0.055);
+  tonoAviso(1180,0.15,0.15,0.045);
+  tonoAviso(1480,0.32,0.2,0.04);
+});
+pintarPreferenciasSonido();
 
 const toast=(m,tipo)=>{
   const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('on'),2800);
@@ -1910,7 +1982,11 @@ $('#wa-chip')?.addEventListener('click',()=>irTab('bot'));
 
 /* ---------- bandeja de entrada ---------- */
 let inChats=[],inTel=null,inPausados=new Set(),inIAactiva=true,bandejaCargada=false;
-function actualizarBadge(n){const b=$('#unread-badge');if(!b)return;b.hidden=!n;b.textContent=n>99?'99+':n}
+function actualizarBadge(n){
+  const b=$('#unread-badge');if(!b)return;
+  b.hidden=!n;b.textContent=n>99?'99+':n;
+  document.title=(n?('('+(n>99?'99+':n)+') '):'')+'Panel · Perfumería Fina Perú';
+}
 async function cargarBandeja(){
   const l=$('#in-list');if(!l)return;
   const prev = bandejaCargada ? new Map(inChats.map(c=>[String(c.telefono),{no:c.noLeidos||0}])) : null;
@@ -2331,13 +2407,14 @@ function tonoAviso(freq,delay,dur,vol){
     const t=audioCtx.currentTime+delay;
     osc.type='triangle';osc.frequency.value=freq;
     gain.gain.setValueAtTime(0.0001,t);
-    gain.gain.linearRampToValueAtTime(vol||0.06,t+0.01);
+    gain.gain.linearRampToValueAtTime((vol||0.06)*volumen(),t+0.01);
     gain.gain.exponentialRampToValueAtTime(0.0001,t+dur);
     osc.connect(gain);gain.connect(audioCtx.destination);
     osc.start(t);osc.stop(t+dur+0.03);
   }catch(e){}
 }
 function alertaSonido(){
+  if(!suenaEvento('derivacion'))return;
   asegurarAudio();
   tonoAviso(880,0,0.14,0.07);
   tonoAviso(1180,0.16,0.16,0.06);
