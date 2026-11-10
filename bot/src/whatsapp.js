@@ -557,9 +557,19 @@ export async function listarChatsWa(sesionId = null) {
       const pushname = c.contact?.pushname || '';
       const verifiedName = c.contact?.verifiedName || c.contact?.businessProfile?.name || '';
       const nombreWa = nombreMostradoWa({ titulo: c.formattedTitle || c.name || '', pushname, verifiedName, nombreGuardado, esEmpresa });
+      const ultimo = c.lastMessage || null;
+      let ultimoTexto = String((ultimo && (ultimo.body || ultimo.caption)) || '').trim();
+      if (!ultimoTexto && ultimo) {
+        const mapaUltimo = { image: '[imagen]', video: '[video]', audio: '[audio]', ptt: '[nota de voz]',
+          document: '[documento]', sticker: '[sticker]', location: '[ubicación]', vcard: '[contacto]',
+          multi_vcard: '[contactos]', poll_creation: '[encuesta]', event_creation: '[evento]' };
+        ultimoTexto = mapaUltimo[String(ultimo.type || '')] || (ultimo.hasMedia ? '[archivo]' : '');
+      }
+      const tieneMensajes = !!(ultimo || c.unreadCount || (c.msgs && c.msgs.length));
       return {
         tel: c.id?.server === 'c.us' ? c.id?.user : (c.contact?.number || c.contact?.phoneNumber?._serialized?.split('@')[0] || ''),
         lid: c.id?.server === 'lid' ? String(c.id?.user || '') : '',
+        id: String(c.id?._serialized || ''),
         esGrupo: !!c.isGroup,
         nombre: nombreWa,
         nombreWa,
@@ -567,11 +577,12 @@ export async function listarChatsWa(sesionId = null) {
         pushname,
         verifiedName,
         esEmpresa,
-        ultimoTexto: c.lastMessage?.body || '',
-        ts: c.timestamp || c.lastMessage?.timestamp || c.lastMessage?.t || 0,
+        ultimoTexto,
+        tieneMensajes,
+        ts: c.timestamp || ultimo?.timestamp || ultimo?.t || 0,
         tsReal: 0,
-        pin: !!(c.pinned || c.isPinned),
-        archived: !!(c.archived || c.isArchived || c.archive),
+        pin: !!(c.pinned === true || c.isPinned === true),
+        archived: c.archived === true || c.isArchived === true,
         real: true,
         noLeidos: c.unreadCount || 0
       };
@@ -702,6 +713,7 @@ export async function listarChatsWa(sesionId = null) {
               pin,
               archived,
               real,
+              tieneMensajes: !!(ultimoReal || (lista && lista.length && ultimoTexto)),
               noLeidos
             });
           } catch (e) {}
@@ -710,6 +722,65 @@ export async function listarChatsWa(sesionId = null) {
       return out;
     }), 45000, 'getChats (respaldo)');
   }
+
+  // WhatsApp Web no trae el último mensaje de todos los chats hasta abrirlos.
+  // Para los que vienen vacíos se lee el último mensaje real desde la página
+  // (cargando anteriores si hace falta). Así se descartan los chats sin
+  // conversación y se muestra el texto real de los demás.
+  try {
+    const vacios = crudos.filter(c => !c.esGrupo && !String(c.ultimoTexto || '').trim() && c.id).map(c => c.id);
+    if (vacios.length) {
+      const enriquecidos = await conTimeout(s.client.pupPage.evaluate(async (ids) => {
+        const W = window;
+        const out = {};
+        let ChatCol = null;
+        try { ChatCol = W.require('WAWebCollections').Chat; } catch (e) { ChatCol = null; }
+        if (!ChatCol || !ChatCol.get) return out;
+        const mapa = {
+          image: '[imagen]', video: '[video]', audio: '[audio]', ptt: '[nota de voz]',
+          document: '[documento]', sticker: '[sticker]', location: '[ubicación]', vcard: '[contacto]'
+        };
+        for (const id of ids) {
+          try {
+            const chat = ChatCol.get(id);
+            if (!chat) continue;
+            let msgs = (chat.msgs && chat.msgs.getModelsArray && chat.msgs.getModelsArray()) || [];
+            const real = () => {
+              for (let i = msgs.length - 1; i >= 0; i--) {
+                const m = msgs[i];
+                if (!m || String(m.type || '') === 'reaction' || m.isNotification) continue;
+                if (m.body || m.caption || m.hasMedia) return m;
+              }
+              return null;
+            };
+            let m = real();
+            let vueltas = 0;
+            while (!m && vueltas < 3) {
+              vueltas++;
+              try {
+                const cargados = await W.require('WAWebChatLoadMessages').loadEarlierMsgs({ chat });
+                if (!cargados || !cargados.length) break;
+                msgs = [...cargados.filter(x => x && !x.isNotification), ...msgs];
+                m = real();
+              } catch (e) { break; }
+            }
+            if (!m) continue;
+            const texto = String(m.caption || m.body || '').trim() || mapa[String(m.type || '')] || (m.hasMedia ? '[archivo]' : '');
+            if (texto) out[id] = texto.slice(0, 300);
+          } catch (e) { /* chat problemático */ }
+        }
+        return out;
+      }, vacios), 90000, 'enriquecer chats');
+      let puestos = 0;
+      for (const c of crudos) {
+        if (c.id && enriquecidos && enriquecidos[c.id] && !String(c.ultimoTexto || '').trim()) {
+          c.ultimoTexto = enriquecidos[c.id];
+          puestos++;
+        }
+      }
+      if (puestos) console.log('[chats] último mensaje recuperado en', puestos, 'chats');
+    }
+  } catch (e) { /* si falla, se sigue con lo que haya */ }
 
   // Chats con identificador @lid (número oculto en el chat): se resuelve el
   // teléfono real para que la Bandeja los pueda importar.
@@ -751,6 +822,7 @@ export async function listarChatsWa(sesionId = null) {
         noLeidos: c.noLeidos || 0,
         pin: !!c.pin,
         archived: !!c.archived,
+        tieneMensajes: c.tieneMensajes !== false,
         real: c.real !== false,
         tsReal: c.tsReal || 0
       };

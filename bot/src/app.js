@@ -2078,12 +2078,16 @@ async function sincronizarChatsDesdeWhatsApp(sesionId = null) {
   }
   const lista = await conTimeout(listarChatsWa(sesionId), 90000, 'listar chats de WhatsApp');
   const propios = estadoWa().map(s => String(s.numero || '')).filter(Boolean);
-  let chats = 0, grupos = 0, sinNumero = 0, archivados = 0;
+  let chats = 0, grupos = 0, sinNumero = 0, archivados = 0, sinConversacion = 0;
   for (const c of lista) {
     if (c.esGrupo) { grupos++; continue; }
     // Chats archivados en WhatsApp: el dueño los escondió, no van a la Bandeja.
     if (c.archived) { archivados++; continue; }
     if (!/^\d{8,15}$/.test(c.telefono)) { sinNumero++; continue; }
+    // Chats sin ninguna conversación real (solo avisos/plantillas): se omiten.
+    if (c.tieneMensajes === false) { sinConversacion++; continue; }
+    // Chats sin conversación legible (ni texto ni multimedia): no se importan.
+    if (!String(c.ultimoTexto || '').trim() && !c.noLeidos && !c.pin) { sinConversacion++; continue; }
     // El chat con el propio número del bot no va a la Bandeja.
     if (propios.includes(String(c.telefono))) continue;
     if (oculto(c.telefono)) continue; // el dueño lo quitó de la Bandeja
@@ -2104,9 +2108,9 @@ async function sincronizarChatsDesdeWhatsApp(sesionId = null) {
     chats++;
   }
   if (grupos || sinNumero) {
-    log(`Sincronización de chats: ${chats} importados de ${lista.length} (${grupos} grupos, ${sinNumero} sin número visible, ${archivados} archivados).`);
+    log(`Sincronización de chats: ${chats} importados de ${lista.length} (${grupos} grupos, ${sinNumero} sin número, ${archivados} archivados, ${sinConversacion} sin conversación).`);
   }
-  return { lista, chats, grupos, sinNumero, archivados };
+  return { lista, chats, grupos, sinNumero, archivados, sinConversacion };
 }
 
 app.post('/api/sincronizar', auth, async (req, res) => {
@@ -2123,10 +2127,11 @@ app.post('/api/sincronizar', auth, async (req, res) => {
       salida.chats = r.chats;
       // Chats nuevos: poner al día sus últimos mensajes en segundo plano para que
       // la Bandeja no quede con conversaciones vacías tras sincronizar.
-      if (salida.chats > 0) setTimeout(() => { actualizarHistorialesConocidos().catch(() => {}); }, 1200);
+      if (salida.chats > 0) setTimeout(() => { actualizarHistorialesConocidos({ forzar: true }).catch(() => {}); }, 1200);
       salida.grupos = r.grupos || 0;
       salida.sinNumero = r.sinNumero || 0;
       salida.archivados = r.archivados || 0;
+      salida.sinConversacion = r.sinConversacion || 0;
       if (req.body?.diagnostico) {
         salida.detalle = r.lista.map(c => ({
           telefono: c.telefono,
@@ -2508,9 +2513,9 @@ let historialesEnCurso = false;
 let bandejaVaciadaEn = 0;
 let historialesHechos = false;
 
-async function actualizarHistorialesConocidos({ limite = 25, maxChats = 120 } = {}) {
+async function actualizarHistorialesConocidos({ limite = 25, maxChats = 120, forzar = false } = {}) {
   if (config.modoPrueba || historialesEnCurso || !hayConexion()) return;
-  if (Date.now() - bandejaVaciadaEn < 120000) return; // Bandeja recién vaciada
+  if (!forzar && Date.now() - bandejaVaciadaEn < 120000) return; // Bandeja recién vaciada
   historialesEnCurso = true;
   try {
     const chats = listar(400).filter(c => /^\d{8,15}$/.test(String(c.telefono || ''))).slice(0, maxChats);
