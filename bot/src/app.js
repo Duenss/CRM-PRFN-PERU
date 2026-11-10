@@ -2042,6 +2042,11 @@ app.get('/api/estadisticas', auth, (req, res) => {
  * Devuelve { lista, chats } para que el llamador loguee/emita el evento.
  */
 async function sincronizarChatsDesdeWhatsApp(sesionId = null) {
+  // El dueño puede desactivar la importación de chats: la Bandeja queda solo
+  // con conversaciones nuevas (los mensajes en vivo sí se registran igual).
+  if (estadoAjustes().importarChats === false) {
+    return { lista: [], chats: 0, grupos: 0, sinNumero: 0, omitido: true };
+  }
   const lista = await conTimeout(listarChatsWa(sesionId), 90000, 'listar chats de WhatsApp');
   const propios = estadoWa().map(s => String(s.numero || '')).filter(Boolean);
   let chats = 0, grupos = 0, sinNumero = 0;

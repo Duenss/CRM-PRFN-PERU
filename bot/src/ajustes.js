@@ -39,6 +39,11 @@ const base = () => ({
   // Al pedir el catálogo: ¿adjuntamos el PDF? ¿y el video?
   enviarCatalogo: true,
   enviarVideo: false,
+  // Si es false, al sincronizar no se importan chats existentes: la Bandeja
+  // solo muestra conversaciones nuevas (el dueño la quiere limpia).
+  importarChats: true,
+  // Qué hacer cuando se cierra la sesión de WhatsApp: preguntar | chats | todo | nada.
+  limpiezaAlDesconectar: 'preguntar',
   catalogoArchivo: '',
   videoArchivo: '',
   actualizado: new Date().toISOString()
@@ -68,6 +73,8 @@ function normalizar(a = {}) {
     bienvenidaTexto: String(a.bienvenidaTexto || '').slice(0, 600),
     enviarCatalogo: a.enviarCatalogo !== false,
     enviarVideo: a.enviarVideo === true,
+    importarChats: a.importarChats !== false,
+    limpiezaAlDesconectar: ['preguntar', 'chats', 'todo', 'nada'].includes(String(a.limpiezaAlDesconectar || '')) ? String(a.limpiezaAlDesconectar) : 'preguntar',
     catalogoArchivo: nombreSeguro(a.catalogoArchivo),
     videoArchivo: nombreSeguro(a.videoArchivo),
     actualizado: new Date().toISOString()

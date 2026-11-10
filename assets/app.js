@@ -991,6 +991,7 @@ async function cargarAjustes(){
     if($('#aj-pdf'))$('#aj-pdf').checked=a.enviarCatalogo!==false;
     cargarArchivosInfo();
     if($('#aj-video'))$('#aj-video').checked=!!a.enviarVideo;
+    if($('#aj-importar-chats'))$('#aj-importar-chats').checked=a.importarChats!==false;
     const es=$('#aj-status');if(es)es.textContent=`Actualizado: ${fmtFechaHora(a.actualizado)}`;
   }catch(e){const es=$('#aj-status');if(es)es.textContent='No se pudieron cargar los ajustes (revisa la conexión).';}
 }
@@ -1005,7 +1006,8 @@ $('#aj-save')?.addEventListener('click',async()=>{
       horaInicio:num('aj-hora-ini'),horaFin:num('aj-hora-fin'),
       bienvenidaTexto:($('#aj-bienvenida')?.value||'').trim(),
       enviarCatalogo:!!$('#aj-pdf')?.checked,
-      enviarVideo:!!$('#aj-video')?.checked
+      enviarVideo:!!$('#aj-video')?.checked,
+      importarChats:!!$('#aj-importar-chats')?.checked
     };
     const r=await botFetch('/api/ajustes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const a=r.ajustes||body;
@@ -1179,6 +1181,37 @@ function iniciales(n){const p=String(n||'?').trim().split(/\s+/);return((p[0]?.[
 
 /* ---------- chip de estado del bot ---------- */
 let problemasBot=[];
+
+/* ---------- limpieza al cerrar la sesión de WhatsApp ---------- */
+async function accionLimpiezaAlDesconectar(modo){
+  if(modo==='nada'){toast('No se limpió la Bandeja');return}
+  try{
+    await botFetch('/api/conversaciones?mensajes=1',{method:'DELETE',timeoutMs:120000});
+    if(modo==='todo'){
+      try{ if(typeof sb!=='undefined'&&sb){const r=await sb.from('clientes').delete().not('id','is',null);if(r&&r.error)throw new Error(r.error.message)} }catch(e){toast('Chats limpios, pero los contactos fallaron: '+e.message,'error')}
+    }
+    toast(modo==='todo'?'Bandeja de chats y contactos limpiados':'Bandeja de chats limpiada');
+    if(typeof cargarBandeja==='function')await cargarBandeja();
+    if(typeof cargarClientes==='function')cargarClientes();
+  }catch(e){toast('No se pudo limpiar: '+e.message,'error')}
+}
+function preguntarLimpiezaBandeja(){
+  const d=$('#dlgLimpieza');if(!d)return;
+  if(!d.open)d.showModal();
+}
+async function alDesconectarWhatsApp(){
+  try{
+    const r=await botFetch('/api/ajustes');
+    const modo=(r.ajustes&&r.ajustes.limpiezaAlDesconectar)||'preguntar';
+    if(modo==='preguntar')preguntarLimpiezaBandeja();
+    else await accionLimpiezaAlDesconectar(modo);
+  }catch(e){preguntarLimpiezaBandeja()}
+}
+$('#dl-chats')?.addEventListener('click',()=>{$('#dlgLimpieza')?.close();accionLimpiezaAlDesconectar('chats')});
+$('#dl-todo')?.addEventListener('click',()=>{$('#dlgLimpieza')?.close();accionLimpiezaAlDesconectar('todo')});
+$('#dl-nada')?.addEventListener('click',()=>{$('#dlgLimpieza')?.close();toast('No se limpió la Bandeja')});
+
+let conexionPrevia=null;
 async function refrescarChip(){
   const chip=$('#wa-chip');if(!chip)return;const t=$('#wa-chip-t');
   try{
@@ -1189,6 +1222,7 @@ async function refrescarChip(){
     const s=(j.sesiones||[]).find(x=>x.conectado)||(j.sesiones||[])[0]||{};
     chip.classList.remove('on','qr','off');
     if(s.conectado){
+      conexionPrevia=true;
       chip.classList.add('on');
       // Mostrar el número vinculado: evita confusiones cuando se cambia de WhatsApp.
       const n=String(s.numero||'').replace(/\D/g,'');
@@ -1197,8 +1231,8 @@ async function refrescarChip(){
       t.textContent=s.numero?(angosto?'WhatsApp conectado':'WhatsApp · '+lindo):'WhatsApp conectado';
       chip.title=s.numero?(lindo+' · '+(j.modoPrueba?'modo prueba':'modo real')+' · '+(j.enviadosHoy??0)+(j.maxPorDia?'/'+j.maxPorDia:'')+' hoy'):'WhatsApp conectado';
     }
-    else if(s.estado==='qr'){chip.classList.add('qr');t.textContent='Escanear QR';chip.title='Abre Ajustes para ver el QR';}
-    else{chip.classList.add('off');t.textContent='Bot sin conexión';}
+    else if(s.estado==='qr'){chip.classList.add('qr');t.textContent='Escanear QR';chip.title='Abre Ajustes para ver el QR';if(conexionPrevia===true){conexionPrevia=false;alDesconectarWhatsApp();}}
+    else{chip.classList.add('off');t.textContent='Bot sin conexión';if(conexionPrevia===true){conexionPrevia=false;alDesconectarWhatsApp();}}
   }catch(e){chip.classList.remove('on','qr');chip.classList.add('off');t.textContent='Bot apagado';chip.title='Enciende el bot en la PC';}
 }
 $('#wa-chip')?.addEventListener('click',()=>irTab('bot'));

@@ -404,6 +404,7 @@
           <textarea id="aj-bienvenida" rows="3" maxlength="600" placeholder="{saludo}, {nombre}. Nos alegra que hayas elegido a *Perfumería Fina Perú*…"></textarea>
           <label style="display:flex;gap:.5rem;align-items:center;margin-top:.5rem"><input type="checkbox" id="aj-pdf" style="width:auto"> <span>Al pedir catálogo, enviar el <b>PDF</b></span></label>
           <label style="display:flex;gap:.5rem;align-items:center;margin-top:.2rem"><input type="checkbox" id="aj-video" style="width:auto"> <span>Al pedir catálogo, enviar también el <b>video</b></span></label>
+          <label style="display:flex;gap:.5rem;align-items:center;margin-top:.5rem"><input type="checkbox" id="aj-importar-chats" style="width:auto"> <span>Importar conversaciones existentes al <b>sincronizar</b> (desmarcado = la Bandeja solo muestra mensajes nuevos)</span></label>
           <div class="grid2" style="margin-top:.9rem">
             <div><label for="aj-pdf-file">Cambiar el PDF del catálogo (máx. 20 MB)</label><input type="file" id="aj-pdf-file" accept="application/pdf"><p class="muted" id="aj-pdf-info" style="margin:.3rem 0 0">—</p></div>
             <div><label for="aj-video-file">Cambiar el video (máx. 60 MB)</label><input type="file" id="aj-video-file" accept="video/mp4,video/webm"><p class="muted" id="aj-video-info" style="margin:.3rem 0 0">—</p></div>
@@ -427,6 +428,13 @@
         <h2>Mantenimiento de la Bandeja</h2>
         <p class="muted" style="font-size:.82rem;margin-top:0">Vacía los chats y el historial de mensajes para empezar de cero cuando cambies de número de WhatsApp. <b>No borra clientes, pedidos ni el catálogo.</b></p>
         <div class="acts"><button class="ghost" id="b-clear-inbox" type="button">Limpiar Bandeja</button></div>
+        <label for="aj-limpieza" style="margin-top:.8rem">Al cerrar la sesión de WhatsApp</label>
+        <select id="aj-limpieza">
+          <option value="preguntar">Preguntar qué limpiar (recomendado)</option>
+          <option value="chats">Limpiar solo la bandeja de chats</option>
+          <option value="todo">Limpiar la bandeja y los contactos</option>
+          <option value="nada">No limpiar nada</option>
+        </select>
         <p class="muted" id="b-clear-status" style="margin-top:.5rem"></p>
       </div>
       <div class="box">
@@ -507,6 +515,16 @@
   </form>
 </dialog>
 
+<dialog id="dlgLimpieza" aria-labelledby="dl-limp-t">
+      <h2 id="dl-limp-t">Se cerró la sesión de WhatsApp</h2>
+      <p class="muted" style="margin-top:0">Antes de conectar el próximo número, ¿qué quieres limpiar?</p>
+      <div class="acts" style="flex-direction:column;align-items:stretch;gap:.5rem;margin-top:.8rem">
+        <button type="button" id="dl-chats">Solo la bandeja de chats</button>
+        <button type="button" class="ghost" id="dl-todo">Bandeja de chats + contactos</button>
+        <button type="button" class="ghost" id="dl-nada">No limpiar nada</button>
+      </div>
+      <p class="muted" style="font-size:.78rem;margin-bottom:0">Puedes fijar esta decisión en Ajustes → Mantenimiento de la Bandeja.</p>
+    </dialog>
 <dialog id="dlgImp">
   <h2>Importar clientes</h2>
   <div id="imp-sum"></div>
