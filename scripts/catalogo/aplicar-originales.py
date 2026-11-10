@@ -48,6 +48,9 @@ def perfil_producto(it):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--web", action="store_true",
+                    help="También copia las fotos a la web (NO recomendado: la web "
+                         "tiene sus propios assets).")
     ap.add_argument("--revertir", action="store_true")
     args = ap.parse_args()
 
@@ -137,14 +140,20 @@ def main():
                 continue
 
             if not args.dry_run:
-                respaldo = os.path.join(BACKUP, archivo)
-                destino_web = os.path.join(web_dir, archivo)
-                if not os.path.exists(respaldo) and os.path.exists(destino_web):
-                    shutil.copy2(destino_web, respaldo)
-                shutil.copy2(origen, destino_web)
                 destino_cat = os.path.join(IMG_OPT, "assets", "img", "products", archivo)
-                if os.path.isdir(os.path.dirname(destino_cat)):
-                    shutil.copy2(origen, destino_cat)
+                if not os.path.isdir(os.path.dirname(destino_cat)):
+                    saltados += 1
+                    continue
+                respaldo = os.path.join(BACKUP, archivo)
+                if not os.path.exists(respaldo):
+                    shutil.copy2(destino_cat, respaldo)
+                shutil.copy2(origen, destino_cat)
+
+                # La web NO se toca salvo que se pase --web.
+                if args.web:
+                    destino_web = os.path.join(web_dir, archivo)
+                    if os.path.isdir(os.path.dirname(destino_web)):
+                        shutil.copy2(origen, destino_web)
             aplicados += 1
 
     modo = "SIMULACIÓN" if args.dry_run else "APLICADO"
