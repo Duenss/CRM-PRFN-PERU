@@ -90,3 +90,6 @@
 
 ### Quitar chats uno por uno
 - En la Bandeja cada chat tiene una **✕** para quitarlo (no lo borra de WhatsApp). Los chats quitados **no vuelven** en la siguiente sincronización (lista de ocultos); “Limpiar Bandeja” la reinicia.
+
+### “Hola” / “Hola información”
+- En la primera interacción, un simple saludo o “información” envía **bienvenida + catálogo PDF + video** (video activado). Verificado en simulación: 4 mensajes salientes (bienvenida, explicación de páginas, PDF y video).

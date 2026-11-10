@@ -375,6 +375,14 @@ async function enviarBienvenida({ tel, nombre, clienteId, sesionId }) {
   return true;
 }
 
+/** ¿El mensaje es solo un saludo o pide "información" sin más? */
+function esSaludoOInfo(texto) {
+  const t = String(texto || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[¡!¿?.,;:/\\\-]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!t) return false;
+  return /^(hola|holi|buenas|buenos dias|buenas tardes|buenas noches|hey|que tal|saludos|informacion|info|hola informacion|hola info|me das informacion|me puedes dar informacion|me pasas informacion)$/.test(t);
+}
+
 /** ¿Pide el catálogo completo / la lista de fragancias? */
 function pideCatalogo(texto) {
   const t = String(texto || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -1501,7 +1509,10 @@ async function manejarMensaje(msg, sesionId = null) {
   }
 
   // Catálogo: se envía el PDF con los rangos de páginas por categoría.
-  if (esTextoReal && pideCatalogo(texto)) {
+  // En la primera interacción, un simple "Hola" o "Hola información" también
+  // dispara el catálogo (con el video si está activado).
+  const primerSaludoInfo = esSaludoOInfo(texto);
+  if (esTextoReal && (pideCatalogo(texto) || primerSaludoInfo)) {
     try {
       await enviarCatalogo({ tel, nombre: nombreChat, clienteId: cliente?.id, sesionId });
     } catch (e) { log('No se pudo enviar el catálogo: ' + e.message); }
