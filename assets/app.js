@@ -1188,7 +1188,15 @@ async function refrescarChip(){
     if(problemasBot.length!==antes)renderCampanas();
     const s=(j.sesiones||[]).find(x=>x.conectado)||(j.sesiones||[])[0]||{};
     chip.classList.remove('on','qr','off');
-    if(s.conectado){chip.classList.add('on');t.textContent='WhatsApp conectado';chip.title='+'+s.numero+' · '+(j.modoPrueba?'modo prueba':'modo real')+' · '+(j.enviadosHoy??0)+(j.maxPorDia?'/'+j.maxPorDia:'')+' hoy';}
+    if(s.conectado){
+      chip.classList.add('on');
+      // Mostrar el número vinculado: evita confusiones cuando se cambia de WhatsApp.
+      const n=String(s.numero||'').replace(/\D/g,'');
+      const lindo=n.length===11?('+'+n.slice(0,2)+' '+n.slice(2,5)+' '+n.slice(5,8)+' '+n.slice(8)):('+'+n);
+      const angosto=window.matchMedia('(max-width:900px)').matches;
+      t.textContent=s.numero?(angosto?'WhatsApp conectado':'WhatsApp · '+lindo):'WhatsApp conectado';
+      chip.title=s.numero?(lindo+' · '+(j.modoPrueba?'modo prueba':'modo real')+' · '+(j.enviadosHoy??0)+(j.maxPorDia?'/'+j.maxPorDia:'')+' hoy'):'WhatsApp conectado';
+    }
     else if(s.estado==='qr'){chip.classList.add('qr');t.textContent='Escanear QR';chip.title='Abre Ajustes para ver el QR';}
     else{chip.classList.add('off');t.textContent='Bot sin conexión';}
   }catch(e){chip.classList.remove('on','qr');chip.classList.add('off');t.textContent='Bot apagado';chip.title='Enciende el bot en la PC';}
