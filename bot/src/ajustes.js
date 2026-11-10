@@ -35,7 +35,7 @@ const base = () => ({
   horaInicio: Math.min(23, Math.max(0, num(config.horaInicio, 9))),
   horaFin: Math.min(24, Math.max(1, num(config.horaFin, 20))),
   // Mensaje de bienvenida (primer mensaje de cada chat). Admite {saludo} y {nombre}.
-  bienvenidaTexto: '{saludo}, {nombre}. Nos alegra que hayas elegido a *Perfumería Fina Perú* como tu perfumería de preferencia. ✨',
+  bienvenidaTexto: '{saludo}, {nombre}. ✨ Bienvenido(a) a *Perfumería Fina Perú*, aromas que fascinan.\n\nNuestras fragancias son *equivalentes de alta calidad* con *50% de esencia*, inspiradas en las casas perfumeras más reconocidas: buena fijación y en envase propio.\n\n💳 En Lima aceptamos todos los medios de pago según tu preferencia: efectivo al recibir, Yape, Plin o transferencia.\n🚚 Envíos a Lima y provincia.\n\n📕 Te envío nuestro catálogo y video para que conozcas las fragancias.\n🌐 Web: https://www.perfumeriafinaperu.com',
   // Al pedir el catálogo: ¿adjuntamos el PDF? ¿y el video?
   enviarCatalogo: true,
   enviarVideo: false,
