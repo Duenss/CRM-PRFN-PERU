@@ -18,6 +18,7 @@ de prueba).
 | **Pedido con varios perfumes** | 1× Khamrah 100 ml (S/ 78) + 2× Khamrah Qahwa 50 ml (S/ 112) → total S/ 190, guardado en el bot con 2 ítems ✅ |
 | **Entrega y estación** | Pedido con recojo en "Estación Central", fecha y hora → guardado en el bot con `entrega: estacion`, `fechaEntrega` y `horaEntrega` ✅ |
 | **Comprobante de pago** | Pedido creado → subida de imagen → estado `comprobante_recibido` → imagen abierta por el proxy con la sesión (200, image/png) ✅ |
+| **Subir PDF/video desde Ajustes** | PDF real de 5.9 MB subido desde la interfaz en 4.9 s → el bot lo guarda y Ajustes muestra “Actual: catalogo.pdf · 5.9 MB”; video 1.2 MB por API ✅ |
 | **Campaña programada (motor)** | Programada → el bot la toma, envía con claim, marca el envío y el mensaje **aparece en la Bandeja**; campaña → `enviada` ✅ (simulación) |
 | **Campaña (envío manual)** | Creada desde la UI como `aprobada` + 1 envío `pendiente` para el cliente ✅ |
 | **Campañas programadas** | Aviso de autodiagnóstico visible con el SQL a ejecutar (constraint viejo) ⚠️ |
