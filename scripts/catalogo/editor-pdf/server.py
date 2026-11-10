@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-editor-pdf/server.py — Editor de PDF local (texto, color y fotos).
+server.py — Editor de PDF local (texto, color y fotos).
 
 Abre el PDF del catálogo (o uno subido), lo muestra por páginas y permite:
-  · clic en un texto  -> editarlo (mismo tamaño, color y fuente si está incrustada)
+  · clic en un texto  -> editarlo (mismo tamaño, color y tipografía)
   · clic en una foto  -> reemplazarla
   · guardar -> genera un PDF nuevo con los parches
 
@@ -15,7 +15,6 @@ Uso:
 
 import base64
 import http.server
-import io
 import json
 import os
 import re
@@ -35,6 +34,22 @@ AQUI = os.path.dirname(os.path.abspath(__file__))
 PUERTO = int(os.environ.get("PUERTO", 4322))
 
 SESION = {"doc": None, "ruta": None, "tmp": None}
+FUENTES_CACHE = {}
+
+DIR_FUENTES = os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts")
+
+# Tipografías reales que usa el PDF, por familia y estilo.
+FAMILIAS = {
+    "georgia": {"normal": "georgia.ttf", "bold": "georgiab.ttf", "italic": "georgiai.ttf", "bolditalic": "georgiaz.ttf"},
+    "arial": {"normal": "arial.ttf", "bold": "arialbd.ttf", "italic": "ariali.ttf", "bolditalic": "arialbi.ttf"},
+    "times": {"normal": "times.ttf", "bold": "timesbd.ttf", "italic": "timesi.ttf", "bolditalic": "timesbi.ttf"},
+    "courier": {"normal": "cour.ttf", "bold": "courbd.ttf", "italic": "couri.ttf", "bolditalic": "courbi.ttf"},
+    "calibri": {"normal": "calibri.ttf", "bold": "calibrib.ttf", "italic": "calibrii.ttf", "bolditalic": "calibriz.ttf"},
+    "verdana": {"normal": "verdana.ttf", "bold": "verdanab.ttf", "italic": "verdanai.ttf", "bolditalic": "verdanaz.ttf"},
+    "tahoma": {"normal": "tahoma.ttf", "bold": "tahomabd.ttf", "italic": "tahoma.ttf", "bolditalic": "tahomabd.ttf"},
+    "segoe": {"normal": "segoeui.ttf", "bold": "segoeuib.ttf", "italic": "segoeuii.ttf", "bolditalic": "segoeuiz.ttf"},
+    "trebuchet": {"normal": "trebuc.ttf", "bold": "trebucbd.ttf", "italic": "trebucit.ttf", "bolditalic": "trebucbi.ttf"},
+}
 
 
 def abrir_pdf(datos=None):
@@ -65,7 +80,7 @@ def color_a_hex(c):
     return "#%06x" % (valor & 0xFFFFFF)
 
 
-def hex_a_color(texto, gris=False):
+def hex_a_color(texto):
     texto = (texto or "#000000").lstrip("#")
     if len(texto) == 3:
         texto = "".join(ch * 2 for ch in texto)
@@ -73,13 +88,7 @@ def hex_a_color(texto, gris=False):
         r, g, b = (int(texto[i:i + 2], 16) for i in (0, 2, 4))
     except Exception:
         r = g = b = 0
-    if gris:
-        return (r / 255, g / 255, b / 255)
     return (r / 255, g / 255, b / 255)
-
-
-def recortar_para_json(rect):
-    return [round(rect.x0, 2), round(rect.y0, 2), round(rect.x1, 2), round(rect.y1, 2)]
 
 
 def textos_de_pagina(page):
@@ -121,33 +130,97 @@ def imagenes_de_pagina(page):
     return salida
 
 
-def parchear_texto(page, dato):
+def archivo_fuente(nombre_span):
+    """
+    TTF de Windows que corresponde a la fuente del texto.
+    Se prefiere la del sistema porque la incrustada en el PDF suele ser un
+    subconjunto y no tiene todas las letras.
+    """
+    bajo = (nombre_span or "").lower().replace("+", "")
+    for familia, estilos in FAMILIAS.items():
+        if familia not in bajo:
+            continue
+        estilo = "normal"
+        if "bold" in bajo and ("italic" in bajo or "oblique" in bajo):
+            estilo = "bolditalic"
+        elif "bold" in bajo:
+            estilo = "bold"
+        elif "italic" in bajo or "oblique" in bajo:
+            estilo = "italic"
+        ruta = os.path.join(DIR_FUENTES, estilos[estilo])
+        if os.path.exists(ruta):
+            return ruta
+        ruta = os.path.join(DIR_FUENTES, estilos["normal"])
+        if os.path.exists(ruta):
+            return ruta
+    return None
+
+
+def fuente_incrustada(doc, page, nombre_span):
+    """Respaldo: extrae la fuente incrustada del PDF (puede ser subconjunto)."""
+    objetivo = (nombre_span or "").lower().replace("+", "")
+    for entrada in page.get_fonts(full=True):
+        xref, ext, tipo, basefont, nombre, encoding = entrada[:6]
+        base = (basefont or "").lower().replace("+", "")
+        if not base or (base not in objetivo and objetivo not in base):
+            continue
+        clave = (doc.name, xref)
+        if clave in FUENTES_CACHE:
+            return FUENTES_CACHE[clave]
+        try:
+            _nombre, _ext, _tipo, buffer = doc.extract_font(xref)
+        except Exception:
+            continue
+        if not buffer:
+            continue
+        fd, ruta = tempfile.mkstemp(suffix="." + (_ext or "ttf"))
+        os.close(fd)
+        with open(ruta, "wb") as f:
+            f.write(buffer)
+        FUENTES_CACHE[clave] = ruta
+        return ruta
+    return None
+
+
+def parchear_texto(doc, page, dato):
     """Reemplaza un texto: borra el original e inserta el nuevo igual ubicado."""
     rect = fitz.Rect(dato["bbox"])
     texto = dato["texto"]
     tamano = float(dato.get("tamano") or 10)
     color = hex_a_color(dato.get("color"))
-    fuente = dato.get("fuente") or ""
+    fuente_span = dato.get("fuente") or ""
 
     page.add_redact_annot(rect)
     page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_NONE)
 
-    # Intentar reutilizar la fuente incrustada
-    opciones = {}
-    nombre_fuente = "helv"
-    if "times" in fuente.lower() or "serif" in fuente.lower() or "cormorant" in fuente.lower():
-        nombre_fuente = "tiro"
-    elif "cinzel" in fuente.lower() or "display" in fuente.lower():
-        nombre_fuente = "tiro"
-    opciones["fontname"] = nombre_fuente
-
     origen = dato.get("origen") or [rect.x0, rect.y1]
     punto = fitz.Point(float(origen[0]), float(origen[1]))
 
-    try:
-        page.insert_text(punto, texto, fontsize=tamano, color=color, **opciones)
-    except Exception:
-        page.insert_text(punto, texto, fontsize=tamano, color=color)
+    candidatas = []
+    ruta_sistema = archivo_fuente(fuente_span)
+    if ruta_sistema:
+        candidatas.append(ruta_sistema)
+    ruta_pdf = fuente_incrustada(doc, page, fuente_span)
+    if ruta_pdf:
+        candidatas.append(ruta_pdf)
+
+    for indice, ruta in enumerate(candidatas):
+        alias = "FUENTE%d" % indice
+        try:
+            page.insert_font(fontname=alias, fontfile=ruta)
+            page.insert_text(punto, texto, fontsize=tamano, color=color, fontname=alias)
+            return
+        except Exception:
+            continue
+
+    bajo = fuente_span.lower()
+    if any(k in bajo for k in ("times", "georgia", "serif", "cormorant", "garamond", "cinzel", "playfair")):
+        nombre = "tiro"
+    elif any(k in bajo for k in ("courier", "mono")):
+        nombre = "cour"
+    else:
+        nombre = "helv"
+    page.insert_text(punto, texto, fontsize=tamano, color=color, fontname=nombre)
 
 
 def parchear_imagen(doc, page, dato):
@@ -256,7 +329,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 dato = json.loads(cuerpo)
                 doc = SESION["doc"] or abrir_pdf()
                 page = doc[int(dato["pagina"]) - 1]
-                parchear_texto(page, dato)
+                parchear_texto(doc, page, dato)
                 return self._json(200, {"ok": True})
 
             if ruta == "/api/imagen":
