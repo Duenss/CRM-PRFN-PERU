@@ -1416,6 +1416,74 @@ async function refrescarHiloAbierto(){
     agregarMensajes(c.mensajes||[],true);
   }catch(e){}
 }
+/* ---------- etiquetas del cliente desde el chat ---------- */
+function etiquetasDelChat(tel){
+  const item=inChats.find(c=>String(c.telefono)===String(tel));
+  const cli=(typeof clientes!=='undefined'?clientes:[]).find(c=>String(c.telefono)===String(tel));
+  const e=cli?.etiquetas??item?.etiquetas;
+  return Array.isArray(e)?e.map(String).filter(Boolean):[];
+}
+function pintarEtiquetasChat(){
+  const cont=$('#in-tags');if(!cont)return;
+  const ets=inTel?etiquetasDelChat(inTel):[];
+  cont.innerHTML=ets.map(t=>'<i class="etag">'+esc(t)+'</i>').join('');
+  if($('#in-tag-add'))$('#in-tag-add').hidden=!inTel;
+}
+function abrirEtiquetasChat(){
+  if(!inTel)return;
+  const item=inChats.find(c=>String(c.telefono)===String(inTel));
+  const nom=item?.nombreWa||item?.nombre||('+'+inTel);
+  if($('#tg-cliente'))$('#tg-cliente').textContent=nom+' · +'+inTel;
+  if($('#tg-input'))$('#tg-input').value=etiquetasDelChat(inTel).join(', ');
+  pintarChipsTag();
+  const d=$('#dlgTags');if(d&&!d.open)d.showModal();
+}
+function listaTagsInput(){
+  return ($('#tg-input')?.value||'').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).slice(0,10);
+}
+function pintarChipsTag(){
+  const ets=new Set(listaTagsInput());
+  document.querySelectorAll('#tg-quick [data-tag]').forEach(b=>b.classList.toggle('on',ets.has(b.dataset.tag)));
+}
+async function guardarEtiquetasChat(){
+  if(!inTel)return;
+  const etiquetas=listaTagsInput();
+  const item=inChats.find(c=>String(c.telefono)===String(inTel));
+  const nombre=(item?.nombreWa||item?.nombre||('+'+inTel)).slice(0,120);
+  const btn=$('#tg-save');if(btn)btn.disabled=true;
+  try{
+    const cli=(typeof clientes!=='undefined'?clientes:[]).find(c=>String(c.telefono)===String(inTel));
+    if(cli){
+      const {error}=await sb.from('clientes').update({etiquetas}).eq('id',cli.id);
+      if(error)throw new Error(error.message);
+      cli.etiquetas=etiquetas;
+    }else{
+      const {data,error}=await sb.from('clientes').insert({telefono:inTel,nombre,etiquetas,activo:true,consentimiento:false}).select();
+      if(error)throw new Error(error.message);
+      if(data&&data[0]&&typeof clientes!=='undefined')clientes.push(data[0]);
+    }
+    if(item)item.etiquetas=etiquetas;
+    $('#dlgTags')?.close();
+    pintarEtiquetasChat();pintarLista();
+    toast(etiquetas.length?'Etiquetas guardadas':'Etiquetas quitadas');
+    if(typeof cargarClientes==='function')cargarClientes();
+  }catch(e){toast('No se guardaron: '+e.message,'error')}
+  if(btn)btn.disabled=false;
+}
+$('#in-tag-add')?.addEventListener('click',abrirEtiquetasChat);
+$('#tg-quick')?.addEventListener('click',e=>{
+  const b=e.target.closest('[data-tag]');if(!b)return;
+  const tag=b.dataset.tag;
+  const input=$('#tg-input');if(!input)return;
+  const lista=listaTagsInput();
+  const i=lista.indexOf(tag);
+  if(i>=0)lista.splice(i,1);else lista.push(tag);
+  input.value=lista.join(', ');
+  pintarChipsTag();
+});
+$('#tg-cancel')?.addEventListener('click',()=>$('#dlgTags')?.close());
+$('#tg-save')?.addEventListener('click',guardarEtiquetasChat);
+
 async function abrirChat(tel){
   const mismo=hiloTel===tel&&$('#in-msgs')?.dataset.iniciado==='1';
   inTel=tel;hiloTel=tel;
@@ -1426,6 +1494,7 @@ async function abrirChat(tel){
   const tipo=item?.tipo==='empresa'?' · Empresa':item?.tipo==='persona'?' · Persona':'';
   $('#in-tel').textContent='+'+tel+tipo;
   $('#in-ava').textContent=iniciales(nom);
+  pintarEtiquetasChat();
   if(!mismo){
     $('#in-msgs').innerHTML='<p class="empty">Cargando mensajes…</p>';
     $('#in-msgs').dataset.iniciado='';
@@ -1441,6 +1510,8 @@ async function abrirChat(tel){
     actualizarPausa();
     botFetch('/api/conversaciones/'+tel+'/leido',{method:'POST'}).catch(()=>{});
     const i=inChats.find(x=>x.telefono===tel);if(i)i.noLeidos=0;
+    if(typeof c.etiquetas!=='undefined'){const it=inChats.find(x=>x.telefono===tel);if(it)it.etiquetas=c.etiquetas}
+    pintarEtiquetasChat();
     pintarLista();actualizarBadge(inChats.reduce((n,x)=>n+(x.noLeidos||0),0));
     if(c.wa)importarHilo(tel);
   }catch(e){if(!mismo)$('#in-msgs').innerHTML='<p class="empty">No se pudo abrir la conversación.</p>'}

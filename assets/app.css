@@ -442,3 +442,12 @@ dialog::backdrop{background:rgba(3,4,8,.66);backdrop-filter:blur(8px)}
   opacity:.45;transition:opacity .15s,color .15s,border-color .15s}
 .in-item:hover .delchat{opacity:1}
 .in-item .delchat:hover{color:var(--bad);border-color:var(--line);background:var(--s2)}
+
+/* Etiquetas del cliente dentro del chat */
+.in-tagsbar{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;padding:.45rem .9rem;border-bottom:1px solid var(--line);background:var(--s1)}
+.in-tags{display:flex;align-items:center;gap:.35rem;flex-wrap:wrap;min-height:22px}
+.in-tags:empty::before{content:'Sin etiquetas';font-size:.72rem;color:var(--mute2)}
+.in-tagsbar #in-tag-add{min-height:30px;font-size:.76rem;padding:.15rem .55rem}
+.tg-quick{display:flex;gap:.4rem;flex-wrap:wrap;margin:.6rem 0}
+.tg-quick button{min-height:32px;font-size:.78rem;padding:.2rem .6rem}
+.tg-quick button.on{border-color:var(--gold-line);color:var(--gold);background:var(--gold-soft)}

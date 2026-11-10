@@ -114,6 +114,10 @@
                 <button class="ghost" id="in-neworder" type="button" title="Crear un pedido para este cliente">+ Pedido</button>
               </div>
             </div>
+            <div class="in-tagsbar">
+              <span class="in-tags" id="in-tags"></span>
+              <button class="ghost" id="in-tag-add" type="button" title="Agregar o quitar etiquetas del cliente">＋ Etiquetas</button>
+            </div>
             <div class="in-msgs" id="in-msgs"></div>
             <div class="quick" id="in-quick" aria-label="Respuestas rápidas">
               <button type="button" data-quick="saludo" title="Saludo con el nombre del cliente">👋 Saludo</button>
@@ -515,6 +519,21 @@
   </form>
 </dialog>
 
+<dialog id="dlgTags" aria-labelledby="tg-tit">
+      <h2 id="tg-tit">Etiquetas del cliente</h2>
+      <p class="muted" id="tg-cliente" style="margin-top:0">—</p>
+      <div class="tg-quick" id="tg-quick">
+        <button type="button" class="ghost" data-tag="vip">VIP</button>
+        <button type="button" class="ghost" data-tag="frecuente">Frecuente</button>
+        <button type="button" class="ghost" data-tag="promo">Promo</button>
+        <button type="button" class="ghost" data-tag="regalo">Regalo</button>
+        <button type="button" class="ghost" data-tag="mayorista">Mayorista</button>
+        <button type="button" class="ghost" data-tag="cumpleanos">Cumpleaños</button>
+      </div>
+      <label for="tg-input">Etiquetas separadas por coma</label>
+      <input id="tg-input" maxlength="200" placeholder="vip, frecuente, regalo">
+      <div class="acts"><button type="button" class="ghost" id="tg-cancel">Cancelar</button><button type="button" id="tg-save">Guardar etiquetas</button></div>
+    </dialog>
 <dialog id="dlgLimpieza" aria-labelledby="dl-limp-t">
       <h2 id="dl-limp-t">Se cerró la sesión de WhatsApp</h2>
       <p class="muted" style="margin-top:0">Antes de conectar el próximo número, ¿qué quieres limpiar?</p>
