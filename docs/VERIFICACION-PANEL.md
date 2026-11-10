@@ -13,6 +13,8 @@ de prueba).
 | **Crear cliente** desde el diálogo "Nuevo cliente" | Aparece en la lista y en Supabase (`consentimiento: true`) ✅ |
 | **Importar CSV** con 1 contacto | «1 teléfonos válidos: 1 nuevos… 1 dieron consentimiento» e importado en Supabase ✅ |
 | **Crear pedido** desde "Nuevo pedido" | Total calculado S/ 56.00, aparece en la lista y el bot lo registra como `P-0001` en `por_entregar` ✅ |
+| **Contador de no leídos** | Mensaje nuevo por SSE → badge “1” y título “(1) Panel…”; al abrir el chat se limpia ✅ |
+| **Responder desde el panel** | El mensaje enviado aparece en el hilo del chat (envío simulado) ✅ |
 | **Comprobante de pago** | Pedido creado → subida de imagen → estado `comprobante_recibido` → imagen abierta por el proxy con la sesión (200, image/png) ✅ |
 | **Campaña (envío manual)** | Creada desde la UI como `aprobada` + 1 envío `pendiente` para el cliente ✅ |
 | **Campañas programadas** | Aviso de autodiagnóstico visible con el SQL a ejecutar (constraint viejo) ⚠️ |
