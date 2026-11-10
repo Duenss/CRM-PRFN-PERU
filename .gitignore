@@ -32,3 +32,8 @@ Thumbs.db
 docs/catalogo/_respaldo-originales/
 
 docs/catalogo/catalogo-editado.pdf
+# no subir archivos con secretos generados para el servidor
+deploy/pterodactyl/bot.env.produccion*
+deploy/pterodactyl/bot.env.produccion2
+deploy/pterodactyl/bot.env.produccion3
+deploy/pterodactyl/servidor-payload*.json
