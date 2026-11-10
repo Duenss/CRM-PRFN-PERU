@@ -34,6 +34,11 @@ const base = () => ({
   intervaloMasivo: 30,
   horaInicio: Math.min(23, Math.max(0, num(config.horaInicio, 9))),
   horaFin: Math.min(24, Math.max(1, num(config.horaFin, 20))),
+  // Mensaje de bienvenida (primer mensaje de cada chat). Admite {saludo} y {nombre}.
+  bienvenidaTexto: '{saludo}, {nombre}. Nos alegra que hayas elegido a *Perfumería Fina Perú* como tu perfumería de preferencia. ✨',
+  // Al pedir el catálogo: ¿adjuntamos el PDF? ¿y el video?
+  enviarCatalogo: true,
+  enviarVideo: false,
   actualizado: new Date().toISOString()
 });
 
@@ -58,6 +63,9 @@ function normalizar(a = {}) {
     intervaloMasivo: clamp(a.intervaloMasivo, 1, 3600),
     horaInicio: Math.min(23, Math.max(0, Math.round(num(a.horaInicio, 9)))),
     horaFin: Math.min(24, Math.max(1, Math.round(num(a.horaFin, 20)))),
+    bienvenidaTexto: String(a.bienvenidaTexto || '').slice(0, 600),
+    enviarCatalogo: a.enviarCatalogo !== false,
+    enviarVideo: a.enviarVideo === true,
     actualizado: new Date().toISOString()
   };
 }

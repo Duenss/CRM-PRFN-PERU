@@ -279,9 +279,15 @@ export function registrarCabecera({ telefono, nombre = '', nombreWa = '', nombre
   } else if (!chat.ultimoEn && ultimoTexto) {
     chat.ultimoTexto = String(ultimoTexto).slice(0, 300);
   }
-  // WhatsApp es la fuente de verdad para los no leídos: si el dueño respondió
-  // desde el celular, el chat llega en 0 y el contador debe limpiarse.
-  if (Number.isFinite(Number(noLeidos))) chat.noLeidos = Math.max(0, Number(noLeidos));
+  // WhatsApp puede devolver un contador VIEJO (p. ej. si el dueño respondió
+  // desde su celular y aún así llega "2"). Solo aceptamos que el contador BAJE;
+  // los mensajes nuevos en vivo ya lo suben por su propio evento.
+  if (Number.isFinite(Number(noLeidos))) {
+    const externo = Math.max(0, Number(noLeidos));
+    chat.noLeidos = (chat.mensajes && chat.mensajes.length)
+      ? Math.min(chat.noLeidos || 0, externo)
+      : externo;
+  }
   chat.pin = !!pin;
   chat.wa = true;
   chats[tel] = chat;

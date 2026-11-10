@@ -92,7 +92,12 @@ REGLAS OBLIGATORIAS:
    - Si dice "ese" / "me gusta" sin especificar, pregunta cuál de las 3 opciones es.
 21. CATEGORÍAS: el catálogo SÍ tiene fragancias de nicho, árabes y de diseñador (nicho: 25, árabe: 31, diseñador: 146). Si el cliente pide "algo de nicho", "un árabe" o "de diseñador", ofrécele 3 opciones de esa categoría en viñetas. NUNCA derives ni digas que no hay esa categoría.
 22. SALUDO: si es el PRIMER mensaje de la conversación, o si el cliente envía un resumen de compra, empieza con "Buenos días", "Buenas tardes" o "Buenas noches" (según la hora de Lima: 5-11, 12-18, 19-4) seguido del nombre del cliente y una frase corta. Ejemplo: "Buenas tardes, Juan. Gracias por tu resumen 😊". No repitas el saludo en los mensajes siguientes.
-23. RESUMEN DE COMPRA: si el cliente manda producto, tamaño, cantidad, total o método de pago, confirma el resumen con esos datos y explica el siguiente paso (efectivo al recibir/recoger; digital: enviar comprobante y el encargado verifica). No inventes productos ni precios y no confirmes el pago.`;
+23. RESUMEN DE COMPRA: si el cliente manda producto, tamaño, cantidad, total o método de pago, confirma el resumen con esos datos y explica el siguiente paso (efectivo al recibir/recoger; digital: enviar comprobante y el encargado verifica). No inventes productos ni precios y no confirmes el pago.
+24. SOLO VENTA AL DETALLE: no des información de ventas por mayor, reventa, kits para emprendedores, envases ni esencias. Si lo piden, responde con educación que no manejamos ese rubro y deriva al administrador.
+25. RECOMENDACIONES: antes de recomendar, pregunta en UN SOLO mensaje: ¿es para *dama* o *caballero*?, ¿qué notas te gustan (cítrico, amaderado, dulce, intenso, fresco)? y ¿para el día o la noche / qué ocasión? Luego recién recomienda.
+26. FICHA DE PRODUCTO: cuando recomiendes una fragancia concreta, el mensaje va con la FOTO y debe incluir: 2 o 3 notas principales, para qué ocasión sirve y qué personalidad/estilo refleja. Sin precios en ese mensaje (el precio va después).
+27. PROMO 3 x S/ 90: si preguntan por promoción, pack, combo o "3 perfumes", explica: *3 perfumes de 30 ml por S/ 90*, pago al recibir el pedido, Lima y provincia. Luego deriva al administrador para coordinar. No inventes otras promociones.
+28. CONCISIÓN: máximo 3 o 4 mensajes por respuesta (sin contar la bienvenida ni el catálogo PDF). No repitas el saludo, usa viñetas cortas y termina con una pregunta abierta para que el cliente siga conversando.`;
 
 function limpiarJSON(txt) {
   const clean = String(txt || '').replace(/```json/gi, '').replace(/```/g, '').trim();
@@ -342,14 +347,74 @@ function respuestaMediosPago() {
   return '¡Claro! Aceptamos estos medios de pago:\n\n• *Efectivo* al entregar o recoger\n• *Yape*\n• *Plin*\n• *Transferencia*\n\nPara Yape, Plin o transferencia, envías tu comprobante y el administrador verifica el pago. ¿Cuál te acomoda? 😊';
 }
 
+/** Consultas de mayoristas, revendedores o insumos (NO es venta al detalle). */
+function esConsultaMayorista(texto) {
+  const t = String(texto || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  return /(por mayor|mayorista|al por mayor|revendedor|revender|distribuidor|emprendedor|kit emprendedor|envases?|esencias?|frascos? al por mayor|precio de fabrica|comprar al por mayor)/.test(t);
+}
+
+/** Promoción de 3 perfumes de 30 ml por S/ 90 (la maneja el administrador). */
+function esPromo3(texto) {
+  const t = String(texto || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const menciona3 = /(promo|promocion|pack|combo|tres|3)\b/.test(t);
+  const mencionaPrecio = /(90|noventa)/.test(t);
+  const menciona30 = /(30\s*ml|treinta\s*ml)/.test(t);
+  const pidePromo = /(promo|promocion|pack|combo)/.test(t);
+  return (menciona3 && mencionaPrecio && menciona30) || (pidePromo && (menciona3 || mencionaPrecio));
+}
+
 export async function redactarRespuesta({ mensaje, historial = [], cliente, contexto = '' }) {
   const pideOpciones = detectarPeticionOpciones(mensaje);
   // Medios de pago: respuesta directa, nunca una lista de perfumes.
   if (esPreguntaMediosPago(mensaje)) {
     return { responder: true, texto: respuestaMediosPago(), productoId: '', pedido: null, pregunta: '' };
   }
+  // Mayoristas/revendedores/insumos: no es nuestro rubro, se deriva con educación.
+  if (esConsultaMayorista(mensaje)) {
+    return {
+      derivar: true,
+      motivo: 'consulta mayorista/revendedor/insumos',
+      aviso: 'Ese tipo de consultas (por mayor, reventa o insumos) no las manejamos por aquí 🙌 Te paso con un administrador para que te oriente.'
+    };
+  }
+  // Promo de 3 x S/ 90: la explica el administrador.
+  if (esPromo3(mensaje)) {
+    return {
+      derivar: true,
+      motivo: 'promoción de 3 perfumes (S/ 90)',
+      aviso: '¡Sí tenemos la promo de *3 perfumes de 30 ml por S/ 90*! 🎁 El pago es al recibir tu pedido (Lima o provincia). Te paso con un administrador para coordinar tu promo.'
+    };
+  }
   // Reclamos: siempre a un administrador, sin que la IA improvise soluciones.
   if (esReclamo(mensaje)) return { derivar: true, motivo: 'reclamo del cliente' };
+  // Antes de recomendar sin contexto, pregunta sexo, notas y ocasión.
+  if (pideOpciones && !detectarFamilia(mensaje) && !detectarCategoria(mensaje)) {
+    return {
+      responder: true,
+      texto: 'Para recomendarte mejor 😊 cuéntame:\n\n• ¿Es para *dama* o *caballero*?\n• ¿Qué notas te gustan: cítrico, amaderado, dulce, intenso, fresco?\n• ¿Es para el día o la noche, o alguna ocasión especial?',
+      productoId: '',
+      pedido: null,
+      pregunta: ''
+    };
+  }
+  // Misma regla si menciona una ocasión (boda, regalo, cita…) pero no el sexo
+  // ni preferencias: preguntamos antes de recomendar.
+  {
+    const t = String(mensaje || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const ocasion = /(boda|cita|regalo|fiesta|graduacion|aniversario|oficina|trabajo)/.test(t);
+    const genero = /(dama|caballero|hombre|mujer|para el|para ella|unisex)/.test(t);
+    const prefiere = /(citric|amaderad|dulce|intens|fresc|floral|arab|nicho|disenador)/.test(t);
+    const pideReco = /(recomiend|que perfume|un perfume|busco|regalo|para una|para un)/.test(t);
+    if (ocasion && pideReco && !genero && !prefiere) {
+      return {
+        responder: true,
+        texto: '¡Qué lindo plan! 😊 Para acertar con la fragancia, cuéntame:\n\n• ¿Es para *dama* o *caballero*?\n• ¿Qué notas prefieres: cítrico, amaderado, dulce, intenso, fresco?\n• ¿Es de día o de noche?',
+        productoId: '',
+        pedido: null,
+        pregunta: ''
+      };
+    }
+  }
   if (!config.geminiKey && !config.anthropicKey && !config.groqKey) {
     if (pideOpciones) {
       const op = await respuestaOpciones(mensaje);

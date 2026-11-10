@@ -674,6 +674,11 @@ dialog::backdrop{background:rgba(3,4,8,.66);backdrop-filter:blur(8px)}
             <div id="anu-tels-wrap" hidden>
               <label for="anu-tels">Números (uno por línea o separados por coma)</label>
               <textarea id="anu-tels" rows="3" placeholder="51933221690, 51987654321"></textarea>
+              <div class="acts" style="justify-content:flex-start;margin-top:.4rem"><button class="ghost" id="anu-pick" type="button">👥 Elegir de mis contactos</button></div>
+              <div id="anu-picker" hidden style="margin-top:.5rem">
+                <input id="anu-pick-q" type="search" placeholder="Buscar por nombre o número…">
+                <div id="anu-pick-list" style="max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:10px;margin-top:.4rem"></div>
+              </div>
             </div>
             <label style="display:flex;gap:.5rem;align-items:center;margin:.7rem 0 .3rem"><input type="checkbox" id="anu-sin-consent" style="width:auto"> <span class="muted">Enviar a TODOS sin consentimiento (incluye chats que nunca aceptaron)</span></label>
             <p class="muted" id="anu-preview">—</p>
@@ -741,6 +746,13 @@ dialog::backdrop{background:rgba(3,4,8,.66);backdrop-filter:blur(8px)}
         </div>
         <div class="acts"><button id="aj-save" type="button">Guardar límites y tiempos</button></div>
         <p class="muted" id="aj-status" style="margin-top:.6rem">—</p>
+        <div style="margin-top:1rem;border-top:1px solid var(--line);padding-top:.9rem">
+          <h2 style="margin-top:0">Mensajes automáticos</h2>
+          <label for="aj-bienvenida">Mensaje de bienvenida (usa <b>{saludo}</b> y <b>{nombre}</b>)</label>
+          <textarea id="aj-bienvenida" rows="3" maxlength="600" placeholder="{saludo}, {nombre}. Nos alegra que hayas elegido a *Perfumería Fina Perú*…"></textarea>
+          <label style="display:flex;gap:.5rem;align-items:center;margin-top:.5rem"><input type="checkbox" id="aj-pdf" style="width:auto"> <span>Al pedir catálogo, enviar el <b>PDF</b></span></label>
+          <label style="display:flex;gap:.5rem;align-items:center;margin-top:.2rem"><input type="checkbox" id="aj-video" style="width:auto"> <span>Al pedir catálogo, enviar también el <b>video</b></span></label>
+        </div>
       </div>
       <div class="box">
         <h2>Envío manual (botón WhatsApp)</h2>
@@ -1447,11 +1459,15 @@ function festivos(y){
   const dia=(m,d,n)=>({mes:m,dia:d,nombre:n});
   const domingoN=(m,n)=>{const d=new Date(y,m,1);let c=0;for(let i=1;i<=31;i++){const x=new Date(y,m,i);if(x.getMonth()!==m)break;if(x.getDay()===0){c++;if(c===n)return i}}return 1};
   return [
-    dia(1,1,'Año Nuevo'),dia(vt.getMonth()+1,vt.getDate(),'Jueves Santo'),dia(vl.getMonth()+1,vl.getDate(),'Viernes Santo'),
+    dia(1,1,'Año Nuevo'),dia(1,6,'Bajada de Reyes'),
+    dia(2,14,'Día del Amor y la Amistad'),dia(3,8,'Día de la Mujer'),
+    dia(vt.getMonth()+1,vt.getDate(),'Jueves Santo'),dia(vl.getMonth()+1,vl.getDate(),'Viernes Santo'),
     dia(5,1,'Día del Trabajo'),dia(5,domingoN(4,2),'Día de la Madre'),dia(6,domingoN(5,3),'Día del Padre'),
     dia(6,29,'San Pedro y San Pablo'),dia(7,28,'Fiestas Patrias'),dia(7,29,'Fiestas Patrias'),
-    dia(8,6,'Batalla de Junín'),dia(8,30,'Santa Rosa de Lima'),dia(10,8,'Combate de Angamos'),
-    dia(11,1,'Todos los Santos'),dia(12,8,'Inmaculada Concepción'),dia(12,25,'Navidad')
+    dia(8,6,'Batalla de Junín'),dia(8,domingoN(7,3),'Día del Niño'),
+    dia(8,30,'Santa Rosa de Lima'),dia(10,8,'Combate de Angamos'),
+    dia(11,1,'Todos los Santos'),dia(12,8,'Inmaculada Concepción'),
+    dia(12,24,'Nochebuena'),dia(12,25,'Navidad'),dia(12,31,'Fin de Año')
   ];
 }
 function eventosDelMes(y,m){
@@ -1665,6 +1681,9 @@ async function cargarAjustes(){
     set('aj-min',a.intervaloMin);set('aj-max',a.intervaloMax);
     set('aj-chats',a.intervaloEntreChats);set('aj-masivo',a.intervaloMasivo);
     set('aj-hora-ini',a.horaInicio);set('aj-hora-fin',a.horaFin);
+    if($('#aj-bienvenida'))$('#aj-bienvenida').value=a.bienvenidaTexto||'';
+    if($('#aj-pdf'))$('#aj-pdf').checked=a.enviarCatalogo!==false;
+    if($('#aj-video'))$('#aj-video').checked=!!a.enviarVideo;
     const es=$('#aj-status');if(es)es.textContent=`Actualizado: ${fmtFechaHora(a.actualizado)}`;
   }catch(e){const es=$('#aj-status');if(es)es.textContent='No se pudieron cargar los ajustes (revisa la conexión).';}
 }
@@ -1676,7 +1695,10 @@ $('#aj-save')?.addEventListener('click',async()=>{
       maxPorDia:num('aj-max-dia'),maxRespuestasPorChat:num('aj-max-resp'),
       intervaloMin:num('aj-min'),intervaloMax:num('aj-max'),
       intervaloEntreChats:num('aj-chats'),intervaloMasivo:num('aj-masivo'),
-      horaInicio:num('aj-hora-ini'),horaFin:num('aj-hora-fin')
+      horaInicio:num('aj-hora-ini'),horaFin:num('aj-hora-fin'),
+      bienvenidaTexto:($('#aj-bienvenida')?.value||'').trim(),
+      enviarCatalogo:!!$('#aj-pdf')?.checked,
+      enviarVideo:!!$('#aj-video')?.checked
     };
     const r=await botFetch('/api/ajustes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const a=r.ajustes||body;
@@ -2393,6 +2415,40 @@ async function guardarAnuncio(){
   }catch(e){toast('No se guardó: '+e.message,'error');return null}
 }
 $('#anu-refresh')?.addEventListener('click',cargarAnuncios);
+/* Selector de contactos para el envío masivo */
+let anuPickerCache=[];
+function anuTelefonosSet(){return new Set(($('#anu-tels')?.value||'').split(/[\s,;]+/).map(s=>s.replace(/\D/g,'')).filter(Boolean));}
+function pintarPickerAnuncio(){
+  const lista=$('#anu-pick-list');if(!lista)return;
+  const q=($('#anu-pick-q')?.value||'').toLowerCase().trim();
+  const sel=anuTelefonosSet();
+  const items=anuPickerCache.filter(d=>!q||String(d.nombre||'').toLowerCase().includes(q)||String(d.telefono).includes(q));
+  lista.innerHTML=items.map(d=>`<label style="display:flex;gap:.5rem;align-items:center;padding:.35rem .6rem;border-bottom:1px solid var(--line);cursor:pointer"><input type="checkbox" data-pick-tel="${esc(String(d.telefono))}" ${sel.has(String(d.telefono))?'checked':''} style="width:auto"><span><b>${esc(d.nombre||('+'+d.telefono))}</b> <small class="muted">+${esc(String(d.telefono))}${d.consentimiento?' · con consentimiento':' · sin consentimiento'}</small></span></label>`).join('')||'<p class="empty" style="padding:.6rem">Sin contactos.</p>';
+}
+async function cargarPickerAnuncio(){
+  const lista=$('#anu-pick-list');if(!lista)return;
+  lista.innerHTML='<p class="empty" style="padding:.6rem">Cargando contactos…</p>';
+  try{
+    const j=await botFetch('/api/anuncios/destinatarios');
+    anuPickerCache=j.destinatarios||[];
+    pintarPickerAnuncio();
+  }catch(e){lista.innerHTML='<p class="empty" style="padding:.6rem">No se pudieron cargar los contactos (revisa la conexión).</p>'}
+}
+$('#anu-pick')?.addEventListener('click',()=>{
+  const p=$('#anu-picker');if(!p)return;
+  p.hidden=!p.hidden;
+  if(!p.hidden&&!anuPickerCache.length)cargarPickerAnuncio();else pintarPickerAnuncio();
+});
+$('#anu-pick-q')?.addEventListener('input',pintarPickerAnuncio);
+$('#anu-pick-list')?.addEventListener('change',e=>{
+  const chk=e.target.closest('[data-pick-tel]');if(!chk)return;
+  const tel=chk.dataset.pickTel;
+  const sel=anuTelefonosSet();
+  if(chk.checked)sel.add(tel);else sel.delete(tel);
+  if($('#anu-tels'))$('#anu-tels').value=[...sel].join(', ');
+  pedirPreviewAnuncio();
+});
+$('#anu-tels')?.addEventListener('input',()=>{pintarPickerAnuncio()});
 $('#anu-filtro')?.addEventListener('change',actualizarWrapsAnuncio);
 $('#anu-tags')?.addEventListener('input',pedirPreviewAnuncio);
 $('#anu-tels')?.addEventListener('input',pedirPreviewAnuncio);

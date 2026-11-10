@@ -354,7 +354,11 @@ function conSaludo(tel, nombre, cuerpo) {
 /** Mensaje 1 de toda conversación nueva: saludo + agradecimiento. */
 async function enviarBienvenida({ tel, nombre, clienteId, sesionId }) {
   const nom = /^\+/.test(String(nombre || '')) ? '' : primerNombre(nombre);
-  const texto = `${saludoHora()}${nom ? ', ' + nom : ''}. Nos alegra que hayas elegido a *Perfumería Fina Perú* como tu perfumería de preferencia. ✨`;
+  const plantilla = String(estadoAjustes().bienvenidaTexto || '').trim()
+    || '{saludo}, {nombre}. Nos alegra que hayas elegido a *Perfumería Fina Perú* como tu perfumería de preferencia. ✨';
+  const texto = plantilla
+    .replaceAll('{saludo}', saludoHora())
+    .replaceAll('{nombre}', nom || 'estimado');
   await enviarRegistrado({ tel, texto, nombre, clienteId, sesionId, origen: 'ia' });
   marcarSaludado(tel);
   log(`Bienvenida enviada a +${tel}.`);
@@ -390,7 +394,8 @@ async function enviarCatalogo({ tel, nombre, clienteId, sesionId }) {
     : '\n\n• Perfumes de *diseñador*, *árabes* y de *nicho*';
   const texto = `Claro, estimado. A continuación le envío un PDF con nuestras fragancias 📄${detalle}\n\nQuedo atento a tu respuesta; si deseas alguna recomendación, también nos tienes aquí 😊`;
   await enviarRegistrado({ tel, texto, nombre, clienteId, sesionId, origen: 'ia' });
-  if (existe) {
+  const cfg = estadoAjustes();
+  if (existe && cfg.enviarCatalogo !== false) {
     try {
       const env = await enviarArchivo(tel, pdf, 'application/pdf', 'Catalogo-Perfumeria-Fina-Navidad-2026.pdf', '📕 Catálogo *Navidad 2026* · Perfumería Fina Perú', sesionId);
       await logMensaje({ clienteId, telefono: tel, direccion: 'saliente', texto: '📕 [catálogo PDF enviado]', origen: 'ia' });
@@ -410,7 +415,38 @@ async function enviarCatalogo({ tel, nombre, clienteId, sesionId }) {
   } else {
     log('No existe el PDF del catálogo; se envió solo la explicación.');
   }
+  // Video explicativo (configurable desde Ajustes).
+  if (cfg.enviarVideo) {
+    const video = path.join(raizProyecto, 'docs', 'entrega', 'perfumeria-fina-crm.mp4');
+    if (fs.existsSync(video)) {
+      try {
+        const envV = await enviarArchivo(tel, video, 'video/mp4', 'Perfumeria-Fina-CRM.mp4', '🎬 Así funciona *Perfumería Fina CRM*', sesionId);
+        registrar({ telefono: tel, texto: '🎬 Video del CRM', direccion: 'saliente', nombre, clienteId, origen: 'ia', waId: envV?.waId || '' });
+        log(`Video enviado a +${tel}.`);
+      } catch (e) {
+        log('No se pudo enviar el video: ' + e.message);
+      }
+    } else {
+      log('Video del CRM no encontrado en el servidor; se omite.');
+    }
+  }
   return true;
+}
+
+/** Ficha corta del producto: notas, ocasión y estilo (para acompañar la foto). */
+function fichaProducto(prod) {
+  const notas = String(prod.notas || '').split(';').map(s => s.trim()).filter(Boolean).slice(0, 3).join(', ');
+  const fam = String(prod.familia_olfativa || '').toLowerCase();
+  const txt = fam + ' ' + String(prod.notas || '').toLowerCase();
+  let ocasion = 'cualquier ocasión';
+  let estilo = 'versátil y elegante';
+  if (/amader|cuero|oriental|ambar|especi/.test(txt)) { ocasion = 'noches y ocasiones especiales'; estilo = 'seguro y con presencia'; }
+  else if (/citric|fresc|acuatic|aromatic/.test(txt)) { ocasion = 'día a día, oficina o clima cálido'; estilo = 'fresco y activo'; }
+  else if (/dulce|gourmand|frutal|vainilla/.test(txt)) { ocasion = 'citas y salidas'; estilo = 'cálido y coqueto'; }
+  else if (/floral/.test(txt)) { ocasion = 'eventos y día'; estilo = 'femenino y delicado'; }
+  const genero = String(prod.genero || '').toLowerCase();
+  const para = genero === 'dama' ? 'para dama' : genero === 'caballero' ? 'para caballero' : 'unisex';
+  return 'Notas: ' + (notas || '—') + '\nIdeal para: ' + ocasion + ' (' + para + ')\nEstilo: ' + estilo;
 }
 
 /** Imagen/precio de un producto concreto sin gastar IA (flujo de venta). */
@@ -434,7 +470,7 @@ async function responderProductoDirecto({ tel, nombre, clienteId, texto, sesionI
     if (pideImagen) {
       const media = mediaProducto(prod);
       if (media) {
-        const caption = `${saludo}. Aquí tienes *${prod.nombre}*${casa} 📸`;
+        const caption = `${saludo}. Aquí tienes *${prod.nombre}*${casa} 📸\n\n${fichaProducto(prod)}`;
         const env = await enviarImagen(tel, media, caption, sesionId);
         await logMensaje({ clienteId, telefono: tel, direccion: 'saliente', texto: '📷 ' + caption, origen: 'bot' });
         registrar({ telefono: tel, texto: '📷 ' + caption, direccion: 'saliente', nombre, clienteId, origen: 'bot', waId: env?.waId || '' });
@@ -1517,9 +1553,9 @@ async function manejarMensaje(msg, sesionId = null) {
       // Con números de prueba (o el del dueño) nunca se pausa ni se avisa: se
       // responde algo útil para poder seguir probando el flujo con IA.
       if (esPrueba) {
-        const ayuda = /reclamo/i.test(ai.motivo)
+        const ayuda = ai.aviso || (/reclamo/i.test(ai.motivo)
           ? 'Lamento lo ocurrido. Te paso con un administrador para que revise tu caso personalmente 🙌'
-          : 'Te paso con un administrador para que te atienda personalmente 🙌';
+          : 'Te paso con un administrador para que te atienda personalmente 🙌');
         log(`Enviando respuesta a +${tel}...`);
         const envP = await enviar(tel, ayuda, sesionId);
         await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'saliente', texto: ayuda, origen: 'ia' });
@@ -1538,9 +1574,9 @@ async function manejarMensaje(msg, sesionId = null) {
         motivo: ai.motivo,
         mensaje: String(texto).slice(0, 300)
       });
-      const aviso = /reclamo/i.test(ai.motivo)
+      const aviso = ai.aviso || (/reclamo/i.test(ai.motivo)
         ? 'Lamento lo ocurrido. Te paso con un administrador para que revise tu caso personalmente 🙌'
-        : 'Te paso con un administrador para que te atienda personalmente 🙌';
+        : 'Te paso con un administrador para que te atienda personalmente 🙌');
       const env2 = await enviar(tel, aviso, sesionId);
       await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'saliente', texto: aviso, origen: 'bot', estado: 'derivado' });
       registrar({ telefono: tel, texto: aviso, direccion: 'saliente', nombre: nombreChat, clienteId: cliente?.id, origen: 'sistema', estado: 'derivado', waId: env2?.waId || '' });
@@ -1810,6 +1846,28 @@ app.get('/api/anuncios', auth, (_req, res) => {
     filtros: anuncios.FILTROS,
     estados: anuncios.ESTADOS
   });
+});
+
+app.get('/api/anuncios/destinatarios', auth, async (req, res) => {
+  try {
+    const clientes = await getClientes();
+    const chats = listar(5000);
+    const q = String(req.query.q || '').toLowerCase().trim();
+    const lista = listaDestinatarios(clientes, chats)
+      .filter(d => !q || String(d.nombre || '').toLowerCase().includes(q) || String(d.telefono).includes(q))
+      .sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || '')))
+      .slice(0, 500)
+      .map(d => ({
+        telefono: d.telefono,
+        nombre: d.nombre,
+        origen: d.origen,
+        consentimiento: d.consentimiento,
+        etiquetas: d.etiquetas
+      }));
+    res.json({ total: lista.length, destinatarios: lista });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.post('/api/anuncios/preview', auth, async (req, res) => {
