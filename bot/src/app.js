@@ -17,6 +17,7 @@ import * as seguimiento from './seguimiento.js';
 import { crearAuth, crearAuthPanel, crearLimitador } from './auth.js';
 import { registrarAjustes } from './routes/ajustes.js';
 import { esBaja, marcarBajaLocal } from './bajas.js';
+import { revisarEsquema } from './diagnostico.js';
 import { registrarPedidos } from './routes/pedidos.js';
 import { registrarSeguimiento } from './routes/seguimiento.js';
 import { registrarAnuncios } from './routes/anuncios.js';
@@ -1794,6 +1795,8 @@ tick();setInterval(tick,2500);
 //  - el campo qr ya NO viaja en el payload: el QR se sirve por /api/qr.
 let programadas = 0;
 let cacheEstado = { t: 0, cuerpo: null };
+// Problemas de esquema detectados al arrancar (se muestran en el panel).
+let problemasEsquema = [];
 
 async function refrescarProgramadas() {
   if (!sb) return;
@@ -1829,6 +1832,7 @@ app.get('/api/estado', auth, (_req, res) => {
     delay: { min: config.delayMin, max: config.delayMax },
     ia: resumenIA(),
     chats: resumenChats(),
+    problemas: problemasEsquema,
     version: '1.0.0'
   };
   cacheEstado = { t: ahora, cuerpo };
@@ -2232,6 +2236,15 @@ if (faltan.length) {
   console.error('Copia bot/.env.example a bot/.env y completa los datos.');
   console.error('El bot arrancará igual para WhatsApp, pero sin Supabase no habrá campañas ni historial.\n');
 }
+
+// Autodiagnóstico silencioso: si el esquema de Supabase no cuadra, se ve en el panel.
+revisarEsquema(sb)
+  .then(lista => {
+    problemasEsquema = lista;
+    for (const p of lista) log('⚠ Esquema: ' + p.mensaje + ' → ' + p.solucion);
+    if (lista.length) cacheEstado = { t: 0, cuerpo: null };
+  })
+  .catch(() => {});
 
 app.listen(config.port, () => {
   log(`Panel del bot: http://localhost:${config.port}/panel`);

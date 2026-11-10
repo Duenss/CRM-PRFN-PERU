@@ -34,6 +34,9 @@
 - Bienvenida, PDF y video configurables desde Ajustes.
 - Supervisor con auto-reinicio del proceso del bot.
 
+### Autodiagnóstico
+- El bot revisa el esquema de Supabase al arrancar y expone `problemas` en `/api/estado`; el panel de Campañas muestra un aviso con el SQL exacto a ejecutar.
+
 ### Campañas
 - Detectado el bloqueo real de "programar campaña": la tabla `campanas` conservaba una restricción vieja que no permite `programada`. Nuevo `sql/11_arreglar_estado_campanas.sql` y mensaje claro en el panel.
 

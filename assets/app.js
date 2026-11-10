@@ -545,6 +545,11 @@ $('#k-manual').onclick=()=>crearCampana('aprobada');
 $('#k-program').onclick=()=>crearCampana('programada');
 
 function renderCampanas(){
+  const aviso=problemasBot.find(p=>p.codigo==='campanas_estado');
+  if($('#k-aviso')){
+    $('#k-aviso').innerHTML=problemasBot.map(p=>`<div class="warnbox" style="margin-bottom:.7rem"><b>${esc(p.mensaje||'Problema de base de datos')}</b><br><span class="muted">${esc(p.solucion||'')}</span></div>`).join('');
+    $('#k-aviso').hidden=!problemasBot.length;
+  }
   $('#k-list').innerHTML=campanas.map(k=>{
     const f=k.fecha_programada?` · ${esc(fmtFechaHora(k.fecha_programada))}`:'';
     const cls=k.estado==='enviada'?'ok':k.estado==='programada'?'warn':'';
@@ -1101,10 +1106,14 @@ function horaWa(iso){if(!iso)return'';const d=new Date(iso);if(isNaN(d.getTime()
 function iniciales(n){const p=String(n||'?').trim().split(/\s+/);return((p[0]?.[0]||'?')+(p[1]?.[0]||'')).toUpperCase()}
 
 /* ---------- chip de estado del bot ---------- */
+let problemasBot=[];
 async function refrescarChip(){
   const chip=$('#wa-chip');if(!chip)return;const t=$('#wa-chip-t');
   try{
     const j=await botFetch('/api/estado');
+    const antes=problemasBot.length;
+    problemasBot=Array.isArray(j.problemas)?j.problemas:[];
+    if(problemasBot.length!==antes)renderCampanas();
     const s=(j.sesiones||[]).find(x=>x.conectado)||(j.sesiones||[])[0]||{};
     chip.classList.remove('on','qr','off');
     if(s.conectado){chip.classList.add('on');t.textContent='WhatsApp conectado';chip.title='+'+s.numero+' · '+(j.modoPrueba?'modo prueba':'modo real')+' · '+(j.enviadosHoy??0)+(j.maxPorDia?'/'+j.maxPorDia:'')+' hoy';}
