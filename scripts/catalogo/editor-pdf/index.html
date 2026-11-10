@@ -8,64 +8,75 @@
   :root{--bg:#14100c;--panel:#1d1813;--line:#332a22;--ink:#f2ebdd;--muted:#a2937f;--gold:#d6b678;--ok:#4caf7d;--err:#e06c61}
   *{box-sizing:border-box}
   body{margin:0;font-family:system-ui,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink);height:100vh;display:flex;flex-direction:column;overflow:hidden}
-  header{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--panel);border-bottom:1px solid var(--line);flex:none}
-  header h1{font-size:.9rem;margin:0}
+  header{display:flex;align-items:center;gap:10px;padding:9px 13px;background:var(--panel);border-bottom:1px solid var(--line);flex:none;flex-wrap:wrap}
+  header h1{font-size:.88rem;margin:0}
   .grow{flex:1}
-  button,input[type=file]::file-selector-button{
-    font:inherit;font-size:.75rem;padding:7px 12px;border-radius:7px;cursor:pointer;
+  button,label.file span{
+    font:inherit;font-size:.73rem;padding:6px 11px;border-radius:7px;cursor:pointer;
     border:1px solid var(--line);background:#241e18;color:var(--ink);
   }
   button:hover{border-color:var(--gold);color:var(--gold)}
   button.primary{background:var(--gold);color:#1b1410;border-color:var(--gold);font-weight:600}
   button.primary:hover{filter:brightness(1.08);color:#1b1410}
-  button:disabled{opacity:.45;cursor:not-allowed}
-  label.file{display:inline-flex;align-items:center;gap:8px;font-size:.75rem;color:var(--muted);cursor:pointer}
+  button:disabled{opacity:.4;cursor:not-allowed}
   label.file input{display:none}
-  label.file span{padding:7px 12px;border:1px dashed var(--gold);border-radius:7px;color:var(--gold)}
+  label.file span{border-style:dashed;border-color:var(--gold);color:var(--gold);display:inline-block}
+  .nav{display:flex;align-items:center;gap:5px}
+  .nav input{width:50px;text-align:center;font:inherit;font-size:.73rem;padding:5px;border-radius:6px;border:1px solid var(--line);background:#15110d;color:var(--ink)}
+  .estado{font-size:.71rem;color:var(--muted);min-width:90px}
+  .estado.ok{color:var(--ok)} .estado.err{color:var(--err)}
+  .sep{width:1px;height:22px;background:var(--line)}
 
-  main{flex:1;display:grid;grid-template-columns:1fr 330px;min-height:0}
+  main{flex:1;display:grid;grid-template-columns:1fr 340px;min-height:0}
   .visor{overflow:auto;background:#0d0a08;display:flex;justify-content:center;padding:18px;position:relative}
-  .hoja{position:relative;line-height:0;box-shadow:0 20px 60px rgba(0,0,0,.6)}
-  .hoja img{display:block;max-width:none}
-  .caja{position:absolute;cursor:pointer;border:1.5px dashed rgba(110,170,255,.0);
-        transition:background .12s,border-color .12s}
-  .caja.texto{background:rgba(110,170,255,.10);border-color:rgba(110,170,255,.55)}
-  .caja.texto:hover{background:rgba(110,170,255,.28)}
-  .caja.imagen{background:rgba(255,170,70,.10);border-color:rgba(255,170,70,.6)}
-  .caja.imagen:hover{background:rgba(255,170,70,.26)}
-  .caja.sel{background:rgba(214,182,120,.35)!important;border-color:var(--gold)!important;border-style:solid}
+  .hoja{position:relative;line-height:0;box-shadow:0 20px 60px rgba(0,0,0,.6);user-select:none}
+  .hoja img{display:block;max-width:none;pointer-events:none}
+  .caja{position:absolute;cursor:move;border:1.5px dashed transparent;transition:background .12s,border-color .12s}
+  .caja.texto{background:rgba(110,170,255,.09);border-color:rgba(110,170,255,.5)}
+  .caja.texto:hover{background:rgba(110,170,255,.26)}
+  .caja.imagen{background:rgba(255,170,70,.09);border-color:rgba(255,170,70,.55)}
+  .caja.imagen:hover{background:rgba(255,170,70,.24)}
+  .caja.sel{background:rgba(214,182,120,.32)!important;border-color:var(--gold)!important;border-style:solid;z-index:5}
+  .caja .asa{position:absolute;right:-5px;bottom:-5px;width:11px;height:11px;background:var(--gold);border-radius:2px;cursor:nwse-resize;display:none}
+  .caja.sel .asa{display:block}
+  .regla{position:absolute;left:0;right:0;top:0;height:0;pointer-events:none}
 
-  .panel{background:var(--panel);border-left:1px solid var(--line);padding:16px;overflow-y:auto}
-  .panel h2{font-size:.8rem;margin:0 0 12px;color:var(--gold);letter-spacing:.06em;text-transform:uppercase}
-  .panel .vacio{font-size:.78rem;color:var(--muted);line-height:1.6}
-  .campo{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
-  .campo label{font-size:.63rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
-  .campo textarea,.campo input[type=text],.campo input[type=number]{
-    font:inherit;font-size:.8rem;padding:8px 10px;border-radius:7px;
+  .panel{background:var(--panel);border-left:1px solid var(--line);padding:14px;overflow-y:auto}
+  .panel h2{font-size:.74rem;margin:0 0 10px;color:var(--gold);letter-spacing:.07em;text-transform:uppercase}
+  .vacio{font-size:.75rem;color:var(--muted);line-height:1.6}
+  .campo{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+  .campo label{font-size:.6rem;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+  .campo input,.campo textarea{
+    font:inherit;font-size:.78rem;padding:7px 9px;border-radius:6px;
     border:1px solid var(--line);background:#15110d;color:var(--ink);width:100%;
   }
-  .campo textarea{min-height:74px;resize:vertical;line-height:1.4}
-  .fila{display:flex;gap:10px}
+  .campo textarea{min-height:62px;resize:vertical;line-height:1.4}
+  .fila{display:flex;gap:8px}
   .fila .campo{flex:1}
-  input[type=color]{width:100%;height:34px;background:none;border:1px solid var(--line);border-radius:7px;padding:2px;cursor:pointer}
-  .ayuda{font-size:.68rem;color:var(--muted);line-height:1.5;margin-top:10px}
-  .aviso{font-size:.7rem;padding:9px 11px;border-radius:7px;margin-bottom:12px;background:#2a2118;border:1px solid #4a3a26;color:#e0cfa8}
-  .estado{font-size:.72rem;color:var(--muted)}
-  .estado.ok{color:var(--ok)} .estado.err{color:var(--err)}
-  .nav{display:flex;align-items:center;gap:6px}
-  .nav input{width:52px;text-align:center;font:inherit;font-size:.75rem;padding:6px;border-radius:6px;border:1px solid var(--line);background:#15110d;color:var(--ink)}
+  input[type=color]{width:100%;height:30px;background:none;border:1px solid var(--line);border-radius:6px;padding:2px;cursor:pointer}
+  .grilla{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px}
+  .grilla button{padding:8px 0;font-size:.9rem;line-height:1}
+  .ayuda{font-size:.66rem;color:var(--muted);line-height:1.5;margin-top:8px}
+  .aviso{font-size:.68rem;padding:8px 10px;border-radius:6px;margin-bottom:10px;background:#2a2118;border:1px solid #4a3a26;color:#e0cfa8}
+  .peligro{border-color:#5c2a26;color:#e08b82}
+  .peligro:hover{border-color:#e06c61;color:#ffb3ac}
+  .acciones{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+  .log{font-size:.64rem;color:var(--muted);white-space:pre-wrap;margin-top:8px;max-height:120px;overflow:auto}
 </style>
 </head>
 <body>
 <header>
   <h1>Editor de PDF</h1>
-  <label class="file"><input type="file" id="inputPdf" accept="application/pdf"><span>Abrir otro PDF</span></label>
+  <label class="file"><input type="file" id="inputPdf" accept="application/pdf"><span>Abrir PDF</span></label>
   <div class="nav">
     <button id="btnPrev">‹</button>
     <input id="numPagina" value="1">
     <span class="estado" id="totalPaginas">/ 41</span>
     <button id="btnNext">›</button>
   </div>
+  <div class="sep"></div>
+  <button id="btnUndo" title="Deshacer (Ctrl+Z)">↶ Deshacer</button>
+  <button id="btnRedo" title="Rehacer (Ctrl+Y)">↷ Rehacer</button>
   <div class="grow"></div>
   <span class="estado" id="estado">Listo</span>
   <button id="btnGuardar">Guardar PDF</button>
@@ -81,12 +92,14 @@
 
   <aside class="panel">
     <div class="aviso">
-      Clic sobre un <b>texto</b> (azul) para editarlo o sobre una <b>foto</b> (naranja) para reemplazarla.
+      Arrastrá un elemento para moverlo, usá las flechas del teclado (Shift = 10 pt)
+      y el cuadradito dorado para cambiar el tamaño.
     </div>
     <div id="editor">
       <h2>Sin selección</h2>
-      <p class="vacio">Elegí un texto o una imagen de la hoja para empezar.</p>
+      <p class="vacio">Clic en un texto (azul) o en una foto (naranja).</p>
     </div>
+    <div class="log" id="log"></div>
   </aside>
 </main>
 
@@ -96,28 +109,40 @@ const hoja = document.getElementById("hoja");
 const imgPagina = document.getElementById("pagina");
 const panel = document.getElementById("editor");
 const numPagina = document.getElementById("numPagina");
+const logEl = document.getElementById("log");
 
 let paginaActual = 1;
 let totalPaginas = 41;
 let capa = { textos: [], imagenes: [], ancho: 595, alto: 842 };
 let seleccion = null;
+let escalaActual = 1;
+let historial = { deshacer: 0, rehacer: 0 };
 
-function pintarEstado(t, tipo = "") { estado.textContent = t; estado.className = "estado " + tipo; }
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const pintarEstado = (t, tipo = "") => { estado.textContent = t; estado.className = "estado " + tipo; };
+
+function actualizarHistorial(d) {
+  if (d && typeof d.deshacer === "number") {
+    historial = { deshacer: d.deshacer, rehacer: d.rehacer };
+    document.getElementById("btnUndo").disabled = historial.deshacer === 0;
+    document.getElementById("btnRedo").disabled = historial.rehacer === 0;
+  }
+}
 
 async function cargarEstado() {
   const r = await fetch("/api/estado");
   const d = await r.json();
   totalPaginas = d.paginas;
   document.getElementById("totalPaginas").textContent = "/ " + d.paginas;
-  numPagina.value = paginaActual;
+  actualizarHistorial(d);
 }
 
-async function cargarPagina(n) {
+async function cargarPagina(n, conservarSeleccion = false) {
   paginaActual = Math.min(Math.max(1, n), totalPaginas);
   numPagina.value = paginaActual;
-  seleccion = null;
-  panel.innerHTML = "<h2>Sin selección</h2><p class='vacio'>Elegí un texto o una imagen de la hoja para empezar.</p>";
-  pintarEstado("Cargando página…");
+  if (!conservarSeleccion) seleccion = null;
+  if (!seleccion) panel.innerHTML = "<h2>Sin selección</h2><p class='vacio'>Clic en un texto (azul) o en una foto (naranja).</p>";
+  pintarEstado("Cargando…");
   imgPagina.src = "/api/pagina?n=" + paginaActual + "&t=" + Date.now();
   await new Promise((res) => { imgPagina.onload = res; });
   const r = await fetch("/api/capa?n=" + paginaActual);
@@ -126,52 +151,189 @@ async function cargarPagina(n) {
   pintarEstado("Página " + paginaActual + " de " + totalPaginas);
 }
 
+/* ---------- Capa interactiva ---------- */
 function pintarCajas() {
   hoja.querySelectorAll(".caja").forEach((c) => c.remove());
-  const escala = imgPagina.clientWidth / capa.ancho;
+  escalaActual = imgPagina.clientWidth / capa.ancho;
 
-  capa.textos.forEach((t, i) => {
-    const d = document.createElement("div");
-    d.className = "caja texto";
-    d.dataset.tipo = "texto";
-    d.dataset.i = i;
-    const [x0, y0, x1, y1] = t.bbox;
-    d.style.left = x0 * escala + "px";
-    d.style.top = y0 * escala + "px";
-    d.style.width = Math.max(6, (x1 - x0) * escala) + "px";
-    d.style.height = Math.max(6, (y1 - y0) * escala) + "px";
-    d.title = t.texto;
-    d.addEventListener("click", (e) => { e.stopPropagation(); seleccionar("texto", t, d); });
-    hoja.appendChild(d);
-  });
+  capa.textos.forEach((t, i) => hoja.appendChild(crearCaja("texto", t, i)));
+  capa.imagenes.forEach((im, i) => hoja.appendChild(crearCaja("imagen", im, i)));
 
-  capa.imagenes.forEach((im) => {
-    const d = document.createElement("div");
-    d.className = "caja imagen";
-    d.dataset.tipo = "imagen";
-    const [x0, y0, x1, y1] = im.bbox;
-    d.style.left = x0 * escala + "px";
-    d.style.top = y0 * escala + "px";
-    d.style.width = Math.max(8, (x1 - x0) * escala) + "px";
-    d.style.height = Math.max(8, (y1 - y0) * escala) + "px";
-    d.addEventListener("click", (e) => { e.stopPropagation(); seleccionar("imagen", im, d); });
-    hoja.appendChild(d);
-  });
+  if (seleccion) {
+    const previa = hoja.querySelector(`.caja[data-tipo="${seleccion.tipo}"][data-i="${seleccion.i}"]`);
+    if (previa) previa.classList.add("sel");
+  }
 }
 
-function marcar(caja) {
+function crearCaja(tipo, dato, i) {
+  const d = document.createElement("div");
+  d.className = "caja " + tipo;
+  d.dataset.tipo = tipo;
+  d.dataset.i = i;
+  aplicarGeometria(d, dato.bbox);
+
+  const asa = document.createElement("span");
+  asa.className = "asa";
+  asa.title = "Cambiar tamaño";
+  d.appendChild(asa);
+
+  d.addEventListener("mousedown", (e) => iniciarArrastre(e, tipo, dato, i, d));
+  asa.addEventListener("mousedown", (e) => iniciarRedimension(e, tipo, dato, i, d));
+  return d;
+}
+
+function aplicarGeometria(el, bbox) {
+  const [x0, y0, x1, y1] = bbox;
+  el.style.left = x0 * escalaActual + "px";
+  el.style.top = y0 * escalaActual + "px";
+  el.style.width = Math.max(6, (x1 - x0) * escalaActual) + "px";
+  el.style.height = Math.max(6, (y1 - y0) * escalaActual) + "px";
+}
+
+/* ---------- Arrastre ---------- */
+function iniciarArrastre(e, tipo, dato, i, el) {
+  if (e.target.classList && e.target.classList.contains("asa")) return;
+  e.preventDefault();
+  e.stopPropagation();
+  seleccionar(tipo, dato, i, el);
+
+  const inicioX = e.clientX, inicioY = e.clientY;
+  let movido = false;
+
+  const mover = (ev) => {
+    const dx = (ev.clientX - inicioX) / escalaActual;
+    const dy = (ev.clientY - inicioY) / escalaActual;
+    if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+    movido = true;
+    aplicarGeometria(el, [dato.bbox[0] + dx, dato.bbox[1] + dy, dato.bbox[2] + dx, dato.bbox[3] + dy]);
+  };
+
+  const soltar = async (ev) => {
+    document.removeEventListener("mousemove", mover);
+    document.removeEventListener("mouseup", soltar);
+    if (!movido) return;
+    const dx = (ev.clientX - inicioX) / escalaActual;
+    const dy = (ev.clientY - inicioY) / escalaActual;
+    await enviarMovimiento(tipo, dato, dx, dy);
+  };
+
+  document.addEventListener("mousemove", mover);
+  document.addEventListener("mouseup", soltar);
+}
+
+async function enviarMovimiento(tipo, dato, dx, dy) {
+  pintarEstado("Moviendo…");
+  const cuerpo = { pagina: paginaActual, clase: tipo, bbox: dato.bbox, dx, dy };
+  if (tipo === "texto") Object.assign(cuerpo, { texto: dato.texto, tamano: dato.tamano, color: dato.color, fuente: dato.fuente, origen: dato.origen });
+  else cuerpo.xref = dato.xref;
+  try {
+    const r = await fetch("/api/mover", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cuerpo) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "Error");
+    actualizarHistorial(d);
+    pintarEstado("Movido ✓", "ok");
+    await cargarPagina(paginaActual, true);
+    reabrirSeleccion(tipo);
+  } catch (e) { pintarEstado("Error", "err"); logEl.textContent = e.message; }
+}
+
+/* ---------- Redimensionar ---------- */
+function iniciarRedimension(e, tipo, dato, i, el) {
+  e.preventDefault();
+  e.stopPropagation();
+  seleccionar(tipo, dato, i, el);
+
+  const inicioX = e.clientX, inicioY = e.clientY;
+  const bbox = [...dato.bbox];
+  let cambiado = false;
+
+  const mover = (ev) => {
+    const dx = (ev.clientX - inicioX) / escalaActual;
+    const dy = (ev.clientY - inicioY) / escalaActual;
+    cambiado = true;
+    aplicarGeometria(el, [bbox[0], bbox[1], Math.max(bbox[0] + 4, bbox[2] + dx), Math.max(bbox[1] + 4, bbox[3] + dy)]);
+  };
+  const soltar = async (ev) => {
+    document.removeEventListener("mousemove", mover);
+    document.removeEventListener("mouseup", soltar);
+    if (!cambiado) return;
+    await enviarRedimension(tipo, dato, (ev.clientX - inicioX) / escalaActual, (ev.clientY - inicioY) / escalaActual);
+  };
+  document.addEventListener("mousemove", mover);
+  document.addEventListener("mouseup", soltar);
+}
+
+async function enviarRedimension(tipo, dato, dx, dy) {
+  // Se reemplaza el contenido adaptando el ancho/alto del marco.
+  pintarEstado("Redimensionando…");
+  const nuevo = [dato.bbox[0], dato.bbox[1], Math.max(dato.bbox[0] + 4, dato.bbox[2] + dx), Math.max(dato.bbox[1] + 4, dato.bbox[3] + dy)];
+  try {
+    if (tipo === "texto") {
+      const tamano = Math.max(4, Number(dato.tamano) * ((nuevo[3] - nuevo[1]) / Math.max(1, dato.bbox[3] - dato.bbox[1])));
+      const r = await fetch("/api/texto", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pagina: paginaActual, bbox: dato.bbox, origen: [nuevo[0], nuevo[1] + (nuevo[3] - nuevo[1]) * 0.8],
+                               texto: dato.texto, tamano, color: dato.color, fuente: dato.fuente }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Error");
+      actualizarHistorial(d);
+    } else {
+      const r = await fetch("/api/mover", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pagina: paginaActual, clase: "imagen", bbox: dato.bbox, xref: dato.xref, dx: 0, dy: 0 }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Error");
+      actualizarHistorial(d);
+    }
+    pintarEstado("Listo ✓", "ok");
+    await cargarPagina(paginaActual, true);
+    reabrirSeleccion(tipo);
+  } catch (e) { pintarEstado("Error", "err"); logEl.textContent = e.message; }
+}
+
+/* ---------- Selección y paneles ---------- */
+function seleccionar(tipo, dato, i, el) {
+  seleccion = { tipo, dato, i };
   hoja.querySelectorAll(".caja.sel").forEach((c) => c.classList.remove("sel"));
-  if (caja) caja.classList.add("sel");
+  if (el) el.classList.add("sel");
+  if (tipo === "texto") panelTexto(dato);
+  else panelImagen(dato);
 }
 
-function seleccionar(tipo, dato, caja) {
-  seleccion = { tipo, dato };
-  marcar(caja);
-  if (tipo === "texto") return panelTexto(dato);
-  return panelImagen(dato);
+function reabrirSeleccion(tipo) {
+  const el = hoja.querySelector(`.caja[data-tipo="${tipo}"]`);
+  if (el) el.classList.add("sel");
+  const dato = tipo === "texto" ? (capa.textos.find((t) => t.bbox) || capa.textos[0]) : capa.imagenes[0];
+  if (dato) seleccionar(tipo, dato, 0, el);
+}
+
+function controlesMover() {
+  return `
+    <div class="grilla">
+      <button data-mover="0,-5">↑</button>
+      <button data-mover="0,-1">↑</button>
+      <button data-mover="5,0">→</button>
+      <button data-mover="-5,0">←</button>
+      <button data-mover="0,1">↓</button>
+      <button data-mover="0,5">↓</button>
+    </div>`;
+}
+
+function conectarControles(tipo, dato) {
+  panel.querySelectorAll("[data-mover]").forEach((b) => {
+    b.addEventListener("click", () => {
+      const [dx, dy] = b.dataset.mover.split(",").map(Number);
+      enviarMovimiento(tipo, dato, dx, dy);
+    });
+  });
+  const borrar = panel.querySelector("#pBorrar");
+  if (borrar) borrar.addEventListener("click", () => borrarElemento(tipo, dato));
 }
 
 function panelTexto(t) {
+  const esEtiqueta = /^[A-ZÁÉÍÓÚÑ\s&.'-]{2,14}$/.test(t.texto.trim());
   panel.innerHTML = `
     <h2>Editar texto</h2>
     <div class="campo"><label>Texto</label><textarea id="pTxt"></textarea></div>
@@ -179,13 +341,75 @@ function panelTexto(t) {
       <div class="campo"><label>Tamaño</label><input type="number" id="pTam" step="0.5" min="4" max="72"></div>
       <div class="campo"><label>Color</label><input type="color" id="pColor"></div>
     </div>
-    <p class="ayuda">Fuente detectada: <b>${escapar(t.fuente || "—")}</b></p>
+    ${controlesMover()}
     <button class="primary" id="pAplicar" style="width:100%">Aplicar cambio</button>
-    <p class="ayuda">Se borra el texto original y se escribe el nuevo en la misma posición.</p>`;
+    ${esEtiqueta ? `<button id="pEtiqueta" style="width:100%;margin-top:6px">Rehacer como cápsula</button>` : ""}
+    <div class="acciones">
+      <button class="peligro" id="pBorrar">Borrar</button>
+      <button id="pCentrar">Centrar</button>
+    </div>
+    <p class="ayuda">Fuente: <b>${esc(t.fuente)}</b> · Arrastrá el cuadro o usá las flechas.</p>`;
   panel.querySelector("#pTxt").value = t.texto;
   panel.querySelector("#pTam").value = t.tamano;
   panel.querySelector("#pColor").value = t.color;
   panel.querySelector("#pAplicar").addEventListener("click", aplicarTexto);
+  conectarControles("texto", t);
+  panel.querySelector("#pCentrar")?.addEventListener("click", () => centrarTexto(t));
+  panel.querySelector("#pEtiqueta")?.addEventListener("click", () => abrirEtiqueta(t));
+}
+
+function panelImagen(im) {
+  panel.innerHTML = `
+    <h2>Foto</h2>
+    <p class="ayuda">Tamaño: ${im.w}×${im.h} px</p>
+    <div class="campo"><label>Desde un enlace (URL)</label><input type="text" id="pUrl" placeholder="https://.../foto.jpg"></div>
+    <button class="primary" id="pAplicarUrl" style="width:100%">Usar esta imagen</button>
+    <div style="margin:12px 0;border-top:1px solid var(--line)"></div>
+    <div class="campo"><label>…o desde tu equipo</label><input type="file" id="pImg" accept="image/*"></div>
+    <button id="pAplicarImg" style="width:100%">Subir archivo</button>
+    ${controlesMover()}
+    <div class="acciones">
+      <button class="peligro" id="pBorrar">Borrar</button>
+      <button id="pReset" disabled title="Disponible al volver a abrir el PDF">Restaurar</button>
+    </div>
+    <div id="pPreview" style="margin-top:10px"></div>`;
+
+  const campoUrl = panel.querySelector("#pUrl");
+  const preview = panel.querySelector("#pPreview");
+  campoUrl.addEventListener("input", () => {
+    const u = campoUrl.value.trim();
+    preview.innerHTML = /^https?:\/\//i.test(u)
+      ? `<img src="${u}" style="width:100%;border-radius:7px;border:1px solid var(--line);background:#fff">` : "";
+  });
+
+  panel.querySelector("#pAplicarUrl").addEventListener("click", async () => {
+    const url = campoUrl.value.trim();
+    if (!/^https?:\/\//i.test(url)) return alert("Pegá un enlace que empiece con http:// o https://");
+    await enviarImagen({ url }, "Descargando…");
+  });
+  panel.querySelector("#pAplicarImg").addEventListener("click", async () => {
+    const archivo = panel.querySelector("#pImg").files[0];
+    if (!archivo) return alert("Elegí una imagen primero.");
+    const dataUrl = await new Promise((res) => { const l = new FileReader(); l.onload = () => res(l.result); l.readAsDataURL(archivo); });
+    await enviarImagen({ dataUrl }, "Reemplazando…");
+  });
+  conectarControles("imagen", im);
+}
+
+async function enviarImagen(extra, textoEstado) {
+  pintarEstado(textoEstado);
+  try {
+    const r = await fetch("/api/imagen", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pagina: paginaActual, xref: seleccion.dato.xref, bbox: seleccion.dato.bbox, ...extra }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "Error");
+    actualizarHistorial(d);
+    pintarEstado("Foto lista ✓", "ok");
+    await cargarPagina(paginaActual, true);
+    reabrirSeleccion("imagen");
+  } catch (e) { pintarEstado("Error", "err"); alert(e.message); }
 }
 
 async function aplicarTexto() {
@@ -196,109 +420,130 @@ async function aplicarTexto() {
   pintarEstado("Aplicando…");
   try {
     const r = await fetch("/api/texto", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ pagina: paginaActual, bbox: seleccion.dato.bbox, origen: seleccion.dato.origen,
                              texto, tamano, color, fuente: seleccion.dato.fuente }),
     });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || "Error");
+    actualizarHistorial(d);
     pintarEstado("Texto cambiado ✓", "ok");
-    await cargarPagina(paginaActual);
-  } catch (e) {
-    pintarEstado("Error", "err"); alert(e.message);
-  }
+    await cargarPagina(paginaActual, true);
+    reabrirSeleccion("texto");
+  } catch (e) { pintarEstado("Error", "err"); alert(e.message); }
 }
 
-function panelImagen(im) {
-  panel.innerHTML = `
-    <h2>Reemplazar foto</h2>
-    <p class="ayuda">Tamaño actual: ${im.w}×${im.h} px</p>
+async function centrarTexto(t) {
+  const ancho = t.bbox[2] - t.bbox[0];
+  const anchoTexto = t.texto.length * t.tamano * 0.5;
+  const dx = Math.max(0, (ancho - anchoTexto) / 2);
+  await enviarMovimiento("texto", t, dx, 0);
+}
 
-    <div class="campo"><label>Desde un enlace (URL)</label>
-      <input type="text" id="pUrl" placeholder="https://.../foto.jpg">
-    </div>
-    <button class="primary" id="pAplicarUrl" style="width:100%">Usar esta imagen</button>
-
-    <div style="margin:16px 0 12px;border-top:1px solid var(--line)"></div>
-
-    <div class="campo"><label>…o desde tu equipo</label><input type="file" id="pImg" accept="image/*"></div>
-    <button id="pAplicarImg" style="width:100%">Subir archivo</button>
-
-    <div id="pPreview" style="margin-top:14px"></div>
-    <p class="ayuda">Se mantiene la posición y el tamaño del marco; la imagen se adapta.</p>`;
-
-  const campoUrl = panel.querySelector("#pUrl");
-  const preview = panel.querySelector("#pPreview");
-
-  campoUrl.addEventListener("input", () => {
-    const u = campoUrl.value.trim();
-    preview.innerHTML = /^https?:\/\//i.test(u)
-      ? `<img src="${u}" alt="Vista previa" style="width:100%;border-radius:8px;border:1px solid var(--line);background:#fff">`
-      : "";
-  });
-
-  panel.querySelector("#pAplicarUrl").addEventListener("click", async () => {
-    const url = campoUrl.value.trim();
-    if (!/^https?:\/\//i.test(url)) return alert("Pegá un enlace que empiece con http:// o https://");
-    pintarEstado("Descargando imagen…");
-    try {
-      const r = await fetch("/api/imagen", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pagina: paginaActual, xref: im.xref, bbox: im.bbox, url }),
-      });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error || "Error");
-      pintarEstado("Foto reemplazada ✓", "ok");
-      await cargarPagina(paginaActual);
-    } catch (e) {
-      pintarEstado("Error", "err"); alert(e.message);
-    }
-  });
-
-  panel.querySelector("#pAplicarImg").addEventListener("click", async () => {
-    const archivo = panel.querySelector("#pImg").files[0];
-    if (!archivo) return alert("Elegí una imagen primero.");
-    const dataUrl = await new Promise((res) => {
-      const lector = new FileReader();
-      lector.onload = () => res(lector.result);
-      lector.readAsDataURL(archivo);
+async function borrarElemento(tipo, dato) {
+  if (!confirm("¿Borrar este elemento de la página?")) return;
+  pintarEstado("Borrando…");
+  try {
+    const r = await fetch("/api/eliminar", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pagina: paginaActual, clase: tipo, bbox: dato.bbox }),
     });
-    pintarEstado("Reemplazando…");
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "Error");
+    actualizarHistorial(d);
+    seleccion = null;
+    panel.innerHTML = "<h2>Sin selección</h2><p class='vacio'>Elemento borrado. Ctrl+Z para deshacer.</p>";
+    pintarEstado("Borrado ✓", "ok");
+    await cargarPagina(paginaActual);
+  } catch (e) { pintarEstado("Error", "err"); alert(e.message); }
+}
+
+function abrirEtiqueta(t) {
+  panel.innerHTML = `
+    <h2>Cápsula (etiqueta)</h2>
+    <p class="ayuda">Se redibuja el recuadro con el ancho justo para el texto nuevo.</p>
+    <div class="campo"><label>Texto</label><input type="text" id="eTxt" maxlength="18"></div>
+    <div class="fila">
+      <div class="campo"><label>Fondo</label><input type="color" id="eFondo" value="#F4EFE4"></div>
+      <div class="campo"><label>Borde/texto</label><input type="color" id="eColor" value="#8A6F18"></div>
+    </div>
+    <div class="fila">
+      <div class="campo"><label>Tamaño letra</label><input type="number" id="eTam" step="0.2" value="${t.tamano}"></div>
+      <div class="campo"><label>Alto cápsula</label><input type="number" id="eAlto" step="0.5" value="${Math.max(6, (t.bbox[3] - t.bbox[1])).toFixed(1)}"></div>
+    </div>
+    <button class="primary" id="eAplicar" style="width:100%">Redibujar cápsula</button>
+    <p class="ayuda">Ej.: cambiar CABALLERO por DAMA y queda centrado y más angosto.</p>`;
+  panel.querySelector("#eTxt").value = t.texto.trim();
+
+  panel.querySelector("#eAplicar").addEventListener("click", async () => {
+    const cuerpo = {
+      pagina: paginaActual,
+      bbox: t.bbox,
+      texto: panel.querySelector("#eTxt").value.trim(),
+      fondo: panel.querySelector("#eFondo").value,
+      color: panel.querySelector("#eColor").value,
+      borde: panel.querySelector("#eColor").value,
+      tamano: Number(panel.querySelector("#eTam").value) || t.tamano,
+      alto: Number(panel.querySelector("#eAlto").value) || undefined,
+      fuente: t.fuente,
+    };
+    pintarEstado("Redibujando cápsula…");
     try {
-      const r = await fetch("/api/imagen", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pagina: paginaActual, xref: im.xref, bbox: im.bbox, dataUrl }),
-      });
+      const r = await fetch("/api/etiqueta", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cuerpo) });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Error");
-      pintarEstado("Foto reemplazada ✓", "ok");
-      await cargarPagina(paginaActual);
-    } catch (e) {
-      pintarEstado("Error", "err"); alert(e.message);
-    }
+      actualizarHistorial(d);
+      pintarEstado("Cápsula lista ✓", "ok");
+      await cargarPagina(paginaActual, true);
+      reabrirSeleccion("texto");
+    } catch (e) { pintarEstado("Error", "err"); alert(e.message); }
   });
 }
 
+/* ---------- Deshacer / rehacer ---------- */
+async function historialAccion(accion) {
+  pintarEstado(accion === "deshacer" ? "Deshaciendo…" : "Rehaciendo…");
+  try {
+    const r = await fetch("/api/" + accion, { method: "POST" });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "Error");
+    if (!d.ok) { pintarEstado(accion === "deshacer" ? "Nada que deshacer" : "Nada que rehacer", "err"); return; }
+    actualizarHistorial(d);
+    pintarEstado(accion === "deshacer" ? "Deshecho ✓" : "Rehecho ✓", "ok");
+    await cargarPagina(paginaActual);
+  } catch (e) { pintarEstado("Error", "err"); }
+}
+
+/* ---------- Eventos globales ---------- */
 document.getElementById("btnPrev").addEventListener("click", () => cargarPagina(paginaActual - 1));
 document.getElementById("btnNext").addEventListener("click", () => cargarPagina(paginaActual + 1));
 numPagina.addEventListener("change", () => cargarPagina(Number(numPagina.value) || 1));
+document.getElementById("btnUndo").addEventListener("click", () => historialAccion("deshacer"));
+document.getElementById("btnRedo").addEventListener("click", () => historialAccion("rehacer"));
+
+document.addEventListener("keydown", (e) => {
+  const enCampo = /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || "");
+  if (enCampo) return;
+
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); historialAccion("deshacer"); }
+  if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === "y" || (e.shiftKey && e.key.toLowerCase() === "z"))) { e.preventDefault(); historialAccion("rehacer"); }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); document.getElementById("btnGuardar").click(); }
+
+  if (!seleccion) return;
+  const paso = e.shiftKey ? 10 : 1;
+  const mapa = { ArrowLeft: [-paso, 0], ArrowRight: [paso, 0], ArrowUp: [0, -paso], ArrowDown: [0, paso] };
+  if (mapa[e.key]) {
+    e.preventDefault();
+    enviarMovimiento(seleccion.tipo, seleccion.dato, ...mapa[e.key]);
+  }
+});
 
 document.getElementById("inputPdf").addEventListener("change", async (e) => {
   const archivo = e.target.files[0];
   if (!archivo) return;
   pintarEstado("Abriendo PDF…");
-  const dataUrl = await new Promise((res) => {
-    const lector = new FileReader();
-    lector.onload = () => res(lector.result);
-    lector.readAsDataURL(archivo);
-  });
-  const r = await fetch("/api/abrir", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ dataUrl }),
-  });
+  const dataUrl = await new Promise((res) => { const l = new FileReader(); l.onload = () => res(l.result); l.readAsDataURL(archivo); });
+  const r = await fetch("/api/abrir", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dataUrl }) });
   const d = await r.json();
   if (!r.ok) { pintarEstado("Error", "err"); return alert(d.error); }
   await cargarEstado();
@@ -310,15 +555,10 @@ document.getElementById("btnGuardar").addEventListener("click", async () => {
   const r = await fetch("/api/guardar", { method: "POST" });
   const d = await r.json();
   if (!r.ok) { pintarEstado("Error", "err"); return alert(d.error); }
-  pintarEstado("Guardado ✓ (" + Math.round(d.bytes / 1024 / 1024 * 10) / 10 + " MB)", "ok");
+  pintarEstado("Guardado ✓ " + (Math.round(d.bytes / 1024 / 1024 * 10) / 10) + " MB", "ok");
 });
 
 document.getElementById("btnDescargar").addEventListener("click", () => window.open("/pdf", "_blank"));
-
-function escapar(s) {
-  return String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-}
-
 window.addEventListener("resize", () => { if (capa.textos.length || capa.imagenes.length) pintarCajas(); });
 
 (async () => {

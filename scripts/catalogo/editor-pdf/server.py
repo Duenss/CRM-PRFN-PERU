@@ -36,7 +36,14 @@ PDF_SALIDA = os.path.join(REPO, "docs", "catalogo", "catalogo-editado.pdf")
 AQUI = os.path.dirname(os.path.abspath(__file__))
 PUERTO = int(os.environ.get("PUERTO", 4322))
 
-SESION = {"doc": None, "ruta": None, "tmp": None}
+SESION = {
+    "doc": None,
+    "ruta": None,
+    "tmp": None,
+    "pila": [],      # fotos del PDF para deshacer
+    "rehacer": [],   # fotos para rehacer
+}
+MAX_HISTORIAL = 20
 FUENTES_CACHE = {}
 
 DIR_FUENTES = os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts")
@@ -73,7 +80,50 @@ def abrir_pdf(datos=None):
     doc = fitz.open(ruta)
     SESION["doc"] = doc
     SESION["ruta"] = ruta
+    SESION["pila"] = []
+    SESION["rehacer"] = []
     return doc
+
+
+def foto_actual():
+    """Copia binaria del PDF de trabajo, para deshacer."""
+    return SESION["doc"].tobytes(garbage=1, deflate=True)
+
+
+def apilar():
+    """Guarda el estado antes de un cambio."""
+    try:
+        SESION["pila"].append(foto_actual())
+        if len(SESION["pila"]) > MAX_HISTORIAL:
+            SESION["pila"].pop(0)
+        SESION["rehacer"] = []
+    except Exception:
+        pass
+
+
+def restaurar(foto):
+    if SESION["doc"] is not None:
+        try:
+            SESION["doc"].close()
+        except Exception:
+            pass
+    SESION["doc"] = fitz.open(stream=foto, filetype="pdf")
+
+
+def deshacer():
+    if not SESION["pila"]:
+        return False
+    SESION["rehacer"].append(foto_actual())
+    restaurar(SESION["pila"].pop())
+    return True
+
+
+def rehacer():
+    if not SESION["rehacer"]:
+        return False
+    SESION["pila"].append(foto_actual())
+    restaurar(SESION["rehacer"].pop())
+    return True
 
 
 def color_a_hex(c):
@@ -167,7 +217,7 @@ def fuente_incrustada(doc, page, nombre_span):
         base = (basefont or "").lower().replace("+", "")
         if not base or (base not in objetivo and objetivo not in base):
             continue
-        clave = (doc.name, xref)
+        clave = (getattr(doc, "name", None) or id(doc), xref)
         if clave in FUENTES_CACHE:
             return FUENTES_CACHE[clave]
         try:
@@ -185,20 +235,8 @@ def fuente_incrustada(doc, page, nombre_span):
     return None
 
 
-def parchear_texto(doc, page, dato):
-    """Reemplaza un texto: borra el original e inserta el nuevo igual ubicado."""
-    rect = fitz.Rect(dato["bbox"])
-    texto = dato["texto"]
-    tamano = float(dato.get("tamano") or 10)
-    color = hex_a_color(dato.get("color"))
-    fuente_span = dato.get("fuente") or ""
-
-    page.add_redact_annot(rect)
-    page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_NONE)
-
-    origen = dato.get("origen") or [rect.x0, rect.y1]
-    punto = fitz.Point(float(origen[0]), float(origen[1]))
-
+def insertar_texto(doc, page, punto, texto, tamano, color, fuente_span):
+    """Inserta texto con la tipografía correcta (sistema > incrustada > base)."""
     candidatas = []
     ruta_sistema = archivo_fuente(fuente_span)
     if ruta_sistema:
@@ -216,7 +254,7 @@ def parchear_texto(doc, page, dato):
         except Exception:
             continue
 
-    bajo = fuente_span.lower()
+    bajo = (fuente_span or "").lower()
     if any(k in bajo for k in ("times", "georgia", "serif", "cormorant", "garamond", "cinzel", "playfair")):
         nombre = "tiro"
     elif any(k in bajo for k in ("courier", "mono")):
@@ -224,6 +262,105 @@ def parchear_texto(doc, page, dato):
     else:
         nombre = "helv"
     page.insert_text(punto, texto, fontsize=tamano, color=color, fontname=nombre)
+
+
+def parchear_texto(doc, page, dato):
+    """Reemplaza un texto: borra el original e inserta el nuevo igual ubicado."""
+    rect = fitz.Rect(dato["bbox"])
+    texto = dato["texto"]
+    tamano = float(dato.get("tamano") or 10)
+    color = hex_a_color(dato.get("color"))
+    fuente_span = dato.get("fuente") or ""
+
+    apilar()
+    page.add_redact_annot(rect)
+    page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_NONE)
+
+    origen = dato.get("origen") or [rect.x0, rect.y1]
+    insertar_texto(doc, page, fitz.Point(float(origen[0]), float(origen[1])), texto, tamano, color, fuente_span)
+
+
+def mover_texto(doc, page, dato):
+    """Mueve un texto (dx, dy en puntos) conservando su estilo."""
+    rect = fitz.Rect(dato["bbox"])
+    dx = float(dato.get("dx") or 0)
+    dy = float(dato.get("dy") or 0)
+    texto = dato.get("texto") or ""
+    tamano = float(dato.get("tamano") or 10)
+    color = hex_a_color(dato.get("color"))
+    fuente_span = dato.get("fuente") or ""
+
+    apilar()
+    page.add_redact_annot(rect)
+    page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_NONE)
+
+    origen = dato.get("origen") or [rect.x0, rect.y1]
+    destino = fitz.Point(float(origen[0]) + dx, float(origen[1]) + dy)
+    insertar_texto(doc, page, destino, texto, tamano, color, fuente_span)
+
+
+def mover_imagen(doc, page, dato):
+    """Mueve una foto a una nueva posición."""
+    rect = fitz.Rect(dato["bbox"])
+    dx = float(dato.get("dx") or 0)
+    dy = float(dato.get("dy") or 0)
+    xref = dato.get("xref")
+    if not xref:
+        raise ValueError("La imagen no tiene referencia")
+    try:
+        datos = doc.extract_image(xref)["image"]
+    except Exception:
+        raise ValueError("No se pudo leer la imagen original")
+
+    apilar()
+    page.add_redact_annot(rect, fill=False)
+    page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_REMOVE)
+
+    destino = fitz.Rect(rect.x0 + dx, rect.y0 + dy, rect.x1 + dx, rect.y1 + dy)
+    page.insert_image(destino, stream=datos, keep_proportion=True)
+
+
+def eliminar_elemento(page, dato):
+    """Borra un texto o una foto de la página."""
+    rect = fitz.Rect(dato["bbox"])
+    clase = dato.get("clase") or "texto"
+    apilar()
+    page.add_redact_annot(rect, fill=False)
+    if clase == "imagen":
+        page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_REMOVE)
+    else:
+        page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_NONE)
+
+
+def dibujar_etiqueta(doc, page, dato):
+    """
+    Redibuja la cápsula (CABALLERO/DAMA) con el ancho justo para el texto
+    nuevo, centrado. Sirve para cambiar de género sin que quede descuadrada.
+    """
+    rect = fitz.Rect(dato["bbox"])
+    texto = (dato.get("texto") or "").strip()
+    if not texto:
+        raise ValueError("La etiqueta no puede quedar vacía")
+
+    tamano = float(dato.get("tamano") or 6)
+    color_texto = hex_a_color(dato.get("color") or "#8A6F18")
+    fondo = hex_a_color(dato.get("fondo") or "#F4EFE4")
+    borde = hex_a_color(dato.get("borde") or "#C2A05C")
+    relleno = float(dato.get("relleno") or 7)
+    alto = float(dato.get("alto") or (rect.height or tamano * 1.9))
+
+    centro_y = (rect.y0 + rect.y1) / 2
+    ancho_texto = fitz.get_text_length(texto, fontname="helv", fontsize=tamano)
+    ancho = max(rect.width, ancho_texto + relleno * 2)
+    caja = fitz.Rect(rect.x0, centro_y - alto / 2, rect.x0 + ancho, centro_y + alto / 2)
+
+    apilar()
+    page.add_redact_annot(rect)
+    page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_NONE)
+
+    page.draw_rect(caja, color=borde, fill=fondo, width=0.6)
+    punto = fitz.Point(caja.x0 + (caja.width - ancho_texto) / 2, centro_y + tamano * 0.36)
+    insertar_texto(doc, page, punto, texto, tamano, color_texto, dato.get("fuente") or "helv")
 
 
 UA_IMAGEN = (
@@ -302,6 +439,8 @@ def parchear_imagen(doc, page, dato):
     if not xref:
         raise ValueError("La imagen no tiene referencia")
 
+    apilar()
+
     # 1) Reemplazo directo del objeto imagen (conserva el marco exacto).
     try:
         page.replace_image(xref, stream=bruto)
@@ -358,6 +497,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 "paginas": doc.page_count,
                 "archivo": os.path.basename(SESION["ruta"] or ""),
                 "salida": PDF_SALIDA,
+                "deshacer": len(SESION["pila"]),
+                "rehacer": len(SESION["rehacer"]),
             })
 
         if ruta.path == "/api/pagina":
@@ -372,7 +513,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_header("Content-Type", "image/png")
             self.send_header("Content-Length", str(len(datos)))
             self.end_headers()
-            self.wfile.write(datos)
+            try:
+                self.wfile.write(datos)
+            except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError):
+                pass
             return
 
         if ruta.path == "/api/capa":
@@ -394,7 +538,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(datos)))
             self.send_header("Content-Disposition", 'attachment; filename="catalogo-editado.pdf"')
             self.end_headers()
-            self.wfile.write(datos)
+            try:
+                self.wfile.write(datos)
+            except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError):
+                pass
             return
 
         return self._json(404, {"error": "Ruta no encontrada"})
@@ -419,14 +566,44 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 doc = SESION["doc"] or abrir_pdf()
                 page = doc[int(dato["pagina"]) - 1]
                 parchear_texto(doc, page, dato)
-                return self._json(200, {"ok": True})
+                return self._json(200, self._estado_historial())
+
+            if ruta == "/api/mover":
+                dato = json.loads(cuerpo)
+                doc = SESION["doc"] or abrir_pdf()
+                page = doc[int(dato["pagina"]) - 1]
+                if (dato.get("clase") or "texto") == "imagen":
+                    mover_imagen(doc, page, dato)
+                else:
+                    mover_texto(doc, page, dato)
+                return self._json(200, self._estado_historial())
+
+            if ruta == "/api/eliminar":
+                dato = json.loads(cuerpo)
+                doc = SESION["doc"] or abrir_pdf()
+                page = doc[int(dato["pagina"]) - 1]
+                eliminar_elemento(page, dato)
+                return self._json(200, self._estado_historial())
+
+            if ruta == "/api/etiqueta":
+                dato = json.loads(cuerpo)
+                doc = SESION["doc"] or abrir_pdf()
+                page = doc[int(dato["pagina"]) - 1]
+                dibujar_etiqueta(doc, page, dato)
+                return self._json(200, self._estado_historial())
 
             if ruta == "/api/imagen":
                 dato = json.loads(cuerpo)
                 doc = SESION["doc"] or abrir_pdf()
                 page = doc[int(dato["pagina"]) - 1]
                 parchear_imagen(doc, page, dato)
-                return self._json(200, {"ok": True})
+                return self._json(200, self._estado_historial())
+
+            if ruta == "/api/deshacer":
+                return self._json(200, {"ok": deshacer(), **self._estado_historial()})
+
+            if ruta == "/api/rehacer":
+                return self._json(200, {"ok": rehacer(), **self._estado_historial()})
 
             if ruta == "/api/guardar":
                 doc = SESION["doc"] or abrir_pdf()
@@ -436,6 +613,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self._json(404, {"error": "Ruta no encontrada"})
         except Exception as e:
             return self._json(500, {"error": str(e)})
+
+    @staticmethod
+    def _estado_historial():
+        return {"ok": True, "deshacer": len(SESION["pila"]), "rehacer": len(SESION["rehacer"])}
 
 
 class Servidor(socketserver.ThreadingMixIn, http.server.HTTPServer):
