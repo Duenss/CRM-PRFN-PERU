@@ -15,6 +15,7 @@ import * as anuncios from './anuncios.js';
 // (Las plantillas de pago se eliminaron: las billeteras digitales las verifica el admin.)
 import * as seguimiento from './seguimiento.js';
 import { crearAuth, crearAuthPanel, crearLimitador } from './auth.js';
+import { registrarAjustes } from './routes/ajustes.js';
 import { emitir, desde as eventosDesde, ultimoId as ultimoEventoId, suscribir, lineaSSE } from './eventos.js';
 import { reclamarEnvioCon, marcarEnvioCon, cerrarCampanaSiCompleta, barrerEnviosColgados, verificarMigracionEnviosCon, esErrorDeMigracion, mensajeErrorMigracion } from './campanas.js';
 import { esEfectivo, decidirEstadoPedidoIA, debeDerivarPago, textoAvisoPagoDigital, corregirEstadoPedidoIA } from './politicas.js';
@@ -2163,58 +2164,11 @@ app.get('/api/stream', auth, (req, res) => {
 });
 
 /* ---------------- Asistente IA ---------------- */
-app.get('/api/ajustes', auth, (_req, res) => res.json({ ajustes: estadoAjustes() }));
-
-app.post('/api/ajustes', auth, (req, res) => {
-  try {
-    const a = actualizarAjustes(req.body || {});
-    // El límite de respuestas por chat vive en el estado de la IA.
-    try { actualizarIA({ maxPorConversacion: a.maxRespuestasPorChat }); } catch { /* opcional */ }
-    log(`Ajustes actualizados: día=${a.maxPorDia || 'sin límite'} · respuestas/chat=${a.maxRespuestasPorChat || 'sin límite'} · mensajes=${a.intervaloMin}-${a.intervaloMax}s · entre chats=${a.intervaloEntreChats}s · masivo=${a.intervaloMasivo}s`);
-    res.json({ ok: true, ajustes: a });
-  } catch (e) {
-    res.status(400).json({ error: e.message });
-  }
-});
-
-app.get('/api/ia', auth, (_req, res) => res.json(estadoIA()));
-
-app.post('/api/ia', auth, (req, res) => {
-  try {
-    const estado = actualizarIA(req.body || {});
-    emitir('ia', {
-      accion: 'config',
-      activa: estado.activa,
-      autoRespuesta: estado.autoRespuesta,
-      maxPorConversacion: estado.maxPorConversacion,
-      pausadas: estado.pausados.length
-    });
-    res.json(estado);
-  } catch (e) {
-    res.status(400).json({ error: e.message });
-  }
-});
-
-app.post('/api/ia/pausar', auth, (req, res) => {
-  try {
-    const tel = normalizar(req.body?.telefono);
-    if (!/^\d{8,15}$/.test(tel)) return res.status(400).json({ error: 'Teléfono inválido.' });
-    const pausado = req.body?.pausado !== false;
-    const estado = pausarIA(tel, pausado, req.body?.motivo || '', req.body?.nombre || '');
-    log(`${pausado ? 'IA pausada' : 'IA reanudada'} para +${tel}${pausado && req.body?.motivo ? ' (' + req.body.motivo + ')' : ''}.`);
-    emitir('ia', {
-      accion: pausado ? 'pausar' : 'reanudar',
-      telefono: tel,
-      pausado,
-      motivo: String(req.body?.motivo || ''),
-      pausadas: estado.pausados.length,
-      activa: estado.activa,
-      autoRespuesta: estado.autoRespuesta
-    });
-    res.json(estado);
-  } catch (e) {
-    res.status(400).json({ error: e.message });
-  }
+// Rutas de ajustes y de la IA (router aparte para no engordar app.js).
+registrarAjustes(app, {
+  auth, log, emitir, normalizar,
+  estadoAjustes, actualizarAjustes,
+  estadoIA, actualizarIA, pausarIA
 });
 
 app.get('/api/estadisticas', auth, (req, res) => {

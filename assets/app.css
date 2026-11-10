@@ -392,3 +392,5 @@ dialog::backdrop{background:rgba(3,4,8,.66);backdrop-filter:blur(8px)}
 .skel.titulo{height:20px;width:45%}
 .skel.fila{height:52px;border-radius:12px}
 @media(prefers-reduced-motion:reduce){.skel::after{animation:none}}
+
+.logbox:focus-visible{outline:2px solid var(--gold);outline-offset:2px}

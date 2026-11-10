@@ -37,7 +37,7 @@ const RUTAS = {
   DELETE: ['/api/anuncios']
 };
 
-function rutaPermitida(metodo, ruta) {
+export function rutaPermitida(metodo, ruta) {
   const lista = RUTAS[metodo];
   if (!lista) return false;
   if (!/^\/api\/[A-Za-z0-9/_\-]*$/.test(ruta)) return false;
@@ -68,7 +68,7 @@ async function usuarioDeToken(token, env) {
   }
 }
 
-function esDueno(usuario, env) {
+export function esDueno(usuario, env) {
   const emails = String(env.OWNER_EMAIL || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
   const uids = String(env.OWNER_UID || '').split(',').map(s => s.trim()).filter(Boolean);
   // Sin configuración explícita: basta con ser usuario autenticado del proyecto.
@@ -78,7 +78,7 @@ function esDueno(usuario, env) {
   return emails.includes(email) || uids.includes(id);
 }
 
-function cors(env, request) {
+export function cors(env, request) {
   const origen = request.headers.get('Origin') || '';
   const permitido = String(env.PANEL_ORIGIN || '').replace(/\/+$/, '');
   if (origen && permitido && origen === permitido) {
