@@ -47,6 +47,18 @@ export function rutaPermitida(metodo, ruta) {
   return lista.some(prefijo => ruta === prefijo || ruta.startsWith(prefijo + '/') || ruta.startsWith(prefijo + '?'));
 }
 
+// Rutas que legítimamente tardan (sincronizar WhatsApp, IA, sesión): más margen.
+// El resto corta a los 8 s para que el panel no se quede colgado si el bot está caído.
+const TIEMPOS_LENTOS = [
+  { re: /^\/api\/(sincronizar|borradores|sesion|logout|prueba)/, ms: 150000 },
+  { re: /^\/api\/anuncios\/ia/, ms: 120000 },
+  { re: /^\/api\/(enviar|revisar)/, ms: 60000 }
+];
+function tiempoMaximo(ruta) {
+  for (const t of TIEMPOS_LENTOS) if (t.re.test(ruta)) return t.ms;
+  return 8000;
+}
+
 function json(cuerpo, estado) {
   return new Response(JSON.stringify(cuerpo), {
     status: estado,
@@ -143,8 +155,9 @@ export async function onRequest(context) {
       headers,
       body: conCuerpo ? request.body : undefined,
       redirect: 'manual',
-      // Si el bot está apagado no queremos colgar la petición: falla en 8 s.
-      signal: AbortSignal.timeout(8000)
+      // Si el bot está apagado no queremos colgar la petición: 8 s por defecto,
+      // más margen en las rutas lentas (sincronizar, IA).
+      signal: AbortSignal.timeout(tiempoMaximo(ruta))
     });
 
     const salida = new Headers(respuesta.headers);

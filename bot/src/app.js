@@ -1274,7 +1274,8 @@ function textoDe(msg) {
   const mapa = {
     image: '[imagen]', video: '[video]', audio: '[audio]', ptt: '[nota de voz]',
     document: '[documento]', sticker: '[sticker]', location: '[ubicación]',
-    vcard: '[contacto]', multi_vcard: '[contactos]'
+    vcard: '[contacto]', multi_vcard: '[contactos]', poll_creation: '[encuesta]',
+    event_creation: '[evento]', call_log: '[llamada]', revoked: '[mensaje eliminado]'
   };
   return mapa[tipo] || (msg && msg.hasMedia ? '[archivo]' : '');
 }
@@ -1383,7 +1384,7 @@ async function manejarMensaje(msg, sesionId = null) {
 
   let texto = textoDe(msg);
   if (!texto) {
-    log(`Mensaje vacío de +${tel} (sin texto ni multimedia).`);
+    log(`Mensaje sin texto de +${tel} (tipo: ${String(msg.type || 'desconocido')}); se ignora.`);
     return;
   }
   let esTextoReal = !/^\[/.test(texto);
@@ -2019,7 +2020,7 @@ app.get('/api/estadisticas', auth, (req, res) => {
  * Devuelve { lista, chats } para que el llamador loguee/emita el evento.
  */
 async function sincronizarChatsDesdeWhatsApp(sesionId = null) {
-  const lista = await conTimeout(listarChatsWa(sesionId), 50000, 'listar chats de WhatsApp');
+  const lista = await conTimeout(listarChatsWa(sesionId), 90000, 'listar chats de WhatsApp');
   let chats = 0;
   for (const c of lista) {
     if (c.esGrupo || !/^\d{8,15}$/.test(c.telefono)) continue;

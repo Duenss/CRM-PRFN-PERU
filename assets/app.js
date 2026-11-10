@@ -1090,6 +1090,7 @@ $('#qr-logout')?.addEventListener('click',async()=>{
 /* ---------- sincronizar chats y contactos desde WhatsApp ---------- */
 async function sincronizar(opts = {}) {
   const { chats = true, contactos = false, btn = null, origen = '' } = opts;
+  // La sincronización de WhatsApp puede tardar; el proxy ya da margen para /api/sincronizar.
   const estado = $('#b-sync-status');
   const antes = btn?.textContent;
   if (btn) { btn.disabled = true; btn.textContent = 'Sincronizando…'; }
