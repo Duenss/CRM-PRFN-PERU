@@ -37,3 +37,7 @@ deploy/pterodactyl/bot.env.produccion*
 deploy/pterodactyl/bot.env.produccion2
 deploy/pterodactyl/bot.env.produccion3
 deploy/pterodactyl/servidor-payload*.json
+deploy/pterodactyl/*.env
+deploy/pterodactyl/*.env.*
+!deploy/pterodactyl/*.example
+!deploy/pterodactyl/*.env.production.example
