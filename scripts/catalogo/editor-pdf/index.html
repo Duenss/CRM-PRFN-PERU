@@ -169,7 +169,11 @@ async function cargarPagina(n, conservarSeleccion = false) {
   if (!seleccion) panel.innerHTML = "<h2>Sin selección</h2><p class='vacio'>Clic en un texto (azul) o en una foto (naranja).</p>";
   pintarEstado("Cargando…");
   imgPagina.src = "/api/pagina?n=" + paginaActual + "&t=" + Date.now();
-  await new Promise((res) => { imgPagina.onload = res; });
+  await new Promise((res, rej) => {
+    imgPagina.onload = res;
+    imgPagina.onerror = () => rej(new Error("NO_BACKEND: no se pudo cargar la página del PDF."));
+    setTimeout(() => rej(new Error("NO_BACKEND: el servidor no respondió a tiempo.")), 20000);
+  });
   capa = await pedirJSON("/api/capa?n=" + paginaActual);
   pintarCajas();
   pintarEstado("Página " + paginaActual + " de " + totalPaginas);

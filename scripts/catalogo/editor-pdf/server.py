@@ -34,7 +34,8 @@ REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.a
 PDF_ORIGEN = os.path.join(REPO, "docs", "catalogo", "catalogo-navidad-2026.pdf")
 PDF_SALIDA = os.path.join(REPO, "docs", "catalogo", "catalogo-editado.pdf")
 AQUI = os.path.dirname(os.path.abspath(__file__))
-PUERTO = int(os.environ.get("PUERTO", 4322))
+HOST = os.environ.get("HOST", "127.0.0.1")
+PUERTO = int(os.environ.get("PORT") or os.environ.get("PUERTO") or 4322)
 
 SESION = {
     "doc": None,
@@ -634,4 +635,4 @@ if __name__ == "__main__":
         abrir_pdf()
     print(f"Editor de PDF: http://127.0.0.1:{PUERTO}")
     print(f"Sale en: {PDF_SALIDA}")
-    Servidor(("127.0.0.1", PUERTO), Handler).serve_forever()
+    Servidor((HOST, PUERTO), Handler).serve_forever()
