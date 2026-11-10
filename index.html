@@ -1381,7 +1381,7 @@ async function renderInicio(){
     kpi('gold','Clientes que aceptan promos',conPromo,`${clientes.length} registrados`,ico.users)+
     kpi('blue','Conversaciones',chats.chats??0,`${chats.noLeidos??0} sin leer`,ico.chat)+
     kpi('warn','Campañas programadas',pend,`${camMes} creadas este mes`,ico.cal)+
-    kpi('green','Mensajes enviados hoy',st?.enviadosHoy??0,`límite ${st?.maxPorDia??'—'}/día`,ico.send));
+    kpi('green','Mensajes enviados hoy',st?.enviadosHoy??0,st?.maxPorDia?`límite ${st.maxPorDia}/día`:'sin límite',ico.send));
   if(st&&st.dias&&st.dias.length)pintarChart(st.dias,st.totalEntrantes||0,st.totalSalientes||0);
   else if($('#i-chart')&&$('#i-chart').dataset.hay!=='1'){if($('#i-chart'))$('#i-chart').dataset.sig='';$('#i-chart').innerHTML='<p class="empty" style="padding:1rem">Sin datos del bot. Enciéndelo para ver el gráfico.</p>';}
   pintarCola(cvs?.conversaciones||[]);
@@ -1647,7 +1647,7 @@ $('#b-test').onclick=async()=>{
     const j=await botFetch('/api/estado',{signal:c.signal});clearTimeout(t);
     const ses=j.sesiones||[];
     s.innerHTML=(ses.length?ses.map(x=>`<span class="status"><span class="dot ${x.conectado?'on':x.estado==='qr'?'':'off'}"></span>${esc(x.etiqueta)}${x.numero?' · +'+esc(x.numero):''}${x.estado==='qr'?' · esperando QR':''}</span>`).join(' '):'<span class="status"><span class="dot off"></span>Sin sesiones</span>')+
-      `<div class="muted" style="margin-top:.5rem">Cola: ${Number(j.cola)||0} · Programadas: ${Number(j.programadas)||0} · Auto-respuesta: ${j.autoRespuesta?'activa':'apagada'}${j.modoPrueba?' · MODO PRUEBA':''} · Hoy: ${j.enviadosHoy??0}/${j.maxPorDia??'—'}</div>`;
+      `<div class="muted" style="margin-top:.5rem">Cola: ${Number(j.cola)||0} · Programadas: ${Number(j.programadas)||0} · Auto-respuesta: ${j.autoRespuesta?'activa':'apagada'}${j.modoPrueba?' · MODO PRUEBA':''} · Hoy: ${j.enviadosHoy??0}${j.maxPorDia?'/'+j.maxPorDia:''}</div>`;
   }catch(e){s.innerHTML='<span class="status"><span class="dot off"></span>Sin conexión con el bot</span> <span class="muted">Enciéndelo y revisa la dirección.</span>'}
 };
 $('#b-open').onclick=()=>{guardarBot();toast('Conexión guardada')};
@@ -1776,7 +1776,7 @@ async function refrescarChip(){
     const j=await botFetch('/api/estado');
     const s=(j.sesiones||[]).find(x=>x.conectado)||(j.sesiones||[])[0]||{};
     chip.classList.remove('on','qr','off');
-    if(s.conectado){chip.classList.add('on');t.textContent='WhatsApp conectado';chip.title='+'+s.numero+' · '+(j.modoPrueba?'modo prueba':'modo real')+' · '+(j.enviadosHoy??0)+'/'+(j.maxPorDia??'—')+' hoy';}
+    if(s.conectado){chip.classList.add('on');t.textContent='WhatsApp conectado';chip.title='+'+s.numero+' · '+(j.modoPrueba?'modo prueba':'modo real')+' · '+(j.enviadosHoy??0)+(j.maxPorDia?'/'+j.maxPorDia:'')+' hoy';}
     else if(s.estado==='qr'){chip.classList.add('qr');t.textContent='Escanear QR';chip.title='Abre Ajustes para ver el QR';}
     else{chip.classList.add('off');t.textContent='Bot sin conexión';}
   }catch(e){chip.classList.remove('on','qr');chip.classList.add('off');t.textContent='Bot apagado';chip.title='Enciende el bot en la PC';}
@@ -2490,7 +2490,7 @@ function pintarConexion(st){
   const cont=$('#ia-conn');if(!cont)return;
   const s=(st.sesiones||[]).find(x=>x.conectado)||(st.sesiones||[])[0]||{};
   const ok=!!s.conectado;
-  cont.innerHTML=`<div class="status" style="margin-bottom:.8rem"><span class="dot ${ok?'on':'off'}"></span>${ok?'Conectado':'Sin conexión'}${s.numero?' · +'+esc(s.numero):''}${s.estado==='qr'?' · esperando QR':''}</div><p class="muted" style="margin:.2rem 0">Modo: ${st.modoPrueba?'prueba (no envía)':'real'} · Retraso: ${st.delay?.min??'—'}-${st.delay?.max??'—'}s · Hoy: ${st.enviadosHoy??0}/${st.maxPorDia??'—'} · Horario: ${st.horario?.inicio??'—'}-${st.horario?.fin??'—'}h</p><div class="acts" style="justify-content:flex-start"><button class="ghost" id="ia-qr" type="button">${ok?'Conexión y QR':'Conectar WhatsApp'}</button><button class="ghost" id="ia-logs" type="button">Ver registro</button></div>`;
+  cont.innerHTML=`<div class="status" style="margin-bottom:.8rem"><span class="dot ${ok?'on':'off'}"></span>${ok?'Conectado':'Sin conexión'}${s.numero?' · +'+esc(s.numero):''}${s.estado==='qr'?' · esperando QR':''}</div><p class="muted" style="margin:.2rem 0">Modo: ${st.modoPrueba?'prueba (no envía)':'real'} · Retraso: ${st.delay?.min??'—'}-${st.delay?.max??'—'}s · Hoy: ${st.enviadosHoy??0}${st.maxPorDia?'/'+st.maxPorDia:''} · Horario: ${st.horario?.inicio??'—'}-${st.horario?.fin??'—'}h</p><div class="acts" style="justify-content:flex-start"><button class="ghost" id="ia-qr" type="button">${ok?'Conexión y QR':'Conectar WhatsApp'}</button><button class="ghost" id="ia-logs" type="button">Ver registro</button></div>`;
   $('#ia-qr').onclick=()=>irTab('bot');
   $('#ia-logs').onclick=()=>irTab('bot');
 }

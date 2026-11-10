@@ -79,7 +79,7 @@ Límites por defecto:
 | Variable | Valor |
 | --- | --- |
 | `DELAY_MIN` / `DELAY_MAX` | 25 / 40 segundos |
-| `MAX_POR_DIA` | 80 mensajes |
+| `MAX_POR_DIA` | 0 = sin limite (solo intervalo) |
 | `HORA_INICIO` / `HORA_FIN` | 9:00 / 20:00 (Lima) |
 | `LUNES_A_SABADO` | true |
 

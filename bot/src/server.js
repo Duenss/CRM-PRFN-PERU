@@ -90,6 +90,8 @@ function contarEnvio() {
   dia.n++;
 }
 function limiteAlcanzado() {
+  // Sin límite diario configurado: solo manda el intervalo entre mensajes.
+  if (!config.maxPorDia) return false;
   const hoy = fechaLima(partesLima());
   if (dia.fecha !== hoy) dia = { fecha: hoy, n: 0 };
   return dia.n >= config.maxPorDia;

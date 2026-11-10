@@ -141,9 +141,9 @@
     },
     {
       "name": "Limite por dia",
-      "description": "Maximo de mensajes enviados por dia",
+      "description": "0 = sin limite diario (solo intervalo entre mensajes)",
       "env_variable": "MAX_POR_DIA",
-      "default_value": "80",
+      "default_value": "0",
       "user_viewable": true,
       "user_editable": true,
       "rules": "required|integer",
