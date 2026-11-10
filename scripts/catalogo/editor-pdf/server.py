@@ -15,6 +15,7 @@ Uso:
 
 import base64
 import http.server
+import io
 import json
 import os
 import re
@@ -25,6 +26,7 @@ import urllib.parse
 import urllib.request
 
 import pymupdf as fitz
+from PIL import Image
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
@@ -251,6 +253,36 @@ def descargar_imagen(url):
     return datos
 
 
+def normalizar_imagen(bruto):
+    """
+    Convierte cualquier imagen (AVIF, WebP, PNG con transparencia…) a JPEG.
+    PyMuPDF no entiende AVIF; Pillow sí, así que se normaliza antes de incrustar.
+    """
+    try:
+        imagen = Image.open(io.BytesIO(bruto))
+        imagen.load()
+    except Exception:
+        raise ValueError("El archivo no es una imagen válida")
+
+    if imagen.mode in ("RGBA", "LA") or (imagen.mode == "P" and "transparency" in imagen.info):
+        fondo = Image.new("RGB", imagen.size, (255, 255, 255))
+        rgba = imagen.convert("RGBA")
+        fondo.paste(rgba, mask=rgba.split()[-1])
+        imagen = fondo
+    else:
+        imagen = imagen.convert("RGB")
+
+    # Limitar el lado mayor para no inflar el PDF.
+    lado = 1400
+    if max(imagen.size) > lado:
+        escala = lado / max(imagen.size)
+        imagen = imagen.resize((max(1, round(imagen.size[0] * escala)), max(1, round(imagen.size[1] * escala))), Image.LANCZOS)
+
+    salida = io.BytesIO()
+    imagen.save(salida, "JPEG", quality=92, optimize=True)
+    return salida.getvalue()
+
+
 def parchear_imagen(doc, page, dato):
     """Reemplaza una foto por otra (archivo o URL), conservando su posición."""
     if dato.get("url"):
@@ -263,6 +295,8 @@ def parchear_imagen(doc, page, dato):
         bruto = base64.b64decode(m[2])
         if len(bruto) < 3000:
             raise ValueError("La imagen es demasiado pequeña")
+
+    bruto = normalizar_imagen(bruto)
 
     xref = dato.get("xref")
     if not xref:
