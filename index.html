@@ -720,7 +720,8 @@ dialog::backdrop{background:rgba(3,4,8,.66);backdrop-filter:blur(8px)}
       <div class="pagehead"><div><h1>Ajustes de conexión</h1><p class="muted">Dirección del bot, estado del número y reglas de envío.</p></div></div>
       <div class="box">
         <h2>Conexión</h2>
-        <label for="b-url">Dirección del bot (API)</label><input id="b-url" placeholder="http://localhost:3000">
+        <label for="b-url">Dirección del bot (API)</label><input id="b-url" placeholder="Vacío = proxy de Cloudflare Pages · local: http://localhost:3000">
+        <p class="muted" style="font-size:.78rem;margin:.2rem 0 .6rem">En Cloudflare Pages deja este campo <b>vacío</b> (usa el proxy <code>/api</code>). En local pon <code>http://localhost:3000</code>.</p>
         <label for="b-token">Token del bot (opcional, si configuraste BOT_TOKEN)</label><input id="b-token" type="password" autocomplete="off">
         <div class="acts"><button class="ghost" id="b-test" type="button">Probar conexión</button><button id="b-open" type="button">Guardar conexión</button></div>
         <p id="b-status" class="muted" style="margin-top:1rem">Sin comprobar.</p>
@@ -1499,7 +1500,7 @@ $('#cal-next').onclick=()=>{calCursor=new Date(calCursor.getFullYear(),calCursor
 $('#cal-today').onclick=()=>{calCursor=new Date();calSel=hoyISO();renderCalendario()};
 
 /* ---------- bot ---------- */
-let botURL=localStorage.getItem('bot_url')||'http://localhost:3000';
+let botURL=localStorage.getItem('bot_url')??'';
 let botToken=localStorage.getItem('bot_token')||'';
 $('#b-url').value=botURL;$('#b-token').value=botToken;
 function guardarBot(){botURL=$('#b-url').value.trim().replace(/\/$/,'');botToken=$('#b-token').value.trim();localStorage.setItem('bot_url',botURL);localStorage.setItem('bot_token',botToken);conectarSSE()}

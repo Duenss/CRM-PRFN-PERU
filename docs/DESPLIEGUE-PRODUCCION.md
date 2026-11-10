@@ -154,3 +154,35 @@ Luego:
 - [ ] Respaldo de `bot/data` y `bot/.wwebjs_auth` programado (cron/rsync).
 - [ ] HTTPS activo si el panel se abre fuera de la red local.
 - [ ] Panel del CRM publicado (Cloudflare Pages) apuntando a la URL del bot.
+
+---
+
+## D. Panel en Cloudflare Pages (HTTPS)
+
+El panel es index.html (un solo archivo). Para que funcione en HTTPS sin
+bloqueo de contenido mixto, el repo incluye un **proxy** en
+unctions/api/[[path]].js que reenvía /api/* al bot por HTTP desde el
+servidor de Cloudflare.
+
+### Pasos
+
+1. Cloudflare → **Workers & Pages → Create → Pages → Connect to Git**.
+2. Elige el repo **CRM-PRFN-PERU** (privado).
+3. Framework preset: **None**. Build command: **vacío**. Build output directory: **/**.
+4. En **Settings → Environment variables** agrega:
+   - BOT_URL = http://157.173.192.178:25577
+   - BOT_TOKEN = el token del bot (el mismo de /bot/.env)
+5. Deploy. La URL queda tipo https://crm-prfn-peru.pages.dev.
+6. Abre el panel, inicia sesión con Supabase y en **Ajustes → Conexión** deja la
+   **URL del bot vacía** y el **token vacío** (el proxy los pone).
+7. Escanea el QR en http://157.173.192.178:25577/panel (o usando el proxy:
+   https://TU-PAGES.pages.dev/panel también sirve, porque el proxy reenvía todo).
+
+### Notas
+
+- El proxy solo reenvía /api/*; el resto (/panel, QR) se sigue usando directo
+  por http://157.173.192.178:25577/panel.
+- Si cambias el puerto del bot, actualiza BOT_URL en Pages y el .env del servidor.
+- Para local: 
+ode scripts/serve-panel.mjs 8080 y en Ajustes pon
+  http://localhost:3000 (y el token si lo usas).
