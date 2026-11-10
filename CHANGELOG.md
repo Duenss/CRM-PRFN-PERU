@@ -35,7 +35,7 @@
 - Supervisor con auto-reinicio del proceso del bot.
 
 ### Calidad
-- Router `bot/src/routes/ajustes.js` separado de `app.js` (primera etapa del split).
+- Routers separados de `app.js`: `routes/ajustes.js`, `routes/pedidos.js` y `routes/seguimiento.js`.
 - 78 pruebas: incluye lista blanca del proxy, validación del dueño y sanitización de `esc()`.
 - Auditoría axe (WCAG AA) en 1280 y 360 px: **0 violaciones** en las 11 pestañas y el login.
 - 69 pruebas unitarias, 11 e2e y CI de GitHub Actions.
