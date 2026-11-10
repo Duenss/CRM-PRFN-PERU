@@ -214,9 +214,49 @@ function panelImagen(im) {
   panel.innerHTML = `
     <h2>Reemplazar foto</h2>
     <p class="ayuda">Tamaño actual: ${im.w}×${im.h} px</p>
-    <div class="campo"><label>Nueva imagen</label><input type="file" id="pImg" accept="image/*"></div>
-    <button class="primary" id="pAplicarImg" style="width:100%">Reemplazar</button>
+
+    <div class="campo"><label>Desde un enlace (URL)</label>
+      <input type="text" id="pUrl" placeholder="https://.../foto.jpg">
+    </div>
+    <button class="primary" id="pAplicarUrl" style="width:100%">Usar esta imagen</button>
+
+    <div style="margin:16px 0 12px;border-top:1px solid var(--line)"></div>
+
+    <div class="campo"><label>…o desde tu equipo</label><input type="file" id="pImg" accept="image/*"></div>
+    <button id="pAplicarImg" style="width:100%">Subir archivo</button>
+
+    <div id="pPreview" style="margin-top:14px"></div>
     <p class="ayuda">Se mantiene la posición y el tamaño del marco; la imagen se adapta.</p>`;
+
+  const campoUrl = panel.querySelector("#pUrl");
+  const preview = panel.querySelector("#pPreview");
+
+  campoUrl.addEventListener("input", () => {
+    const u = campoUrl.value.trim();
+    preview.innerHTML = /^https?:\/\//i.test(u)
+      ? `<img src="${u}" alt="Vista previa" style="width:100%;border-radius:8px;border:1px solid var(--line);background:#fff">`
+      : "";
+  });
+
+  panel.querySelector("#pAplicarUrl").addEventListener("click", async () => {
+    const url = campoUrl.value.trim();
+    if (!/^https?:\/\//i.test(url)) return alert("Pegá un enlace que empiece con http:// o https://");
+    pintarEstado("Descargando imagen…");
+    try {
+      const r = await fetch("/api/imagen", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pagina: paginaActual, xref: im.xref, url }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Error");
+      pintarEstado("Foto reemplazada ✓", "ok");
+      await cargarPagina(paginaActual);
+    } catch (e) {
+      pintarEstado("Error", "err"); alert(e.message);
+    }
+  });
+
   panel.querySelector("#pAplicarImg").addEventListener("click", async () => {
     const archivo = panel.querySelector("#pImg").files[0];
     if (!archivo) return alert("Elegí una imagen primero.");

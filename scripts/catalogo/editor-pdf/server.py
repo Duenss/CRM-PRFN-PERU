@@ -22,6 +22,7 @@ import socketserver
 import sys
 import tempfile
 import urllib.parse
+import urllib.request
 
 import pymupdf as fitz
 
@@ -223,17 +224,71 @@ def parchear_texto(doc, page, dato):
     page.insert_text(punto, texto, fontsize=tamano, color=color, fontname=nombre)
 
 
+UA_IMAGEN = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+)
+MAX_IMAGEN = 15 * 1024 * 1024
+
+
+def descargar_imagen(url):
+    """Descarga una imagen desde una URL y valida que sea usable."""
+    if not url.lower().startswith(("http://", "https://")):
+        raise ValueError("La URL debe empezar con http:// o https://")
+    peticion = urllib.request.Request(url, headers={"User-Agent": UA_IMAGEN, "Accept": "image/*,*/*"})
+    try:
+        with urllib.request.urlopen(peticion, timeout=30) as r:
+            tipo = (r.headers.get("Content-Type") or "").lower()
+            datos = r.read(MAX_IMAGEN + 1)
+    except Exception as e:
+        raise ValueError("No se pudo descargar la imagen: %s" % e)
+    if len(datos) > MAX_IMAGEN:
+        raise ValueError("La imagen supera 15 MB")
+    if len(datos) < 3000:
+        raise ValueError("La imagen es demasiado pequeña (%d bytes)" % len(datos))
+    if not tipo.startswith("image/"):
+        raise ValueError("La URL no devuelve una imagen (Content-Type: %s)" % (tipo or "desconocido"))
+    return datos
+
+
 def parchear_imagen(doc, page, dato):
-    """Reemplaza una foto por otra, conservando su posición."""
-    data_url = dato["dataUrl"]
-    m = re.match(r"^data:image/(\w+);base64,(.+)$", data_url, re.S)
-    if not m:
-        raise ValueError("Formato de imagen no válido")
-    bruto = base64.b64decode(m[2])
+    """Reemplaza una foto por otra (archivo o URL), conservando su posición."""
+    if dato.get("url"):
+        bruto = descargar_imagen(dato["url"])
+    else:
+        data_url = dato.get("dataUrl") or ""
+        m = re.match(r"^data:image/(\w+);base64,(.+)$", data_url, re.S)
+        if not m:
+            raise ValueError("Formato de imagen no válido")
+        bruto = base64.b64decode(m[2])
+        if len(bruto) < 3000:
+            raise ValueError("La imagen es demasiado pequeña")
+
     xref = dato.get("xref")
     if not xref:
         raise ValueError("La imagen no tiene referencia")
-    doc.replace_image(xref, stream=bruto)
+
+    # 1) Reemplazo directo del objeto imagen (conserva el marco exacto).
+    try:
+        page.replace_image(xref, stream=bruto)
+        return
+    except Exception:
+        pass
+
+    # 2) Respaldo: borrar la imagen de esa zona e insertar la nueva.
+    rect = None
+    for info in page.get_image_info(xrefs=True):
+        if info.get("xref") == xref:
+            rect = fitz.Rect(info["bbox"])
+            break
+    if rect is None and dato.get("bbox"):
+        rect = fitz.Rect(dato["bbox"])
+    if rect is None:
+        raise ValueError("No se encontró la imagen en la página")
+
+    page.add_redact_annot(rect, fill=False)
+    page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_REMOVE)
+    page.insert_image(rect, stream=bruto, keep_proportion=True)
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
