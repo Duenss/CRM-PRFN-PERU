@@ -129,9 +129,34 @@ function actualizarHistorial(d) {
   }
 }
 
+/* Petición que falla con un mensaje claro si el backend no existe. */
+async function pedirJSON(url, opciones) {
+  const r = await fetch(url, opciones);
+  const tipo = (r.headers.get("Content-Type") || "").toLowerCase();
+  if (!tipo.includes("application/json")) {
+    throw new Error(
+      "NO_BACKEND: esta página está publicada como sitio estático y no tiene el servidor Python. " +
+      "Abrí el editor en tu PC con Abrir-Editor.bat (http://127.0.0.1:4322)."
+    );
+  }
+  const datos = await r.json();
+  if (!r.ok) throw new Error(datos.error || ("Error " + r.status));
+  return datos;
+}
+
+function mostrarSinBackend(mensaje) {
+  pintarEstado("Sin servidor", "err");
+  panel.innerHTML = `
+    <h2>Falta el servidor</h2>
+    <p class='vacio' style='margin-bottom:10px'>${esc(mensaje.replace("NO_BACKEND: ", ""))}</p>
+    <p class='vacio'>Este editor trabaja con <b>PyMuPDF</b> en tu equipo: no puede correr en un hosting
+    estático como Cloudflare Pages.</p>
+    <p class='ayuda'>Ejecutá <b>Abrir-Editor.bat</b> en la carpeta del editor y abrí
+    <b>http://127.0.0.1:4322</b>.</p>`;
+}
+
 async function cargarEstado() {
-  const r = await fetch("/api/estado");
-  const d = await r.json();
+  const d = await pedirJSON("/api/estado");
   totalPaginas = d.paginas;
   document.getElementById("totalPaginas").textContent = "/ " + d.paginas;
   actualizarHistorial(d);
@@ -145,8 +170,7 @@ async function cargarPagina(n, conservarSeleccion = false) {
   pintarEstado("Cargando…");
   imgPagina.src = "/api/pagina?n=" + paginaActual + "&t=" + Date.now();
   await new Promise((res) => { imgPagina.onload = res; });
-  const r = await fetch("/api/capa?n=" + paginaActual);
-  capa = await r.json();
+  capa = await pedirJSON("/api/capa?n=" + paginaActual);
   pintarCajas();
   pintarEstado("Página " + paginaActual + " de " + totalPaginas);
 }
@@ -567,11 +591,15 @@ document.getElementById("inputPdf").addEventListener("change", async (e) => {
   if (!archivo) return;
   pintarEstado("Abriendo PDF…");
   const dataUrl = await new Promise((res) => { const l = new FileReader(); l.onload = () => res(l.result); l.readAsDataURL(archivo); });
-  const r = await fetch("/api/abrir", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dataUrl }) });
-  const d = await r.json();
-  if (!r.ok) { pintarEstado("Error", "err"); return alert(d.error); }
-  await cargarEstado();
-  await cargarPagina(1);
+  try {
+    await pedirJSON("/api/abrir", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dataUrl }) });
+    await cargarEstado();
+    await cargarPagina(1);
+  } catch (e) {
+    if (String(e.message).startsWith("NO_BACKEND")) return mostrarSinBackend(e.message);
+    pintarEstado("Error", "err");
+    alert(e.message);
+  }
 });
 
 document.getElementById("btnGuardar").addEventListener("click", async () => {
