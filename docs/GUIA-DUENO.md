@@ -58,6 +58,8 @@ Guía corta para usar el CRM en el día a día. El panel vive en
   cantidad y precio, y pulsa **“+ Agregar este perfume al pedido”**. Puedes añadir **varios
   perfumes** (cada uno con su tamaño y cantidad) antes de guardar; la lista muestra el total
   y el saldo, y cada línea se puede quitar.
+- **Entrega**: elige **Delivery** (a domicilio) o **Recojo en estación** (indica la estación),
+  y opcionalmente **fecha y hora** de entrega.
 - **Comprobante**: abre el pedido y adjunta la captura del Yape/Plin/transferencia.
 - Estados: `esperando_pago` → `comprobante_recibido` → `por_entregar` → `entregado`.
 - Si el bot está apagado, el pedido se guarda en el navegador y se sincroniza al encenderlo.

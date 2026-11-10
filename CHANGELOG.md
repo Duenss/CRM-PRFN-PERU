@@ -54,6 +54,9 @@
 ### Buscador global
 - Sustituido el avatar “JP” por un buscador de funciones, perfumes y clientes (atajo: tecla `/`).
 
+### Pedidos: entrega
+- El formulario permite elegir **Delivery** o **Recojo en estación**, con estación, fecha y hora de entrega; se guardan y se muestran en la lista de pedidos.
+
 ### Pedidos con varios perfumes
 - El formulario de pedido permite agregar **varios perfumes**, cada uno con su tamaño, cantidad y precio; lista con quitar, total y saldo en vivo.
 

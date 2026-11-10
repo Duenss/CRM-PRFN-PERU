@@ -16,6 +16,7 @@ de prueba).
 | **Contador de no leídos** | Mensaje nuevo por SSE → badge “1” y título “(1) Panel…”; al abrir el chat se limpia ✅ |
 | **Responder desde el panel** | El mensaje enviado aparece en el hilo del chat (envío simulado) ✅ |
 | **Pedido con varios perfumes** | 1× Khamrah 100 ml (S/ 78) + 2× Khamrah Qahwa 50 ml (S/ 112) → total S/ 190, guardado en el bot con 2 ítems ✅ |
+| **Entrega y estación** | Pedido con recojo en "Estación Central", fecha y hora → guardado en el bot con `entrega: estacion`, `fechaEntrega` y `horaEntrega` ✅ |
 | **Comprobante de pago** | Pedido creado → subida de imagen → estado `comprobante_recibido` → imagen abierta por el proxy con la sesión (200, image/png) ✅ |
 | **Campaña programada (motor)** | Programada → el bot la toma, envía con claim, marca el envío y el mensaje **aparece en la Bandeja**; campaña → `enviada` ✅ (simulación) |
 | **Campaña (envío manual)** | Creada desde la UI como `aprobada` + 1 envío `pendiente` para el cliente ✅ |
