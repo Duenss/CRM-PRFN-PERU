@@ -45,3 +45,12 @@ En el repo solo viven plantillas con valores vacíos: `bot/.env.example`,
 
 Escribe al dueño del proyecto con: qué endpoint, cómo reproducirlo y el impacto.
 No publiques el detalle en issues públicos.
+
+## Estado de las claves (actualizado)
+
+- `SUPABASE_SERVICE_ROLE_KEY`: rotada el 10/11/2026; la anterior ya no existe.
+- `BOT_TOKEN`: rotado el 10/11/2026 (64 hex). El anterior quedó revocado.
+- Pendiente del dueño: rotar la clave de Gemini y confirmar que el repo siga privado.
+- Historial de git: los archivos con secretos se sacaron del índice; si el repo estuvo
+  público, considerar reescribir la historia (`git filter-repo`) o asumir las claves viejas
+  como comprometidas.
