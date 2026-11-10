@@ -17,6 +17,7 @@ de prueba).
 | **Responder desde el panel** | El mensaje enviado aparece en el hilo del chat (envío simulado) ✅ |
 | **Pedido con varios perfumes** | 1× Khamrah 100 ml (S/ 78) + 2× Khamrah Qahwa 50 ml (S/ 112) → total S/ 190, guardado en el bot con 2 ítems ✅ |
 | **Comprobante de pago** | Pedido creado → subida de imagen → estado `comprobante_recibido` → imagen abierta por el proxy con la sesión (200, image/png) ✅ |
+| **Campaña programada (motor)** | Programada → el bot la toma, envía con claim, marca el envío y el mensaje **aparece en la Bandeja**; campaña → `enviada` ✅ (simulación) |
 | **Campaña (envío manual)** | Creada desde la UI como `aprobada` + 1 envío `pendiente` para el cliente ✅ |
 | **Campañas programadas** | Aviso de autodiagnóstico visible con el SQL a ejecutar (constraint viejo) ⚠️ |
 | **Envío masivo** (anuncio simulado) | Texto con `{nombre}` + PDF + video, estado `enviado` 1/1, 0 errores ✅ |

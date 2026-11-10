@@ -40,6 +40,7 @@ Cloudflare Pages. Ver `SECURITY.md`.
 | Crear cliente / importar CSV | Verificado en Supabase y en la lista del panel |
 | Crear pedido (UI) | `P-0001`, total S/ 56, visible en panel y bot |
 | Comprobante de pago | Subida → `comprobante_recibido` → abierto por el proxy (200) |
+| Motor de campañas (simulado) | Programada → enviada; envío pendiente → enviado; mensaje en la Bandeja ✅ |
 | Campaña manual (UI) | `aprobada` + 1 envío `pendiente` |
 | Envío masivo (simulado) | Texto + PDF + video, `enviado` 1/1, 0 errores |
 | Chat simulado | Bienvenida, recomendaciones, promo 3×90, mayoristas, catálogo, pagos, BAJA |
