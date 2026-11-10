@@ -2218,6 +2218,7 @@ app.delete('/api/conversaciones', auth, async (req, res) => {
   try {
     vaciarConversaciones();
     limpiarOcultos();
+    bandejaVaciadaEn = Date.now();
     let borroMensajes = false;
     if (String(req.query.mensajes || '') === '1' && sb) {
       const r = await sb.from('mensajes').delete().not('id', 'is', null);
@@ -2502,18 +2503,24 @@ setInterval(() => { if (!config.modoPrueba && hayConexion()) sincronizarAuto('pe
  * apagado). Se ejecuta una vez al conectar y de nuevo al reconectar.
  */
 let historialesEnCurso = false;
+// Momento del último vaciado de la Bandeja: frena la puesta al día de
+// historiales unos segundos para que no recree chats recién borrados.
+let bandejaVaciadaEn = 0;
 let historialesHechos = false;
 
 async function actualizarHistorialesConocidos({ limite = 25, maxChats = 120 } = {}) {
   if (config.modoPrueba || historialesEnCurso || !hayConexion()) return;
+  if (Date.now() - bandejaVaciadaEn < 120000) return; // Bandeja recién vaciada
   historialesEnCurso = true;
   try {
     const chats = listar(400).filter(c => /^\d{8,15}$/.test(String(c.telefono || ''))).slice(0, maxChats);
     let actualizados = 0;
     for (const c of chats) {
       try {
+        // Si el chat se borró mientras corría esta puesta al día, no se recrea.
+        if (!obtener(c.telefono)) continue;
         const msgs = await conTimeout(historialWa(c.telefono, limite), 30000, 'historial +' + c.telefono);
-        if (msgs && msgs.length) {
+        if (msgs && msgs.length && obtener(c.telefono)) {
           const nuevos = importarMensajes(c.telefono, msgs);
           if (nuevos) actualizados++;
         }
