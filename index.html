@@ -505,6 +505,7 @@ dialog::backdrop{background:rgba(3,4,8,.66);backdrop-filter:blur(8px)}
         <div class="card-h"><b>Nuevo pedido</b><button class="ghost" id="pe-close" type="button" style="min-height:30px;padding:.2rem .6rem">Cerrar</button></div>
         <div style="padding:1rem">
           <div class="grid2">
+            <div style="grid-column:1/-1"><label for="pe-cliente">Elegir de mis clientes (opcional)</label><select id="pe-cliente"><option value="">— escribir manualmente —</option></select></div>
             <div><label for="pe-tel">WhatsApp del cliente</label><input id="pe-tel" placeholder="9 dígitos o 51XXXXXXXXX"></div>
             <div><label for="pe-nombre">Nombre</label><input id="pe-nombre" maxlength="120"></div>
           </div>
@@ -2099,6 +2100,28 @@ $('#in-text')?.addEventListener('input',e=>{e.target.style.height='auto';e.targe
 
 /* ---------- pedidos, plantillas de pago y seguimiento ---------- */
 let pedidosCache=[],inSegActivo=false,alertasNuevas=0,evUltimo=null;
+/* Pedidos guardados en el navegador cuando el bot está apagado. Se suben solos
+   cuando el bot vuelve a responder. */
+const PEDIDOS_LOCAL_KEY='pf_pedidos_offline_v1';
+function leerPedidosLocales(){try{const v=JSON.parse(localStorage.getItem(PEDIDOS_LOCAL_KEY)||'[]');return Array.isArray(v)?v:[]}catch{return[]}}
+function guardarPedidosLocales(l){try{localStorage.setItem(PEDIDOS_LOCAL_KEY,JSON.stringify(l||[]))}catch{}}
+function nuevoPedidoLocalId(){return 'LOCAL-'+Date.now().toString(36).toUpperCase()}
+async function sincronizarPedidosLocales(){
+  const locales=leerPedidosLocales();
+  if(!locales.length)return 0;
+  const quedan=[];let ok=0;
+  for(const p of locales){
+    try{
+      await botFetch('/api/pedidos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+        telefono:p.telefono,nombre:p.nombre,metodo:p.metodo,adelanto:p.adelanto,notas:p.notas,items:p.items
+      })});
+      ok++;
+    }catch(e){quedan.push(p)}
+  }
+  guardarPedidosLocales(quedan);
+  if(ok)toast(ok+' pedido(s) local(es) sincronizado(s) con el bot');
+  return ok;
+}
 const ESTADO_TXT={borrador:'Borrador',esperando_pago:'Esperando pago',comprobante_recibido:'Comprobante recibido',por_entregar:'Por entregar',entregado:'Entregado',cancelado:'Cancelado'};
 const ESTADO_TAG={borrador:'',esperando_pago:'warn',comprobante_recibido:'warn',por_entregar:'ok',entregado:'ok',cancelado:'bad'};
 const metodoTxt=m=>({yape:'Yape',plin:'Plin',transferencia:'Transferencia',efectivo:'Efectivo',otro:'Otro'})[m]||'Por definir';
@@ -2108,18 +2131,23 @@ function actualizarBadgePedidos(){const n=pedidosCache.filter(p=>['esperando_pag
 
 async function cargarPedidos(){
   try{
-    const j=await botFetch('/api/pedidos?limite=200');
+    let j=await botFetch('/api/pedidos?limite=200');
+    if(leerPedidosLocales().length){
+      const subidos=await sincronizarPedidosLocales();
+      if(subidos>0)j=await botFetch('/api/pedidos?limite=200');
+    }
     pedidosCache=j.pedidos||[];guardarUltimo('pedidos',j);renderPedidos(j);actualizarBadgePedidos();
     if(tabActual==='calendario')renderCalendario();
   }catch(e){
-    // Si ya había pedidos cargados, se mantienen en pantalla.
-    if(pedidosCache.length){renderPedidos({});avisoStale($('#pe-sub'),leerUltimo('pedidos')?.t)}
+    // Sin bot: se muestran los pedidos guardados en este navegador.
+    if(leerPedidosLocales().length||pedidosCache.length){renderPedidos({});avisoStale($('#pe-sub'),leerUltimo('pedidos')?.t)}
     else if($('#pe-list'))$('#pe-list').innerHTML='<p class="empty">No se pudo cargar. Revisa que el bot esté encendido.</p>';
   }
 }
 function renderPedidos(j){
-  const ps=pedidosCache;
-  if($('#pe-count'))$('#pe-count').textContent=`${ps.length} pedidos · ${j?.resumen?.abiertos||0} abiertos`;
+  const locales=leerPedidosLocales().map(p=>({...p,local:true}));
+  const ps=[...locales,...pedidosCache];
+  if($('#pe-count'))$('#pe-count').textContent=`${ps.length} pedidos${locales.length?' ('+locales.length+' local(es))':''} · ${j?.resumen?.abiertos||0} abiertos`;
   if($('#pe-sub'))$('#pe-sub').textContent=`${j?.resumen?.abiertos||0} pedidos abiertos · S/ ${j?.resumen?.ventasEntregadas||0} entregados en total.`;
   const estados=j?.estados||Object.keys(ESTADO_TXT);
   $('#pe-list').innerHTML=ps.map(p=>{
@@ -2127,7 +2155,7 @@ function renderPedidos(j){
     const items=(p.items||[]).map(i=>`${i.cantidad}× ${esc(i.nombre)} ${i.ml} ml`).join(', ');
     return `<div class="lrow">
       <div class="lt">
-        <b>${esc(p.id)} · ${esc(p.nombre||('+'+p.telefono))} <i class="tag ${ESTADO_TAG[p.estado]||''}">${esc(ESTADO_TXT[p.estado]||p.estado)}</i></b>
+        <b>${esc(p.id)} · ${esc(p.nombre||('+'+p.telefono))} <i class="tag ${p.local?'warn':(ESTADO_TAG[p.estado]||'')}">${p.local?'Local (sin bot)':esc(ESTADO_TXT[p.estado]||p.estado)}</i></b>
         <small>+${esc(p.telefono)} · ${esc(items||'Sin productos')}</small>
         <small>Total S/ ${p.total}${p.adelanto?` · Adelanto S/ ${p.adelanto}`:''} · Saldo S/ ${p.saldo} · ${metodoTxt(p.metodo)}</small>
         ${p.entrega?`<small>${p.entrega==='estacion'?`Recojo: ${esc(p.estacion||'estación')}`:'Delivery'}${p.fechaEntrega?` · ${esc(p.fechaEntrega)} ${esc(horaTxt(p.horaEntrega))}`:''}${p.refExterna?` · Ref. ${esc(p.refExterna)}`:''}</small>`:''}
@@ -2138,7 +2166,7 @@ function renderPedidos(j){
         ${comp?`<button class="ghost" data-comp="${esc(p.id)}" type="button">Comprobante</button>`:''}
         ${p.estado==='comprobante_recibido'?`<button data-verificar="${esc(p.id)}" type="button">Verificar pago</button><button class="ghost" data-rechazar="${esc(p.id)}" type="button">Rechazar</button>`:''}
         ${p.estado==='por_entregar'?`<button data-entregar="${esc(p.id)}" type="button">Marcar entregado</button>`:''}
-        <select data-estado="${esc(p.id)}" style="min-height:34px;min-width:150px">${estados.map(e=>`<option value="${esc(e)}"${e===p.estado?' selected':''}>${esc(ESTADO_TXT[e]||e)}</option>`).join('')}</select>
+        ${p.local?'<button class="ghost" data-local-del="'+esc(p.id)+'" type="button">Borrar local</button>':`<select data-estado="${esc(p.id)}" style="min-height:34px;min-width:150px">${estados.map(e=>`<option value="${esc(e)}"${e===p.estado?' selected':''}>${esc(ESTADO_TXT[e]||e)}</option>`).join('')}</select>`}
       </div>
     </div>`;
   }).join('')||'<p class="empty">Aún no hay pedidos. Crea uno con "Nuevo pedido" o espera a que la IA detecte una compra.</p>';
@@ -2158,7 +2186,13 @@ function refrescarTotalPedido(){
   const adel=Math.max(0,Number($('#pe-adelanto').value)||0);
   if($('#pe-total'))$('#pe-total').textContent=`Total: S/ ${total.toFixed(2)} · Saldo: S/ ${Math.max(0,total-adel).toFixed(2)}${$('#pe-metodo').value==='efectivo'?' · Se cobra al entregar':''}`;
 }
+function llenarClientesPedido(){
+  const sel=$('#pe-cliente');if(!sel)return;
+  const lista=(typeof clientes!=='undefined'?clientes:[]).filter(c=>c&&c.telefono).slice(0,500);
+  sel.innerHTML='<option value="">— escribir manualmente —</option>'+lista.map(c=>`<option value="${esc(c.telefono)}" data-nombre="${esc(c.nombre||'')}">${esc(c.nombre||('+'+c.telefono))} · +${esc(c.telefono)}</option>`).join('');
+}
 function abrirFormPedido(tel='',nombre=''){
+  llenarClientesPedido();
   llenarProductosPedido();
   $('#pe-form').hidden=false;
   $('#pe-tel').value=tel||'';$('#pe-nombre').value=nombre||'';
@@ -2167,6 +2201,12 @@ function abrirFormPedido(tel='',nombre=''){
   refrescarTotalPedido();
   $('#pe-form').scrollIntoView({block:'center',behavior:'smooth'});
 }
+$('#pe-cliente')?.addEventListener('change',e=>{
+  const opt=e.target.selectedOptions[0];
+  if(!opt||!opt.value)return;
+  if($('#pe-tel'))$('#pe-tel').value=opt.value;
+  if($('#pe-nombre'))$('#pe-nombre').value=opt.dataset.nombre||'';
+});
 async function guardarPedido(){
   const tel=norm($('#pe-tel').value);
   if(!/^\d{8,15}$/.test(tel))return toast('Escribe un WhatsApp válido.', 'error');
@@ -2188,7 +2228,24 @@ async function guardarPedido(){
     $('#pe-form').hidden=true;
     toast('Pedido guardado');
     await cargarPedidos();
-  }catch(e){toast('No se guardó: '+e.message,'error')}
+  }catch(e){
+    const adelanto=Number($('#pe-adelanto').value)||0;
+    const cantidad=Math.max(1,Number($('#pe-cant').value)||1);
+    const total=precio*cantidad;
+    const locales=leerPedidosLocales();
+    locales.unshift({
+      id:nuevoPedidoLocalId(),telefono:tel,
+      nombre:$('#pe-nombre').value.trim()||prod.nombre,
+      metodo:$('#pe-metodo').value||'',adelanto,notas:$('#pe-notas').value.trim(),
+      items:[{productoId:prod.id,nombre:prod.nombre,ml,cantidad,precio}],
+      total,saldo:Math.max(0,total-adelanto),estado:'borrador',local:true,
+      actualizado:new Date().toISOString()
+    });
+    guardarPedidosLocales(locales);
+    $('#pe-form').hidden=true;
+    toast('Bot apagado: pedido guardado en este navegador. Se sincroniza al encenderlo.');
+    await cargarPedidos();
+  }
   b.disabled=false;
 }
 async function cambiarEstadoPedido(id,estado,mensaje){
@@ -2306,6 +2363,12 @@ $('#pe-list')?.addEventListener('click',e=>{
   if(en){cambiarEstadoPedido(en.dataset.entregar,'entregado','Pedido marcado como entregado');return;}
   const c=e.target.closest('[data-comp]');
   if(c){const p=pedidosCache.find(x=>x.id===c.dataset.comp);const comp=(p?.comprobantes||[]).slice(-1)[0];if(comp)window.open(botURL+'/media/comprobantes/'+encodeURIComponent(comp.archivo),'_blank');else toast('Este pedido no tiene comprobante.','error');}
+});
+$('#pe-list')?.addEventListener('click',e=>{
+  const d=e.target.closest('[data-local-del]');if(!d)return;
+  const id=d.dataset.localDel;
+  guardarPedidosLocales(leerPedidosLocales().filter(p=>p.id!==id));
+  renderPedidos({});toast('Pedido local borrado');
 });
 $('#pe-list')?.addEventListener('change',async e=>{
   const s=e.target.closest('[data-estado]');if(!s)return;
