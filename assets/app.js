@@ -1237,7 +1237,7 @@ async function refrescarChip(){
       chip.classList.add('on');
       // Mostrar el número vinculado: evita confusiones cuando se cambia de WhatsApp.
       const n=String(s.numero||'').replace(/\D/g,'');
-      const lindo=n.length===11?('+'+n.slice(0,2)+' '+n.slice(2,5)+' '+n.slice(5,8)+' '+n.slice(8)):('+'+n);
+      const lindo=n?('+'+n):'';
       const angosto=window.matchMedia('(max-width:900px)').matches;
       t.textContent=s.numero?(angosto?'WhatsApp conectado':'WhatsApp · '+lindo):'WhatsApp conectado';
       chip.title=s.numero?(lindo+' · '+(j.modoPrueba?'modo prueba':'modo real')+' · '+(j.enviadosHoy??0)+(j.maxPorDia?'/'+j.maxPorDia:'')+' hoy'):'WhatsApp conectado';
