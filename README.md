@@ -1,265 +1,72 @@
 # CRM Perfumería Fina Perú
 
-Panel privado para clientes, catálogo, campañas, anuncios y envío semi-manual por WhatsApp.
-Incluye un bot con QR para programar envíos, una **bandeja de entrada** en vivo y un
-**Asistente IA** que responde consultas (nunca envía campañas solo).
+Panel de ventas + bot de WhatsApp con IA para Perfumería Fina Perú.
 
-## Novedades 2026-11-09 (producción)
+- **Panel**: un `index.html` estático (Cloudflare Pages) que lee y escribe en Supabase.
+- **Proxy**: `functions/api/[[path]].js` valida la sesión del dueño y reenvía `/api/*` al bot.
+- **Bot**: Node + Express + whatsapp-web.js, desplegado en Pterodactyl.
 
-- **Bienvenida en dos mensajes**: toda conversación nueva empieza con saludo según la hora
-  de Lima + agradecimiento (“Nos alegra que hayas elegido a *Perfumería Fina Perú* como tu
-  perfumería de preferencia”), y después el tema que pidió el cliente.
-- **Catálogo PDF navideño**: si el cliente pide el catálogo, el bot envía
-  `docs/catalogo/catalogo-navidad-2026.pdf` (41 páginas, 202 fragancias) con los rangos por
-  categoría: **Diseñador 4–28 · Árabes 30–35 · Nicho 37–41**.
-- **Módulo de Anuncios** (nueva pestaña): un mensaje único que redactas y envías a *todos*,
-  *por etiquetas* o a *números seleccionados*, con vista previa, conteo de destinatarios y
-  progreso en vivo. Respeta consentimiento, bajas, horario y límite diario.
-- **Medios de pago**: “¿cuáles son tus medios de pago?” responde efectivo/Yape/Plin/
-  transferencia (ya no una lista de perfumes). Se eliminaron las plantillas de pago: los
-  datos salen de `PAGO_*` y **el administrador verifica el pago digital**.
-- **Agenda con cupos**: las entregas/recojos se agendan con fecha y hora en formato
-  a. m./p. m., validando `CUPOS_ESTACION` por hora para no saturar una franja.
-- **Audios completos**: transcripción completa (4096 tokens, 60 s, 4000 caracteres) con
-  rotación de modelos y respaldo gratuito opcional con Groq Whisper.
-- **Despliegue listo**: `Dockerfile`, `docker-compose.yml`, `ecosystem.config.cjs`,
-  `bot/.env.production.example`, egg de Pterodactyl en `deploy/pterodactyl/` y guía en
-  **`docs/DESPLIEGUE-PRODUCCION.md`**.
-- **Limpieza para producción**: `bot/scripts/limpiar-datos.mjs` respalda y vacía clientes y
-  datos locales antes de entregar.
-- **Tests**: `51/51` pruebas unitarias (`bot/test`) + arnés e2e del panel
-  (`scripts/e2e-panel.mjs`). Ver `docs/auditoria/ENTREGA-2026-11-08.md`.
+## Requisitos
 
-## Novedades 2026-11-08 (importante antes de desplegar)
+- Node.js 20+ (probado con 24).
+- Proyecto de Supabase (tablas del CRM) y un usuario de Auth para el dueño.
+- Un servidor para el bot (Pterodactyl/Wings o cualquier VPS con Docker y Chromium).
+- Cuenta de Cloudflare (Pages) para el panel.
 
-- **Tiempo real (SSE)**: el panel usa `GET /api/stream` del bot; si el stream falla, cae
-  solo al polling. Ya no hay doble polling ni re-render completo del hilo.
-- **Campañas a prueba de duplicados**: el bot reclama cada envío en Supabase antes de
-  mandarlo y cierra la campaña siempre. Requiere ejecutar **`sql/07_envios_claim.sql`**;
-  sin esa migración las campañas **no se envían** (fail-safe) y el log lo avisa.
-- **IA de campañas**: los borradores salen con el formato de WhatsApp de la tienda
-  (gancho ✨, beneficios ✅, fragancias 🔥, envíos 🚚, CTA 🛍️ y link). Si la IA falla o no
-  hay clave, hay 3 borradores de respaldo con el catálogo real.
-- **IA del asistente**: si el cliente pide opciones o una familia (p. ej. "amaderados"),
-  responde con **3 opciones en viñetas** (nombre + inspirado en, sin precios); el precio
-  y la foto se envían cuando el cliente elige o pregunta.
-- **Estilo profesional de WhatsApp**: la IA usa *negrita* para nombres/precios, _cursiva_
-  para matices, viñetas `•` y emojis con criterio; el bot normaliza el markdown de web
-  (`**` → `*`) y el panel muestra el formato en el hilo y en la vista previa.
-- **Pagos**: solo **efectivo** cierra la venta desde el bot. Yape/Plin/transferencia
-  **nunca** se confirman: avisa al dueño, deriva y **pausa la IA de ese chat** hasta que el
-  dueño verifique y reanude.
-- **Conexión sin ventana de Chrome**: `HEADLESS=true` en `bot/.env` evita que el bot abra
-  una ventana de WhatsApp Web. El QR se escanea **solo en Ajustes** y la sesión queda
-  guardada en `bot/.wwebjs_auth` (no se repite al reiniciar). El envío manual de campañas
-  abre WhatsApp Web en tu mismo navegador (Brave) o la app de escritorio, según Ajustes.
-- **Tests**: `43/43` pruebas unitarias (`bot/test`) + arnés e2e del panel
-  (`scripts/e2e-panel.mjs`). Ver `docs/auditoria/ENTREGA-2026-11-08.md`.
-- **Roadmap de mejoras**: `docs/MEJORAS-ROADMAP.md` (conexión, campañas, IA, bandeja, datos,
-  analítica y seguridad, priorizado por esfuerzo/impacto).
+## Instalación en 5 pasos
 
-> Si vienes de una instalación anterior: primero corre `sql/07_envios_claim.sql`, luego
-> reinicia el bot y por último despliega el panel.
+1. **Base de datos**: ejecuta en Supabase → SQL Editor los archivos de `sql/` en orden:
+   `00_instalar_todo.sql` (o `01`…`02`), `03_seguridad_rls.sql`, `07_envios_claim.sql` y
+   `10_permisos_panel.sql`. Crea el usuario del dueño en **Authentication → Users**.
+2. **Bot local**:
+   ```bash
+   cd bot
+   cp .env.example .env      # completa valores
+   npm install
+   node src/server.js
+   ```
+3. **Bot en producción**: usa la imagen `ghcr.io/duenss/crm-prfn-bot-image:latest` con el
+   `STARTUP` de Pterodactyl (`cd /home/container/bot; exec node src/server.js`). Detalles en
+   `docs/DESPLIEGUE-PRODUCCION.md`.
+4. **Panel en Cloudflare Pages**: conecta este repo, preset *None*, build vacío, salida `/`.
+   Variables en Pages: `BOT_URL`, `BOT_TOKEN`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
+   `OWNER_EMAIL` y `PANEL_ORIGIN` (ver `docs/DESPLIEGUE-PRODUCCION.md`).
+5. **WhatsApp**: abre el panel, entra a *Ajustes → Conectar WhatsApp (QR)* y escanea el QR con
+   el número de la tienda.
 
-## Estructura
+## Variables de entorno del bot
 
-```
-index.html                 Panel del dueño (Cloudflare Pages). Inicio, Bandeja,
-                           Campañas, Clientes, Catálogo, Calendario, Asistente IA, Ajustes.
-functions/api/borradores.js Generador de borradores con IA (Pages Function)
-sql/01a_productos_1-51.sql    Perfumes 1 a 51
-sql/01b_productos_52-102.sql  Perfumes 52 a 102
-sql/01c_productos_103-152.sql Perfumes 103 a 152
-sql/01d_productos_153-202.sql Perfumes 153 a 202
-sql/01_productos.sql          Catálogo completo en un solo archivo (referencia)
-sql/02_datos_y_esquema.sql    Tienda, plantillas, calendario y tabla de mensajes
-sql/03_seguridad_rls.sql      Políticas de acceso (RLS)
-sql/07_envios_claim.sql       Claim de envíos de campaña (obligatorio para enviar)
-sql/00_instalar_todo.sql      Todo en un solo archivo (opción rápida)
-bot/                       Bot de WhatsApp con QR, cola de envíos, bandeja e IA
-docs/                      Contratos de diseño y traspaso técnico (leer antes de tocar)
-scripts/                   Generador del SQL del catálogo
-```
+| Variable | Descripción |
+|---|---|
+| `SUPABASE_URL` | URL del proyecto Supabase |
+| `SUPABASE_SERVICE_ROLE_KEY` | Clave secreta de Supabase (solo servidor) |
+| `BOT_TOKEN` | Token largo para la API del bot (obligatorio en producción) |
+| `GEMINI_API_KEY` | IA para respuestas, anuncios y transcripción |
+| `MAX_POR_DIA` | `0` = sin límite diario |
+| `DELAY_MIN` / `DELAY_MAX` | Segundos entre mensajes (25–40 por defecto) |
+| `PANEL_ORIGINS` | Orígenes permitidos para CORS |
+| `PANEL_USER` / `PANEL_PASS` | Basic Auth para `/panel` y `/qr` |
 
-Documentos clave antes de modificar el panel:
+Plantilla completa: `bot/.env.production.example`.
 
-- `docs/DISENO_PANEL.md` — contrato visual (tokens, componentes, pantallas).
-- `docs/TRASPASO.md` — arquitectura, API, fases y errores ya resueltos.
-- `docs/CREDITOS.md` — atribución de la inspiración visual (wacrm, MIT).
-
-## 1. Base de datos (una sola vez)
-
-En Supabase → **SQL Editor**, ejecuta los archivos **uno por uno**, en este orden:
-
-1. `sql/01a_productos_1-51.sql` → perfumes 1 a 51.
-2. `sql/01b_productos_52-102.sql` → perfumes 52 a 102.
-3. `sql/01c_productos_103-152.sql` → perfumes 103 a 152.
-4. `sql/01d_productos_153-202.sql` → perfumes 153 a 202.
-5. `sql/02_datos_y_esquema.sql` → datos de la tienda, plantillas y columnas nuevas.
-6. `sql/03_seguridad_rls.sql` → deja el acceso solo para el dueño con sesión iniciada.
-7. `sql/07_envios_claim.sql` → claim de envíos de campaña (estado `enviando`, `wa_id`,
-   índice). **Sin este paso las campañas no se envían** (fail-safe).
-
-> **Importante:** antes de pulsar **Run**, haz clic dentro del editor y presiona `Ctrl+A`
-> (o asegúrate de no tener texto seleccionado). Si hay una selección parcial, Supabase
-> ejecuta solo esa parte y aparece `syntax error at end of input`.
->
-> El catálogo está partido en 4 archivos pequeños (~25 KB cada uno) justamente para
-> evitar que el editor corte un pegado grande. Si prefieres hacerlo de una sola vez,
-> usa `sql/00_instalar_todo.sql`, pero es más propenso a ese problema.
-
-Después, en **Authentication → Providers**, desactiva *Allow new users to sign up* y crea el usuario del dueño en **Authentication → Users**.
-
-## 2. Panel (Cloudflare Pages)
-
-Sube el proyecto a un repositorio y conéctalo a Cloudflare Pages:
-
-- Build command: *(vacío)*
-- Output directory: `/`
-- Variables de entorno:
-  - `GEMINI_API_KEY` (o `ANTHROPIC_API_KEY`)
-  - `AI_MODEL` (opcional, por defecto `gemini-3-flash-preview`)
-  - `SUPABASE_URL`
-  - `SUPABASE_PUBLISHABLE_KEY`
-
-Para probar en tu PC:
-
-```bash
-npx wrangler pages dev .
-```
-
-Copia `.dev.vars.example` a `.dev.vars` y completa las claves.
-
-> La clave `service_role` **nunca** va en el panel ni en Cloudflare Pages.
-> El panel solo usa la clave `publishable` y el login del dueño.
-
-## 3. Bot de WhatsApp (QR)
-
-El bot no puede vivir en Cloudflare Pages: necesita un proceso Node con Chromium.
-Puede correr en la PC de la tienda, en un VPS o en Railway/Render.
+## Pruebas
 
 ```bash
 cd bot
-copy .env.example .env
-npm install
-npm start
+npm test                 # unitarias (69)
+node ../scripts/e2e-panel.mjs   # e2e del panel (11)
 ```
 
-Abre <http://localhost:3000/qr> y escanea el QR con el celular.
-En `bot/README.md` está la guía completa, el modo prueba y el despliegue con Docker.
+## Troubleshooting
 
-### Sobre Chrome
+- **“Bot apagado” en el panel**: el bot no responde. Revisa el servidor en Pterodactyl y
+  `BOT_URL`/`BOT_TOKEN` en Cloudflare Pages.
+- **“Sesión requerida” en `/api/*`**: falta login o el `SUPABASE_ANON_KEY` de Pages no es el
+  correcto.
+- **Sin permisos al guardar**: ejecuta `sql/10_permisos_panel.sql` (RLS).
+- **No llega el QR**: revisa que Chromium exista en el contenedor y el log del bot.
 
-No hace falta tener Chrome instalado para tu uso diario (puedes seguir con Brave).
-El bot usa su **propio Chrome de pruebas** (Chromium de Puppeteer), que se instala una vez:
+## Documentación
 
-```bash
-cd bot
-npx puppeteer browsers install chrome
-```
-
-Queda en `C:\Users\<usuario>\.cache\puppeteer\...` y no interfiere con tu navegador.
-Deja `CHROME_PATH=` vacío en `bot/.env` para que use ese binario.
-
-> Nota: WhatsApp Web a veces no avisa a `whatsapp-web.js` que terminó de sincronizar,
-> y el bot se queda en "QR" aunque el celular ya vinculó. `bot/src/whatsapp.js` incluye
-> un vigilante que detecta la sesión vinculada y fuerza el evento, así el bot pasa solo
-> a "Conectado" en unos segundos.
-
-## 4. Panel nuevo: Inicio, Bandeja y Asistente IA
-
-- **Inicio** — KPIs (clientes, conversaciones, campañas, enviados hoy), gráfico de
-  mensajes de 7/30 días, cola de respuestas, campañas, cumpleaños y actividad.
-- **Bandeja** — todas las conversaciones de WhatsApp en vivo: leer, responder,
-  marcar como leído y **pausar la IA en un chat concreto**.
-- **Asistente IA** — interruptor maestro, respuesta automática, máximo de respuestas
-  por conversación, indicaciones de tono y lista de chats (pausar/reanudar).
-- **Ajustes** — todo dentro del mismo dashboard: dirección del bot, probar y guardar
-  conexión, **QR para vincular WhatsApp**, **enviar mensaje de prueba** y **registro del
-  bot en vivo**. Un solo panel: no hay una segunda pantalla que abrir.
-
-Extras de acabado:
-
-- **Sonidos de interfaz** (tonos Web Audio, como el portafolio v4): botón de altavoz en
-  la barra superior para activar/desactivar; suenan clics, confirmaciones y errores.
-- **Actualizaciones fantasma**: las listas y contadores solo se repintan cuando cambian
-  de verdad y siempre con una transición suave, sin parpadeos.
-
-Todo se controla desde el bot (`/api/ia`), así que los cambios sobreviven al reinicio.
-
-## Flujo de uso
-
-1. **Clientes:** agrega o importa el CSV de WhatsApp.
-2. **Catálogo:** revisa los 202 perfumes.
-3. **Campañas:** elige plantilla u objetivo, agrega perfumes, genera 3 borradores con IA, edita y aprueba.
-4. **Envío manual:** botón por cliente que abre WhatsApp con el mensaje listo.
-5. **Envío programado:** elige número, fecha y "Programar con el bot"; el bot envía de a uno cada 25-40 s.
-6. **Calendario:** cumpleaños, recompras y fechas especiales.
-7. **Bandeja + IA:** responde mensajes con IA, registra BAJA y deriva al dueño cuando hace falta.
-
-## API del bot (resumen)
-
-| Método | Ruta | Para qué |
-| --- | --- | --- |
-| GET | `/api/estado` | Conexión, cola, enviados hoy, horario, resumen IA (sin QR; caché 2 s) |
-| GET | `/api/stream?token=…` | **SSE en vivo** para el panel (mensajes, ack, campañas, IA, pedidos) |
-| GET | `/api/qr?sesion=1&token=…` | QR de WhatsApp como imagen PNG |
-| GET | `/api/estadisticas?dias=7` | Serie de mensajes por día |
-| GET | `/api/conversaciones` | Lista de chats (con no leídos y pausas) |
-| GET | `/api/conversaciones/:telefono` | Hilo completo |
-| POST | `/api/conversaciones/:telefono/enviar` | Enviar mensaje manual |
-| POST | `/api/conversaciones/:telefono/leido` | Marcar como leído |
-| POST | `/api/conversaciones/:telefono/importar` | Traer el historial del chat desde WhatsApp |
-| POST | `/api/sincronizar` | Traer **todos** los chats a la Bandeja y/o los contactos a Clientes (`{chats,contactos}`) |
-| GET/POST | `/api/ia` | Leer/guardar estado de la IA |
-| POST | `/api/ia/pausar` | Pausar/reanudar IA por teléfono |
-| POST | `/api/prueba` | Enviar mensaje de prueba a OWNER_NUMBER/NUMEROS_PRUEBA |
-| GET | `/api/logs` | Últimas líneas del registro del bot |
-| POST | `/api/sesion/reiniciar` | Reiniciar la sesión de WhatsApp (regenera QR) |
-| POST | `/api/logout` | Cerrar sesión de WhatsApp |
-| POST | `/api/simular-entrante` | **Solo pruebas** con `SIMULAR_ENTRANTES=true` |
-
-## Puesta en producción (checklist)
-
-1. **Supabase**
-   - [ ] Ejecutar `sql/01a`–`01d`, luego `02` y `03` en el SQL Editor.
-   - [ ] Desactivar el registro público y crear el usuario del dueño.
-2. **Bot (`bot/.env`)**
-   - [ ] Pegar `SUPABASE_SERVICE_ROLE_KEY` (Supabase → Settings → API).
-   - [ ] Pegar `GEMINI_API_KEY` (o `ANTHROPIC_API_KEY`) para respuestas con IA real.
-   - [ ] Poner `MODO_PRUEBA=false` (envíos reales) al confirmar todo.
-   - [ ] `HORA_INICIO=9` y `HORA_FIN=20`, `LUNES_A_SABADO=true`.
-   - [ ] `SIMULAR_ENTRANTES=false`.
-   - [ ] `SESIONES=1` mientras haya un solo número.
-3. **Panel (Cloudflare Pages)**
-   - [ ] Variables `GEMINI_API_KEY`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`.
-   - [ ] En el panel, en **Ajustes**, poner la URL pública del bot y probar conexión.
-4. **Bot en línea 24/7**
-   - [ ] PC de la tienda con el bot encendido, o VPS. Ver `bot/README.md` (Docker).
-5. **Prueba final con un número real** distinto al del dueño.
-
-## Reglas de seguridad incluidas
-
-- Solo clientes con consentimiento, activos y sin baja reciben promociones.
-- El mensaje incluye la opción de responder BAJA.
-- La IA nunca envía sola: redacta borradores y responde solo consultas informativas.
-- La clave de IA vive en el servidor, no en el navegador.
-- RLS: sin sesión iniciada no se puede leer ni escribir.
-- Modo prueba del bot (`MODO_PRUEBA=true`) para no enviar nada real al principio.
-
-## Costos
-
-| Concepto | Costo |
-| --- | --- |
-| Cloudflare Pages | 0 |
-| Supabase | 0 (capa gratuita) |
-| IA (Gemini) | 0 a 10 soles/mes |
-| Bot en PC propia | 0 |
-| Bot en VPS | ~20-40 soles/mes (opcional) |
-
-## Riesgo del bot
-
-`whatsapp-web.js` no es una librería oficial de WhatsApp. Automatizar WhatsApp Web
-va contra sus términos y puede provocar el bloqueo del número. El dueño asumió
-el riesgo. Por eso el bot incluye retraso aleatorio, horario, límite diario,
-consentimiento y baja. Aun así, pruébalo primero con un número secundario.
+`docs/DESPLIEGUE-PRODUCCION.md` · `docs/TRASPASO.md` · `docs/DISENO_PANEL.md` ·
+`docs/MARCA.md` · `SECURITY.md` · `CHANGELOG.md`
