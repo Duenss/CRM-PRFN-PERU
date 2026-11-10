@@ -1,0 +1,939 @@
+[
+  {
+    "ancho": 360,
+    "tab": "inicio",
+    "desborde": 0,
+    "pequenos": [
+      {
+        "tag": "BUTTON",
+        "txt": "Escanear QR",
+        "w": 122,
+        "h": 34
+      },
+      {
+        "tag": "BUTTON",
+        "txt": "soundToggle",
+        "w": 38,
+        "h": 38
+      },
+      {
+        "tag": "BUTTON",
+        "txt": "7 días",
+        "w": 63,
+        "h": 32
+      },
+      {
+        "tag": "BUTTON",
+        "txt": "30 días",
+        "w": 72,
+        "h": 32
+      },
+      {
+        "tag": "A",
+        "txt": "Abrir bandeja →",
+        "w": 95,
+        "h": 19
+      },
+      {
+        "tag": "A",
+        "txt": "Ver todas →",
+        "w": 71,
+        "h": 19
+      }
+    ],
+    "desbordan": [
+      {
+        "id": "t-inicio",
+        "sw": 342,
+        "cw": 328
+      },
+      {
+        "id": "i-stats",
+        "sw": 342,
+        "cw": 328
+      }
+    ]
+  },
+  {
+    "ancho": 360,
+    "tab": "bandeja",
+    "desborde": 0,
+    "pequenos": [
+      {
+        "tag": "BUTTON",
+        "txt": "Escanear QR",
+        "w": 122,
+        "h": 34
+      },
+      {
+        "tag": "BUTTON",
+        "txt": "soundToggle",
+        "w": 38,
+        "h": 38
+      }
+    ],
+    "desbordan": []
+  },
+  {
+    "ancho": 360,
+    "tab": "pedidos",
+    "desborde": 0,
+    "pequenos": [
+      {
+        "tag": "BUTTON",
+        "txt": "Escanear QR",
+        "w": 122,
+        "h": 34
+      },
+      {
+        "tag": "BUTTON",
+        "txt": "soundToggle",
+        "w": 38,
+        "h": 38
+      }
+    ],
+    "desbordan": []
+  },
+  {
+    "ancho": 360,
+    "tab": "analiticas",
+    "desborde": 0,
+    "pequenos": [
+      {
+        "tag": "BUTTON",
+        "txt": "Escanear QR",
+        "w": 122,
+        "h": 34
+      },
+      {
+        "tag": "BUTTON",
+        "txt": "soundToggle",
+        "w": 38,
+        "h": 38
+      }
+    ],
+    "desbordan": [
+      {
+        "id": "card",
+        "sw": 345,
+        "cw": 326
+      },
+      {
+        "id": "an-chart",
+        "sw": 345,
+        "cw": 326
+      }
+    ]
+  },
+  {
+    "ancho": 360,
+    "tab": "campanas",
+    "desborde": 0,
+    "pequenos": [
+      {
+        "tag": "BUTTON",
+        "txt": "Escanear QR",
+        "w": 122,
+        "h": 34
+      },
+      {
+        "tag": "BUTTON",
+        "txt": "soundToggle",
+        "w": 38,
+        "h": 38
+      },
+      {
+        "tag": "INPUT",
+        "txt": "k-baja",
+        "w": 13,
+        "h": 13
+      }
+    ],
+    "desbordan": [
+      {
+        "id": "app",
+        "sw": 550,
+        "cw": 360
+      },
+      {
+        "id": "page",
+        "sw": 550,
+        "cw": 360
+      },
+      {
+        "id": "t-campanas",
+        "sw": 534,
+        "cw": 328
+      },
+      {
+        "id": "two",
+        "sw": 534,
+        "cw": 328
+      }
+    ]
+  },
+  {
+    "ancho": 360,
+    "tab": "anuncios",
+    "desborde": 0,
+    "pequenos": [
+      {
+        "tag": "BUTTON",
+        "txt": "Escanear QR",
+        "w": 122,
+        "h": 34
+      },
+      {
+        "tag": "BUTTON",
+        "txt": "soundToggle",
+        "w": 38,
+        "h": 38
+      },
+      {
+        "tag": "INPUT",
+        "txt": "anu-adj-catalogo",
+        "w": 13,
+        "h": 13
+      },
+      {
+        "tag": "INPUT",
+        "txt": "anu-adj-video",
+        "w": 13,
+        "h": 13
+      },
+      {
+        "tag": "INPUT",
+        "txt": "anu-sin-consent",
+        "w": 13,
+        "h": 13
+      }
+    ],
+    "desbordan": []
+  },
+  {
+    "ancho": 360,
+    "tab": "clientes",
+    "desborde": 0,
+    "pequenos": [
+      {
+        "tag": "BUTTON",
+        "txt": "Escanear QR",
+        "w": 122,
+        "h": 34
+      },
+      {
+        "tag": "BUTTON",
+        "txt": "soundToggle",
+        "w": 38,
+        "h": 38
+      }
+    ],
+    "desbordan": []
+  },
+  {
+    "ancho": 360,
+    "tab": "catalogo",
+    "desborde": 0,
+    "pequenos": [
+      {
+        "tag": "BUTTON",
+        "txt": "Escanear QR",
+        "w": 122,
+        "h": 34
+      },
+      {
+        "tag": "BUTTON",
+        "txt": "soundToggle",
+        "w": 38,
+        "h": 38
+      }
+    ],
+    "desbordan": []
+  },
+  {
+    "ancho": 360,
+    "tab": "calendario",
+    "desborde": 0,
+    "pequenos": [
+      {
+        "tag": "BUTTON",
+        "txt": "Escanear QR",
+        "w": 122,
+        "h": 34
+      },
+      {
+        "tag": "BUTTON",
+        "txt": "soundToggle",
+        "w": 38,
+        "h": 38
+      }
+    ],
+    "desbordan": []
+  },
+  {
+    "ancho": 360,
+    "tab": "ia",
+    "desborde": 0,
+    "pequenos": [
+      {
+        "tag": "BUTTON",
+        "txt": "Escanear QR",
+        "w": 122,
+        "h": 34
+      },
+      {
+        "tag": "BUTTON",
+        "txt": "soundToggle",
+        "w": 38,
+        "h": 38
+      },
+      {
+        "tag": "INPUT",
+        "txt": "ia-activa",
+        "w": 44,
+        "h": 26
+      },
+      {
+        "tag": "INPUT",
+        "txt": "ia-auto",
+        "w": 44,
+        "h": 26
+      },
+      {
+        "tag": "A",
+        "txt": "Ajustes →",
+        "w": 59,
+        "h": 19
+      }
+    ],
+    "desbordan": []
+  },
+  {
+    "ancho": 360,
+    "tab": "bot",
+    "desborde": 0,
+    "pequenos": [
+      {
+        "tag": "BUTTON",
+        "txt": "Escanear QR",
+        "w": 122,
+        "h": 34
+      },
+      {
+        "tag": "BUTTON",
+        "txt": "soundToggle",
+        "w": 38,
+        "h": 38
+      },
+      {
+        "tag": "INPUT",
+        "txt": "aj-pdf",
+        "w": 13,
+        "h": 13
+      },
+      {
+        "tag": "INPUT",
+        "txt": "aj-video",
+        "w": 13,
+        "h": 13
+      }
+    ],
+    "desbordan": []
+  },
+  {
+    "ancho": 768,
+    "tab": "inicio",
+    "desborde": 0,
+    "pequenos": [
+      {
+        "tag": "BUTTON",
+        "txt": "Escanear QR",
+        "w": 122,
+        "h": 34
+      },
+      {
+        "tag": "BUTTON",
+        "txt": "soundToggle",
+        "w": 38,
+        "h": 38
+      },
+      {
+        "tag": "BUTTON",
+        "txt": "7 días",
+        "w": 63,
+        "h": 32
+      },
+      {
+        "tag": "BUTTON",
+        "txt": "30 días",
+        "w": 72,
+        "h": 32
+      },
+      {
+        "tag": "A",
+        "txt": "Abrir bandeja →",
+        "w": 95,
+        "h": 19
+      },
+      {
+        "tag": "A",
+        "txt": "Ver todas →",
+        "w": 71,
+        "h": 19
+      }
+    ],
+    "desbordan": []
+  },
+  {
+    "ancho": 768,
+    "tab": "bandeja",
+    "desborde": 0,
+    "pequenos": [
+      {
+        "tag": "BUTTON",
+        "txt": "Escanear QR",
+        "w": 122,
+        "h": 34
+      },
+      {
+        "tag": "BUTTON",
+        "txt": "soundToggle",
+        "w": 38,
+        "h": 38
+      }
+    ],
+    "desbordan": []
+  },
+  {
+    "ancho": 768,
+    "tab": "pedidos",
+    "desborde": 0,
+    "pequenos": [
+      {
+        "tag": "BUTTON",
+        "txt": "Escanear QR",
+        "w": 122,
+        "h": 34
+      },
+      {
+        "tag": "BUTTON",
+        "txt": "soundToggle",
+        "w": 38,
+        "h": 38
+      }
+    ],
+    "desbordan": []
+  },
+  {
+    "ancho": 768,
+    "tab": "analiticas",
+    "desborde": 0,
+    "pequenos": [
+      {
+        "tag": "BUTTON",
+        "txt": "Escanear QR",
+        "w": 122,
+        "h": 34
+      },
+      {
+        "tag": "BUTTON",
+        "txt": "soundToggle",
+        "w": 38,
+        "h": 38
+      }
+    ],
+    "desbordan": []
+  },
+  {
+    "ancho": 768,
+    "tab": "campanas",
+    "desborde": 0,
+    "pequenos": [
+      {
+        "tag": "BUTTON",
+        "txt": "Escanear QR",
+        "w": 122,
+        "h": 34
+      },
+      {
+        "tag": "BUTTON",
+        "txt": "soundToggle",
+        "w": 38,
+        "h": 38
+      },
+      {
+        "tag": "INPUT",
+        "txt": "k-baja",
+        "w": 13,
+        "h": 13
+      }
+    ],
+    "desbordan": []
+  },
+  {
+    "ancho": 768,
+    "tab": "anuncios",
+    "desborde": 0,
+    "pequenos": [
+      {
+        "tag": "BUTTON",
+        "txt": "Escanear QR",
+        "w": 122,
+        "h": 34
+      },
+      {
+        "tag": "BUTTON",
+        "txt": "soundToggle",
+        "w": 38,
+        "h": 38
+      },
+      {
+        "tag": "INPUT",
+        "txt": "anu-adj-catalogo",
+        "w": 13,
+        "h": 13
+      },
+      {
+        "tag": "INPUT",
+        "txt": "anu-adj-video",
+        "w": 13,
+        "h": 13
+      },
+      {
+        "tag": "INPUT",
+        "txt": "anu-sin-consent",
+        "w": 13,
+        "h": 13
+      }
+    ],
+    "desbordan": []
+  },
+  {
+    "ancho": 768,
+    "tab": "clientes",
+    "desborde": 0,
+    "pequenos": [
+      {
+        "tag": "BUTTON",
+        "txt": "Escanear QR",
+        "w": 122,
+        "h": 34
+      },
+      {
+        "tag": "BUTTON",
+        "txt": "soundToggle",
+        "w": 38,
+        "h": 38
+      }
+    ],
+    "desbordan": []
+  },
+  {
+    "ancho": 768,
+    "tab": "catalogo",
+    "desborde": 0,
+    "pequenos": [
+      {
+        "tag": "BUTTON",
+        "txt": "Escanear QR",
+        "w": 122,
+        "h": 34
+      },
+      {
+        "tag": "BUTTON",
+        "txt": "soundToggle",
+        "w": 38,
+        "h": 38
+      }
+    ],
+    "desbordan": []
+  },
+  {
+    "ancho": 768,
+    "tab": "calendario",
+    "desborde": 0,
+    "pequenos": [
+      {
+        "tag": "BUTTON",
+        "txt": "Escanear QR",
+        "w": 122,
+        "h": 34
+      },
+      {
+        "tag": "BUTTON",
+        "txt": "soundToggle",
+        "w": 38,
+        "h": 38
+      }
+    ],
+    "desbordan": []
+  },
+  {
+    "ancho": 768,
+    "tab": "ia",
+    "desborde": 0,
+    "pequenos": [
+      {
+        "tag": "BUTTON",
+        "txt": "Escanear QR",
+        "w": 122,
+        "h": 34
+      },
+      {
+        "tag": "BUTTON",
+        "txt": "soundToggle",
+        "w": 38,
+        "h": 38
+      },
+      {
+        "tag": "INPUT",
+        "txt": "ia-activa",
+        "w": 44,
+        "h": 26
+      },
+      {
+        "tag": "INPUT",
+        "txt": "ia-auto",
+        "w": 44,
+        "h": 26
+      },
+      {
+        "tag": "A",
+        "txt": "Ajustes →",
+        "w": 59,
+        "h": 19
+      }
+    ],
+    "desbordan": []
+  },
+  {
+    "ancho": 768,
+    "tab": "bot",
+    "desborde": 0,
+    "pequenos": [
+      {
+        "tag": "BUTTON",
+        "txt": "Escanear QR",
+        "w": 122,
+        "h": 34
+      },
+      {
+        "tag": "BUTTON",
+        "txt": "soundToggle",
+        "w": 38,
+        "h": 38
+      },
+      {
+        "tag": "INPUT",
+        "txt": "aj-pdf",
+        "w": 13,
+        "h": 13
+      },
+      {
+        "tag": "INPUT",
+        "txt": "aj-video",
+        "w": 13,
+        "h": 13
+      }
+    ],
+    "desbordan": []
+  },
+  {
+    "ancho": 1280,
+    "tab": "inicio",
+    "desborde": 0,
+    "pequenos": [
+      {
+        "tag": "BUTTON",
+        "txt": "Escanear QR",
+        "w": 122,
+        "h": 34
+      },
+      {
+        "tag": "BUTTON",
+        "txt": "soundToggle",
+        "w": 38,
+        "h": 38
+      },
+      {
+        "tag": "BUTTON",
+        "txt": "7 días",
+        "w": 63,
+        "h": 32
+      },
+      {
+        "tag": "BUTTON",
+        "txt": "30 días",
+        "w": 72,
+        "h": 32
+      },
+      {
+        "tag": "A",
+        "txt": "Abrir bandeja →",
+        "w": 95,
+        "h": 19
+      },
+      {
+        "tag": "A",
+        "txt": "Ver todas →",
+        "w": 71,
+        "h": 19
+      }
+    ],
+    "desbordan": []
+  },
+  {
+    "ancho": 1280,
+    "tab": "bandeja",
+    "desborde": 0,
+    "pequenos": [
+      {
+        "tag": "BUTTON",
+        "txt": "Escanear QR",
+        "w": 122,
+        "h": 34
+      },
+      {
+        "tag": "BUTTON",
+        "txt": "soundToggle",
+        "w": 38,
+        "h": 38
+      }
+    ],
+    "desbordan": []
+  },
+  {
+    "ancho": 1280,
+    "tab": "pedidos",
+    "desborde": 0,
+    "pequenos": [
+      {
+        "tag": "BUTTON",
+        "txt": "Escanear QR",
+        "w": 122,
+        "h": 34
+      },
+      {
+        "tag": "BUTTON",
+        "txt": "soundToggle",
+        "w": 38,
+        "h": 38
+      }
+    ],
+    "desbordan": []
+  },
+  {
+    "ancho": 1280,
+    "tab": "analiticas",
+    "desborde": 0,
+    "pequenos": [
+      {
+        "tag": "BUTTON",
+        "txt": "Escanear QR",
+        "w": 122,
+        "h": 34
+      },
+      {
+        "tag": "BUTTON",
+        "txt": "soundToggle",
+        "w": 38,
+        "h": 38
+      }
+    ],
+    "desbordan": []
+  },
+  {
+    "ancho": 1280,
+    "tab": "campanas",
+    "desborde": 0,
+    "pequenos": [
+      {
+        "tag": "BUTTON",
+        "txt": "Escanear QR",
+        "w": 122,
+        "h": 34
+      },
+      {
+        "tag": "BUTTON",
+        "txt": "soundToggle",
+        "w": 38,
+        "h": 38
+      },
+      {
+        "tag": "INPUT",
+        "txt": "k-baja",
+        "w": 13,
+        "h": 13
+      }
+    ],
+    "desbordan": []
+  },
+  {
+    "ancho": 1280,
+    "tab": "anuncios",
+    "desborde": 0,
+    "pequenos": [
+      {
+        "tag": "BUTTON",
+        "txt": "Escanear QR",
+        "w": 122,
+        "h": 34
+      },
+      {
+        "tag": "BUTTON",
+        "txt": "soundToggle",
+        "w": 38,
+        "h": 38
+      },
+      {
+        "tag": "INPUT",
+        "txt": "anu-adj-catalogo",
+        "w": 13,
+        "h": 13
+      },
+      {
+        "tag": "INPUT",
+        "txt": "anu-adj-video",
+        "w": 13,
+        "h": 13
+      },
+      {
+        "tag": "INPUT",
+        "txt": "anu-sin-consent",
+        "w": 13,
+        "h": 13
+      }
+    ],
+    "desbordan": []
+  },
+  {
+    "ancho": 1280,
+    "tab": "clientes",
+    "desborde": 0,
+    "pequenos": [
+      {
+        "tag": "BUTTON",
+        "txt": "Escanear QR",
+        "w": 122,
+        "h": 34
+      },
+      {
+        "tag": "BUTTON",
+        "txt": "soundToggle",
+        "w": 38,
+        "h": 38
+      }
+    ],
+    "desbordan": []
+  },
+  {
+    "ancho": 1280,
+    "tab": "catalogo",
+    "desborde": 0,
+    "pequenos": [
+      {
+        "tag": "BUTTON",
+        "txt": "Escanear QR",
+        "w": 122,
+        "h": 34
+      },
+      {
+        "tag": "BUTTON",
+        "txt": "soundToggle",
+        "w": 38,
+        "h": 38
+      }
+    ],
+    "desbordan": []
+  },
+  {
+    "ancho": 1280,
+    "tab": "calendario",
+    "desborde": 0,
+    "pequenos": [
+      {
+        "tag": "BUTTON",
+        "txt": "Escanear QR",
+        "w": 122,
+        "h": 34
+      },
+      {
+        "tag": "BUTTON",
+        "txt": "soundToggle",
+        "w": 38,
+        "h": 38
+      }
+    ],
+    "desbordan": []
+  },
+  {
+    "ancho": 1280,
+    "tab": "ia",
+    "desborde": 0,
+    "pequenos": [
+      {
+        "tag": "BUTTON",
+        "txt": "Escanear QR",
+        "w": 122,
+        "h": 34
+      },
+      {
+        "tag": "BUTTON",
+        "txt": "soundToggle",
+        "w": 38,
+        "h": 38
+      },
+      {
+        "tag": "INPUT",
+        "txt": "ia-activa",
+        "w": 44,
+        "h": 26
+      },
+      {
+        "tag": "INPUT",
+        "txt": "ia-auto",
+        "w": 44,
+        "h": 26
+      },
+      {
+        "tag": "A",
+        "txt": "Ajustes →",
+        "w": 59,
+        "h": 19
+      }
+    ],
+    "desbordan": []
+  },
+  {
+    "ancho": 1280,
+    "tab": "bot",
+    "desborde": 0,
+    "pequenos": [
+      {
+        "tag": "BUTTON",
+        "txt": "Escanear QR",
+        "w": 122,
+        "h": 34
+      },
+      {
+        "tag": "BUTTON",
+        "txt": "soundToggle",
+        "w": 38,
+        "h": 38
+      },
+      {
+        "tag": "INPUT",
+        "txt": "aj-pdf",
+        "w": 13,
+        "h": 13
+      },
+      {
+        "tag": "INPUT",
+        "txt": "aj-video",
+        "w": 13,
+        "h": 13
+      }
+    ],
+    "desbordan": []
+  }
+]
