@@ -87,3 +87,6 @@
 
 ### Prueba real de envío
 - Mensaje enviado por el bot al +51 910 418 951: **entregado ✓✓** y reflejado en la Bandeja.
+
+### Quitar chats uno por uno
+- En la Bandeja cada chat tiene una **✕** para quitarlo (no lo borra de WhatsApp). Los chats quitados **no vuelven** en la siguiente sincronización (lista de ocultos); “Limpiar Bandeja” la reinicia.
