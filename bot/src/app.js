@@ -1293,6 +1293,9 @@ const yaRespondidos = new Set();
 const ultimoProducto = new Map();
 // Última respuesta por teléfono: frena ráfagas sin bloquear (cooldown corto).
 const cooldown = new Map();
+// Último mensaje entrante por chat y aviso de que ya hay una respuesta en curso.
+const ultimoEntrante = new Map();
+const turnoEnCurso = new Set();
 // Momento de la última respuesta automática, para espaciar respuestas entre
 // chats distintos (el bot nunca contesta a todos de golpe).
 let ultimaRespuestaGlobal = 0;
@@ -1587,12 +1590,57 @@ async function manejarMensaje(msg, sesionId = null) {
   if (!esPrueba && !dentroHorario()) { log(`Mensaje fuera de horario de +${tel}; no se responde automáticamente.`); return; }
   if (!cliente && !config.responderDesconocidos) return;
   if (!esPrueba && ia.maxPorConversacion > 0 && respuestasIA(tel) >= ia.maxPorConversacion) {
-    log(`Límite de ${ia.maxPorConversacion} respuestas automáticas alcanzado con +${tel}; queda para el dueño.`);
+    log(`Límite de ${ia.maxPorConversacion} respuestas automáticas alcanzado con +${tel}; se avisa al cliente y al dueño.`);
+    const aviso = 'Gracias por tu paciencia 🙌 Te paso con un administrador para continuar con tu pedido.';
+    try {
+      await enviarRegistrado({ tel, texto: aviso, nombre, clienteId: cliente?.id, sesionId });
+    } catch (e) { log('No se pudo avisar del pase al administrador: ' + e.message); }
+    try {
+      pausarIA(tel, true, 'Límite de respuestas automáticas', nombre);
+      await notificarDueno(
+        `⚠️ *ATENCIÓN REQUERIDA*
+
+👤 Cliente: ${cliente?.nombre || '+' + tel}
+📱 WhatsApp: +${tel}
+📝 Motivo: se alcanzó el límite de ${ia.maxPorConversacion} respuestas automáticas
+
+💬 *ÚLTIMO MENSAJE*
+${String(texto).slice(0, 300)}
+
+👉 Atiéndelo desde la pestaña *Bandeja*.`,
+        sesionId
+      );
+      emitir('derivacion', { telefono: tel, nombre, motivo: 'Límite de respuestas automáticas', mensaje: String(texto).slice(0, 300) });
+    } catch (e) { log('No se pudo notificar el pase al administrador: ' + e.message); }
     return;
   }
-  if (!esPrueba && config.cooldownSegundos > 0 && Date.now() - (cooldown.get(tel) || 0) < config.cooldownSegundos * 1000) {
-    log(`Respuesta omitida por enfriamiento corto (${tel}, ${config.cooldownSegundos}s).`);
-    return;
+  // Enfriamiento inteligente: en vez de descartar el mensaje, se espera a que
+  // el cliente termine de escribir (ráfaga) y recién ahí se responde UNA vez.
+  // Así un "para varón" enviado 3 s después del último mensaje no se pierde.
+  if (!esPrueba && config.cooldownSegundos > 0) {
+    ultimoEntrante.set(tel, Date.now());
+    if (turnoEnCurso.has(tel)) return; // ya hay una respuesta preparándose
+    turnoEnCurso.add(tel);
+    try {
+      for (let vueltas = 0; vueltas < 6; vueltas++) {
+        const t0 = ultimoEntrante.get(tel) || Date.now();
+        const falta = config.cooldownSegundos * 1000 - (Date.now() - t0);
+        if (falta <= 0) break;
+        await dormir(Math.min(falta + 120, 15000));
+        if ((ultimoEntrante.get(tel) || 0) > t0) continue; // llegó otro mensaje: seguir esperando
+        break;
+      }
+    } finally {
+      turnoEnCurso.delete(tel);
+    }
+    // Si mientras esperaba llegó un mensaje más nuevo, se responde a ese.
+    const chatAhora = obtener(tel);
+    const ultEnt = [...((chatAhora && chatAhora.mensajes) || [])].reverse()
+      .find(m => m.direccion === 'entrante' && String(m.texto || '').trim());
+    if (ultEnt && String(ultEnt.texto).trim() !== String(texto).trim()) {
+      texto = String(ultEnt.texto);
+      textoIA = texto;
+    }
   }
   cooldown.set(tel, Date.now());
 
