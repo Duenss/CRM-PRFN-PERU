@@ -53,7 +53,8 @@ export function rutaPermitida(metodo, ruta) {
 const TIEMPOS_LENTOS = [
   { re: /^\/api\/(sincronizar|borradores|sesion|logout|prueba)/, ms: 150000 },
   { re: /^\/api\/anuncios\/ia/, ms: 120000 },
-  { re: /^\/api\/(enviar|revisar)/, ms: 60000 }
+  { re: /^\/api\/(enviar|revisar)/, ms: 60000 },
+  { re: /^\/api\/archivos/, ms: 180000 }
 ];
 function tiempoMaximo(ruta) {
   for (const t of TIEMPOS_LENTOS) if (t.re.test(ruta)) return t.ms;
