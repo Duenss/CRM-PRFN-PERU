@@ -1295,7 +1295,7 @@ function innerFilaChat(c){
   const nom=(c.grupo?'👥 ':'')+nomBase+(c.propio?' (Tú)':'');
   const tipo=c.grupo?'<span class="tipo">Grupo</span>':c.tipo==='empresa'?'<span class="tipo emp">Empresa</span>':c.tipo==='persona'?'<span class="tipo per">Persona</span>':'';
   const ets=(c.etiquetas||[]).map(e=>`<i class="etag ${esc(e.tipo||'')}">${esc(e.texto)}</i>`).join('');
-  return `<div class="ava">${c.grupo?'👥':esc(iniciales(nomBase))}</div><div class="ib"><b>${esc(nom)}${tipo}</b><small>${esc(waPlano((c.ultimoTexto||'').slice(0,44))||'—')}</small>${ets?`<div class="itags">${ets}</div>`:''}</div><div class="imeta"><time>${esc(horaWa(c.ultimoEn))}</time>${inPausados.has(c.telefono)?'<span class="paused">IA off</span>':''}${c.seguimiento?'<span class="paused" style="color:var(--success);border-color:rgba(61,214,140,.5)">Seg</span>':''}${c.noLeidos?`<span class="unread">${c.noLeidos}</span>`:''}<button class="pinbtn${c.fijado?' on':''}" type="button" data-pin="${esc(c.telefono)}" title="${c.fijado?'Desfijar chat':'Fijar chat'}" aria-label="Fijar o desfijar chat">📌</button><button class="delchat" type="button" data-delchat="${esc(c.telefono)}" title="Quitar este chat de la Bandeja (no lo borra de WhatsApp)" aria-label="Quitar de la Bandeja">✕</button></div>`;
+  return `<div class="ava">${c.grupo?'👥':esc(iniciales(nomBase))}</div><div class="ib"><b>${esc(nom)}${tipo}</b><small>${esc(waPlano((c.ultimoTexto||'').slice(0,44))||'—')}</small>${ets?`<div class="itags">${ets}</div>`:''}</div><div class="imeta"><time>${esc(horaWa(c.ultimoEn))}</time>${inPausados.has(c.telefono)?'<span class="paused">IA off</span>':''}${c.seguimiento?'<span class="paused" style="color:var(--success);border-color:rgba(61,214,140,.5)">Seg</span>':''}${c.noLeidos?`<span class="unread">${c.noLeidos}</span>`:''}<button class="delchat" type="button" data-delchat="${esc(c.telefono)}" title="Quitar este chat de la Bandeja (no lo borra de WhatsApp)" aria-label="Quitar de la Bandeja">✕</button></div>`;
 }
 function filaChatHTML(c){
   const on=c.telefono===inTel?' on':'';
@@ -1506,6 +1506,7 @@ async function abrirChat(tel){
   const tipo=item?.tipo==='empresa'?' · Empresa':item?.tipo==='persona'?' · Persona':'';
   $('#in-tel').textContent='+'+tel+tipo;
   $('#in-ava').textContent=iniciales(nom);
+  actualizarBotonPin();actualizarBotonIA();
   const esGrupoChat=!!item?.grupo;
   if($('#in-form'))$('#in-form').hidden=esGrupoChat;
   if($('#in-note'))$('#in-note').hidden=!esGrupoChat;
@@ -1521,6 +1522,7 @@ async function abrirChat(tel){
     if(inTel!==tel)return;
     if(c.pausado)inPausados.add(tel);else inPausados.delete(tel);
     inSegActivo=!!c.seguimiento?.activo;actualizarBotonSeg();
+    actualizarBotonPin();actualizarBotonIA();
     if(mismo)agregarMensajes(c.mensajes||[],false);else pintarHilo(c.mensajes||[]);
     actualizarPausa();
     botFetch('/api/conversaciones/'+tel+'/leido',{method:'POST'}).catch(()=>{});
@@ -1855,6 +1857,43 @@ async function cambiarEstadoPedido(id,estado,mensaje){
     await cargarPedidos();
   }catch(e){toast('No se actualizó: '+e.message,'error')}
 }
+function actualizarBotonPin(){
+  const b=$('#in-pin');if(!b)return;
+  const item=inChats.find(c=>String(c.telefono)===String(inTel));
+  const fijado=!!item?.fijado;
+  b.textContent=fijado?'📌 Fijado':'📌 Fijar';
+  b.className=fijado?'':'ghost';
+  b.title=fijado?'Quitar de fijados':'Fijar este chat arriba';
+}
+function actualizarBotonIA(){
+  const b=$('#in-ia');if(!b)return;
+  const pausada=inTel?inPausados.has(String(inTel)):false;
+  b.textContent=pausada?'IA: pausada':'IA: on';
+  b.className=pausada?'':'ghost';
+  b.title=pausada?'La IA no responde en este chat. Pulsa para reactivarla.':'Pausar la IA en este chat';
+}
+$('#in-pin')?.addEventListener('click',async()=>{
+  if(!inTel)return;
+  const item=inChats.find(c=>String(c.telefono)===String(inTel));
+  const nuevo=!(item&&item.fijado);
+  try{
+    await botFetch('/api/conversaciones/'+inTel+'/fijar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fijado:nuevo})});
+    if(item)item.fijado=nuevo;
+    pintarLista();actualizarBotonPin();
+    toast(nuevo?'Chat fijado arriba':'Chat desfijado');
+  }catch(e){toast('No se pudo fijar: '+e.message,'error')}
+});
+$('#in-ia')?.addEventListener('click',async()=>{
+  if(!inTel)return;
+  const pausada=inPausados.has(String(inTel));
+  try{
+    await botFetch('/api/ia/pausar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({telefono:inTel,pausado:!pausada,motivo:pausada?'reactivada por el dueño':'pausada por el dueño'})});
+    if(pausada)inPausados.delete(String(inTel));else inPausados.add(String(inTel));
+    actualizarBotonIA();pintarLista();actualizarPausa();
+    toast(pausada?'IA reactivada en este chat ✅':'IA pausada en este chat');
+  }catch(e){toast('No se pudo cambiar la IA: '+e.message,'error')}
+});
+
 function actualizarBotonSeg(){
   const b=$('#in-seg');if(!b)return;
   b.textContent='Seguimiento: '+(inSegActivo?'on':'off');
