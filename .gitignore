@@ -41,3 +41,7 @@ deploy/pterodactyl/*.env
 deploy/pterodactyl/*.env.*
 !deploy/pterodactyl/*.example
 !deploy/pterodactyl/*.env.production.example
+
+# temporales de diagnostico
+bot/.tmp-*
+docs/auditoria/capturas/responsive/
