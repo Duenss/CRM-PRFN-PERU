@@ -364,6 +364,15 @@ export function yaExisteWa(telefono, waId) {
 }
 
 /** Borra todos los chats de la Bandeja (memoria + disco). */
+/** Borra un chat concreto de la Bandeja. */
+export function eliminar(telefono) {
+  const tel = limpiarTel(telefono);
+  if (!tel || !chats[tel]) return false;
+  delete chats[tel];
+  guardar();
+  return true;
+}
+
 export function vaciar() {
   chats = {};
   guardar();

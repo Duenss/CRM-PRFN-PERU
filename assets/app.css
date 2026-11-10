@@ -435,3 +435,10 @@ dialog::backdrop{background:rgba(3,4,8,.66);backdrop-filter:blur(8px)}
 .toplogo:hover{filter:brightness(1.06)}
 .toplogo .brand-mark{width:20px;height:20px;color:#1A1408;filter:none}
 @media(max-width:760px){.toplogo{width:34px;height:34px}.toplogo .brand-mark{width:18px;height:18px}}
+
+/* Quitar un chat de la Bandeja (no lo borra de WhatsApp) */
+.in-item .delchat{width:20px;height:20px;flex:0 0 auto;display:grid;place-items:center;border-radius:5px;
+  border:1px solid transparent;background:transparent;color:var(--mute2);font-size:.66rem;line-height:1;padding:0;
+  opacity:.45;transition:opacity .15s,color .15s,border-color .15s}
+.in-item:hover .delchat{opacity:1}
+.in-item .delchat:hover{color:var(--bad);border-color:var(--line);background:var(--s2)}

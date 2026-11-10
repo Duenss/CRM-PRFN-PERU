@@ -1249,7 +1249,7 @@ function innerFilaChat(c){
   const nom=c.nombreWa||c.nombre||('+'+c.telefono);
   const tipo=c.tipo==='empresa'?'<span class="tipo emp">Empresa</span>':c.tipo==='persona'?'<span class="tipo per">Persona</span>':'';
   const ets=(c.etiquetas||[]).map(e=>`<i class="etag ${esc(e.tipo||'')}">${esc(e.texto)}</i>`).join('');
-  return `<div class="ava">${esc(iniciales(nom))}</div><div class="ib"><b>${esc(nom)}${tipo}</b><small>${esc(waPlano((c.ultimoTexto||'').slice(0,44))||'—')}</small>${ets?`<div class="itags">${ets}</div>`:''}</div><div class="imeta"><time>${esc(horaWa(c.ultimoEn))}</time>${inPausados.has(c.telefono)?'<span class="paused">IA off</span>':''}${c.seguimiento?'<span class="paused" style="color:var(--success);border-color:rgba(61,214,140,.5)">Seg</span>':''}${c.noLeidos?`<span class="unread">${c.noLeidos}</span>`:''}</div>`;
+  return `<div class="ava">${esc(iniciales(nom))}</div><div class="ib"><b>${esc(nom)}${tipo}</b><small>${esc(waPlano((c.ultimoTexto||'').slice(0,44))||'—')}</small>${ets?`<div class="itags">${ets}</div>`:''}</div><div class="imeta"><time>${esc(horaWa(c.ultimoEn))}</time>${inPausados.has(c.telefono)?'<span class="paused">IA off</span>':''}${c.seguimiento?'<span class="paused" style="color:var(--success);border-color:rgba(61,214,140,.5)">Seg</span>':''}${c.noLeidos?`<span class="unread">${c.noLeidos}</span>`:''}<button class="delchat" type="button" data-delchat="${esc(c.telefono)}" title="Quitar este chat de la Bandeja (no lo borra de WhatsApp)" aria-label="Quitar de la Bandeja">✕</button></div>`;
 }
 function filaChatHTML(c){
   const on=c.telefono===inTel?' on':'';
@@ -1433,7 +1433,22 @@ async function togglePausa(){
   }catch(e){toast('No se pudo cambiar: '+e.message)}
   b.disabled=false;
 }
-$('#in-list')?.addEventListener('click',e=>{const it=e.target.closest('[data-tel]');if(it)abrirChat(it.dataset.tel)});
+$('#in-list')?.addEventListener('click',e=>{
+  if(e.target.closest('[data-delchat]'))return;
+  const it=e.target.closest('[data-tel]');if(it)abrirChat(it.dataset.tel);
+});
+$('#in-list')?.addEventListener('click',async e=>{
+  const b=e.target.closest('[data-delchat]');if(!b)return;
+  e.stopPropagation();
+  const tel=b.dataset.delchat;
+  if(!confirm('¿Quitar este chat de la Bandeja?\nNo se borra de WhatsApp.'))return;
+  try{
+    await botFetch('/api/conversaciones/'+tel+'?mensajes=1',{method:'DELETE',timeoutMs:60000});
+    inChats=inChats.filter(c=>String(c.telefono)!==String(tel));
+    pintarLista();
+    toast('Chat quitado de la Bandeja');
+  }catch(err){toast('No se pudo quitar: '+err.message,'error')}
+});
 $('#in-q')?.addEventListener('input',pintarLista);
 $('#in-refresh')?.addEventListener('click',cargarBandeja);
 $('#in-pause')?.addEventListener('click',togglePausa);

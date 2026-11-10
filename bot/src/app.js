@@ -9,7 +9,8 @@ import { redactarRespuesta, transcribirAudio, redactarBorradores, redactarAnunci
 import { Cola, dormir, esperaEntreEnvios } from './queue.js';
 import { estadoIA, actualizarIA, pausarIA, estaPausado, promptIA, resumenIA } from './ia.js';
 import { estadoAjustes, actualizarAjustes, esperaMasivaMs, esperaChatMs } from './ajustes.js';
-import { registrar, listar, obtener, marcarLeido, respuestasIA, porDia, resumen as resumenChats, registrarCabecera, importarMensajes, yaExisteWa, actualizarAck, mensajesEntrantes, vaciar as vaciarConversaciones, flush as flushConversaciones } from './conversaciones.js';
+import { oculto, ocultar, limpiar as limpiarOcultos } from './ocultos.js';
+import { registrar, listar, obtener, marcarLeido, respuestasIA, porDia, resumen as resumenChats, registrarCabecera, importarMensajes, yaExisteWa, actualizarAck, mensajesEntrantes, eliminar as eliminarConversacion, vaciar as vaciarConversaciones, flush as flushConversaciones } from './conversaciones.js';
 import * as pedidos from './pedidos.js';
 import * as anuncios from './anuncios.js';
 // (Las plantillas de pago se eliminaron: las billeteras digitales las verifica el admin.)
@@ -2049,6 +2050,7 @@ async function sincronizarChatsDesdeWhatsApp(sesionId = null) {
     if (!/^\d{8,15}$/.test(c.telefono)) { sinNumero++; continue; }
     // El chat con el propio número del bot no va a la Bandeja.
     if (propios.includes(String(c.telefono))) continue;
+    if (oculto(c.telefono)) continue; // el dueño lo quitó de la Bandeja
     registrarCabecera({
       telefono: c.telefono,
       nombre: c.nombre,
@@ -2156,9 +2158,29 @@ registrarConversaciones(app, {
   logMensaje, registrar, log
 });
 
+app.delete('/api/conversaciones/:telefono', auth, async (req, res) => {
+  const tel = normalizar(req.params.telefono);
+  if (!/^\d{8,15}$/.test(tel)) return res.status(400).json({ error: 'Teléfono inválido.' });
+  try {
+    const borrado = eliminarConversacion(tel);
+    ocultar(tel); // que no vuelva al sincronizar
+    let msgsBorrados = false;
+    if (String(req.query.mensajes || '') === '1' && sb) {
+      const r = await sb.from('mensajes').delete().eq('telefono', tel);
+      if (r && r.error) throw new Error(r.error.message || String(r.error));
+      msgsBorrados = true;
+    }
+    emitir('sync', { motivo: 'chat_eliminado', telefono: tel });
+    res.json({ ok: true, borrado, msgsBorrados });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.delete('/api/conversaciones', auth, async (req, res) => {
   try {
     vaciarConversaciones();
+    limpiarOcultos();
     let borroMensajes = false;
     if (String(req.query.mensajes || '') === '1' && sb) {
       const r = await sb.from('mensajes').delete().not('id', 'is', null);
