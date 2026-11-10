@@ -606,12 +606,20 @@ export async function listarChatsWa(sesionId = null) {
     await evalPagina(s, async () => {
       const pane = document.querySelector('#pane-side');
       if (!pane) return;
-      for (let i = 0; i < 12; i++) {
-        pane.scrollTop = pane.scrollHeight;
-        await new Promise(r => setTimeout(r, 350));
-        if (pane.scrollTop === 0) break;
+      const W = window;
+      const total = () => {
+        try { return W.require('WAWebCollections').Chat.getModelsArray().length; } catch (e) { return 0; }
+      };
+      let anterior = -1;
+      let estable = 0;
+      for (let i = 0; i < 60; i++) {
+        try { pane.scrollTop = pane.scrollHeight; } catch (e) { break; }
+        await new Promise(r => setTimeout(r, 400));
+        const n = total();
+        if (n === anterior) estable++; else { anterior = n; estable = 0; }
+        if (estable >= 4) break;       // dejó de crecer: ya está toda la lista
       }
-    }, undefined, 20000, 'cargar lista de chats');
+    }, undefined, 60000, 'cargar lista de chats');
   } catch { /* si no se puede, se sigue con lo cargado */ }
 
   let crudos;
