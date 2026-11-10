@@ -403,3 +403,10 @@ dialog::backdrop{background:rgba(3,4,8,.66);backdrop-filter:blur(8px)}
 .quick button{font-size:.74rem;padding:.3rem .55rem;min-height:32px;border-radius:99px;background:var(--s2);border:1px solid var(--line);color:var(--mute);cursor:pointer}
 .quick button:hover{color:var(--ink);border-color:var(--gold-line)}
 .quick button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+
+/* Productos de un pedido (varios perfumes por pedido) */
+.pe-items{display:flex;flex-direction:column;gap:.35rem;margin:.2rem 0 .5rem}
+.pe-item{display:flex;align-items:center;justify-content:space-between;gap:.6rem;background:var(--s2);border:1px solid var(--line);border-radius:10px;padding:.45rem .65rem;font-size:.85rem}
+.pe-item b{font-weight:600}
+.pe-item button{min-height:34px;font-size:.78rem;padding:.2rem .55rem}
+.pe-empty{border:1px dashed var(--line);border-radius:10px;padding:.6rem;color:var(--mute);font-size:.82rem}

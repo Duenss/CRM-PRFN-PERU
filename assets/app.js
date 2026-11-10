@@ -1497,6 +1497,42 @@ function renderPedidos(j){
     </div>`;
   }).join('')||'<p class="empty">Aún no hay pedidos. Crea uno con "Nuevo pedido" o espera a que la IA detecte una compra.</p>';
 }
+let peItems=[];
+function productoPeActual(){return productos.find(x=>x.id===$('#pe-prod').value)||null}
+function totalPeItems(){return peItems.reduce((s,it)=>s+(Number(it.precio)||0)*(Number(it.cantidad)||1),0)}
+function renderPeItems(){
+  const cont=$('#pe-items');if(!cont)return;
+  cont.innerHTML=peItems.map(function(it,i){
+    const sub=((Number(it.precio)||0)*(Number(it.cantidad)||1)).toFixed(2);
+    return '<div class="pe-item"><span><b>'+esc(it.nombre)+'</b> · '+it.ml+' ml · '+it.cantidad+'× · <b>S/ '+sub+'</b></span><button class="ghost" type="button" data-pe-del="'+i+'" aria-label="Quitar '+esc(it.nombre)+'">Quitar</button></div>';
+  }).join('')||'<div class="pe-empty">Aún no agregaste perfumes. Elige uno y pulsa “+ Agregar”.</div>';
+  const total=totalPeItems();
+  const adel=Math.max(0,Number($('#pe-adelanto')?.value)||0);
+  if($('#pe-total'))$('#pe-total').textContent=peItems.length
+    ? 'Pedido: '+peItems.length+' producto(s) · Total: S/ '+total.toFixed(2)+' · Saldo: S/ '+Math.max(0,total-adel).toFixed(2)+($('#pe-metodo')?.value==='efectivo'?' · Se cobra al entregar':'')
+    : 'Sin productos agregados todavía.';
+}
+function refrescarActualPe(){
+  const p=productoPeActual();
+  const ml=$('#pe-ml')?.value==='100'?100:50;
+  const cant=Math.max(1,Number($('#pe-cant')?.value)||1);
+  const precio=Number($('#pe-precio')?.value)||0;
+  const el=$('#pe-current');
+  if(el)el.textContent=p?('Actual: '+cant+' × '+p.nombre+' '+ml+' ml = S/ '+(precio*cant).toFixed(2)):'';
+}
+function agregarPeItem(){
+  const p=productoPeActual();
+  if(!p){toast('Elige un perfume del catálogo.','error');return false}
+  const ml=$('#pe-ml').value==='100'?100:50;
+  const cantidad=Math.max(1,Number($('#pe-cant').value)||1);
+  const precio=Number($('#pe-precio').value)||0;
+  if(precio<=0){toast('Escribe el precio unitario.','error');return false}
+  peItems.push({productoId:p.id,nombre:p.nombre,ml,cantidad,precio});
+  $('#pe-cant').value=1;
+  $('#pe-precio').value=precioPedidoActual();
+  renderPeItems();refrescarActualPe();
+  return true;
+}
 function llenarProductosPedido(){
   const sel=$('#pe-prod');if(!sel)return;
   sel.innerHTML=productos.map(p=>`<option value="${esc(p.id)}">${esc(p.nombre)} (${esc(p.casa_inspirada||'')})</option>`).join('')||'<option value="">Sin catálogo</option>';
@@ -1524,9 +1560,20 @@ function abrirFormPedido(tel='',nombre=''){
   $('#pe-tel').value=tel||'';$('#pe-nombre').value=nombre||'';
   $('#pe-cant').value=1;$('#pe-adelanto').value=0;$('#pe-metodo').value='';$('#pe-notas').value='';
   $('#pe-ml').value='100';$('#pe-precio').value=precioPedidoActual();
-  refrescarTotalPedido();
+  peItems=[];renderPeItems();refrescarActualPe();
   $('#pe-form').scrollIntoView({block:'center',behavior:'smooth'});
 }
+$('#pe-add')?.addEventListener('click',agregarPeItem);
+$('#pe-items')?.addEventListener('click',e=>{
+  const b=e.target.closest('[data-pe-del]');if(!b)return;
+  peItems.splice(Number(b.dataset.peDel),1);renderPeItems();
+});
+$('#pe-prod')?.addEventListener('change',()=>{$('#pe-precio').value=precioPedidoActual();refrescarActualPe()});
+$('#pe-ml')?.addEventListener('change',()=>{$('#pe-precio').value=precioPedidoActual();refrescarActualPe()});
+$('#pe-cant')?.addEventListener('input',refrescarActualPe);
+$('#pe-precio')?.addEventListener('input',refrescarActualPe);
+$('#pe-adelanto')?.addEventListener('input',renderPeItems);
+$('#pe-metodo')?.addEventListener('change',renderPeItems);
 $('#pe-cliente')?.addEventListener('change',e=>{
   const opt=e.target.selectedOptions[0];
   if(!opt||!opt.value)return;
@@ -1536,34 +1583,33 @@ $('#pe-cliente')?.addEventListener('change',e=>{
 async function guardarPedido(){
   const tel=norm($('#pe-tel').value);
   if(!/^\d{8,15}$/.test(tel))return toast('Escribe un WhatsApp válido.', 'error');
+  if(!peItems.length && !agregarPeItem()) return;
+  if(!peItems.length)return toast('Agrega al menos un perfume.','error');
   const prod=productos.find(x=>x.id===$('#pe-prod').value);
-  if(!prod)return toast('Elige un perfume del catálogo.', 'error');
-  const ml=Number($('#pe-ml').value)===100?100:50;
-  const precio=Number($('#pe-precio').value)||0;
-  if(precio<=0)return toast('Escribe el precio unitario.', 'error');
+  const items=peItems.map(it=>({productoId:it.productoId,nombre:it.nombre,ml:it.ml,cantidad:it.cantidad,precio:it.precio}));
   const b=$('#pe-save');b.disabled=true;
   try{
     await botFetch('/api/pedidos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
       telefono:tel,
-      nombre:$('#pe-nombre').value.trim()||prod.nombre,
+      nombre:$('#pe-nombre').value.trim()||(prod?prod.nombre:items[0].nombre),
       metodo:$('#pe-metodo').value,
       adelanto:Number($('#pe-adelanto').value)||0,
       notas:$('#pe-notas').value.trim(),
-      items:[{productoId:prod.id,nombre:prod.nombre,ml,cantidad:Math.max(1,Number($('#pe-cant').value)||1),precio}]
+      items
     })});
+    peItems=[];renderPeItems();
     $('#pe-form').hidden=true;
     toast('Pedido guardado');
     await cargarPedidos();
   }catch(e){
     const adelanto=Number($('#pe-adelanto').value)||0;
-    const cantidad=Math.max(1,Number($('#pe-cant').value)||1);
-    const total=precio*cantidad;
+    const total=items.reduce((s,it)=>s+(Number(it.precio)||0)*(Number(it.cantidad)||1),0);
     const locales=leerPedidosLocales();
     locales.unshift({
       id:nuevoPedidoLocalId(),telefono:tel,
-      nombre:$('#pe-nombre').value.trim()||prod.nombre,
+      nombre:$('#pe-nombre').value.trim()||(prod?prod.nombre:items[0].nombre),
       metodo:$('#pe-metodo').value||'',adelanto,notas:$('#pe-notas').value.trim(),
-      items:[{productoId:prod.id,nombre:prod.nombre,ml,cantidad,precio}],
+      items,
       total,saldo:Math.max(0,total-adelanto),estado:'borrador',local:true,
       actualizado:new Date().toISOString()
     });

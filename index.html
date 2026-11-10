@@ -144,9 +144,14 @@
             <div><label for="pe-ml">Tamaño</label><select id="pe-ml"><option value="50">50 ml</option><option value="100">100 ml</option></select></div>
           </div>
           <div class="grid2">
-            <div><label for="pe-cant">Cantidad</label><input id="pe-cant" type="number" min="1" max="9" value="1"></div>
+            <div><label for="pe-cant">Cantidad</label><input id="pe-cant" type="number" min="1" max="99" value="1"></div>
             <div><label for="pe-precio">Precio unitario (S/)</label><input id="pe-precio" type="number" min="0" step="0.5" value="0"></div>
           </div>
+          <div class="acts" style="justify-content:flex-start;margin:.1rem 0 .5rem">
+            <button class="ghost" id="pe-add" type="button">+ Agregar este perfume al pedido</button>
+            <span class="muted" id="pe-current" style="font-size:.8rem"></span>
+          </div>
+          <div id="pe-items" class="pe-items"></div>
           <div class="grid2">
             <div><label for="pe-metodo">Método de pago</label><select id="pe-metodo">
               <option value="">Por definir</option>
