@@ -68,5 +68,5 @@ node ../scripts/e2e-panel.mjs   # e2e del panel (11)
 
 ## Documentación
 
-`docs/DESPLIEGUE-PRODUCCION.md` · `docs/TRASPASO.md` · `docs/DISENO_PANEL.md` ·
+`docs/PRUEBAS-CHAT.md` · `scripts/probar-chat.mjs` (pruebas simuladas del chat) · `docs/DESPLIEGUE-PRODUCCION.md` · `docs/TRASPASO.md` · `docs/DISENO_PANEL.md` ·
 `docs/MARCA.md` · `SECURITY.md` · `CHANGELOG.md`

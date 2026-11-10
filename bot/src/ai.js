@@ -94,7 +94,7 @@ REGLAS OBLIGATORIAS:
 22. SALUDO: si es el PRIMER mensaje de la conversación, o si el cliente envía un resumen de compra, empieza con "Buenos días", "Buenas tardes" o "Buenas noches" (según la hora de Lima: 5-11, 12-18, 19-4) seguido del nombre del cliente y una frase corta. Ejemplo: "Buenas tardes, Juan. Gracias por tu resumen 😊". No repitas el saludo en los mensajes siguientes.
 23. RESUMEN DE COMPRA: si el cliente manda producto, tamaño, cantidad, total o método de pago, confirma el resumen con esos datos y explica el siguiente paso (efectivo al recibir/recoger; digital: enviar comprobante y el encargado verifica). No inventes productos ni precios y no confirmes el pago.
 24. SOLO VENTA AL DETALLE: no des información de ventas por mayor, reventa, kits para emprendedores, envases ni esencias. Si lo piden, responde con educación que no manejamos ese rubro y deriva al administrador.
-25. RECOMENDACIONES: antes de recomendar, pregunta en UN SOLO mensaje: ¿es para *dama* o *caballero*?, ¿qué notas te gustan (cítrico, amaderado, dulce, intenso, fresco)? y ¿para el día o la noche / qué ocasión? Luego recién recomienda.
+25. RECOMENDACIONES: antes de recomendar, pregunta en UN SOLO mensaje: ¿es para *dama* o *caballero*?, ¿qué notas te gustan (cítrico, amaderado, dulce, intenso, fresco)? y ¿para el día o la noche / qué ocasión? Luego recién recomienda. Al recomendar, menciona también la promo de *3 perfumes de 30 ml por S/ 90* y ofrece pasar con un administrador para cerrar la compra.
 26. FICHA DE PRODUCTO: cuando recomiendes una fragancia concreta, el mensaje va con la FOTO y debe incluir: 2 o 3 notas principales, para qué ocasión sirve y qué personalidad/estilo refleja. Sin precios en ese mensaje (el precio va después).
 27. PROMO 3 x S/ 90: si preguntan por promoción, pack, combo o "3 perfumes", explica: *3 perfumes de 30 ml por S/ 90*, pago al recibir el pedido, Lima y provincia. Luego deriva al administrador para coordinar. No inventes otras promociones.
 28. CONCISIÓN: máximo 3 o 4 mensajes por respuesta (sin contar la bienvenida ni el catálogo PDF). No repitas el saludo, usa viñetas cortas y termina con una pregunta abierta para que el cliente siga conversando.`;
@@ -430,8 +430,9 @@ export async function redactarRespuesta({ mensaje, historial = [], cliente, cont
 
   const extra = String(contexto || '').trim();
 
+  const hora = new Date().toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit', hour12: true });
   const prompt = `Datos de la tienda:
-${tienda}${extra ? `\n\nIndicaciones del dueño (respétalas siempre):\n${extra.slice(0, 1200)}` : ''}
+${tienda}\nHora actual en Lima: ${hora} (saluda acorde a esta hora, nunca con otro momento del día)${extra ? `\n\nIndicaciones del dueño (respétalas siempre):\n${extra.slice(0, 1200)}` : ''}
 
 Catálogo relevante:
 ${lista}

@@ -487,7 +487,7 @@ async function responderProductoDirecto({ tel, nombre, clienteId, texto, sesionI
       }
     }
     if (pidePrecio) {
-      const msg = `${saludo}. Precios de *${prod.nombre}*:\n\n• 50 ml — *S/ ${p50}*\n• 100 ml — *S/ ${p100}*\n\n¿Cuál prefieres? 😊`;
+      const msg = `${saludo ? saludo + '. ' : ''}Precios de *${prod.nombre}*:\n\n• 50 ml — *S/ ${p50}*\n• 100 ml — *S/ ${p100}*\n\n¿Cuál prefieres? 😊`;
       await enviarRegistrado({ tel, texto: msg, nombre, clienteId, sesionId });
     }
     log(`Respuesta directa de producto ${prod.nombre} a +${tel} (${pideImagen ? 'imagen' : ''}${pideImagen && pidePrecio ? '+' : ''}${pidePrecio ? 'precio' : ''}).`);

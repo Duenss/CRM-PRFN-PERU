@@ -34,6 +34,11 @@
 - Bienvenida, PDF y video configurables desde Ajustes.
 - Supervisor con auto-reinicio del proceso del bot.
 
+### Pruebas del chat
+- `scripts/probar-chat.mjs` + `docs/PRUEBAS-CHAT.md`: guion de pruebas simuladas (sin QR) y reales.
+- Corregido saludo vacío en la respuesta de precios y la IA ya usa la hora de Lima (no saluda "buenas tardes" de noche).
+- Al recomendar se menciona la promo 3 × S/ 90 y se ofrece pasar con un administrador.
+
 ### Calidad
 - Routers separados de `app.js`: `routes/ajustes.js`, `routes/pedidos.js`, `routes/seguimiento.js`, `routes/anuncios.js` y `routes/conversaciones.js`.
 - 78 pruebas: incluye lista blanca del proxy, validación del dueño y sanitización de `esc()`.
