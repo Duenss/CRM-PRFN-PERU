@@ -34,6 +34,10 @@
 - Bienvenida, PDF y video configurables desde Ajustes.
 - Supervisor con auto-reinicio del proceso del bot.
 
+### Panel sin el bot
+- El panel ya no se queda esperando al bot: carga catálogo (202 productos) y plantillas en ~4 s con el bot apagado; el respaldo de clientes se pide sin bloquear y el proxy corta a los 8 s.
+- Verificado deteniendo el bot: 0 errores JS y datos de Supabase visibles.
+
 ### Envío masivo
 - Motor de anuncios verificado en simulación: texto con `{nombre}` + PDF + video, estado `enviado` 1/1 y 0 errores.
 
