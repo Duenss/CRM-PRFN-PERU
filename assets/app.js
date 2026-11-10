@@ -2217,6 +2217,7 @@ $('#gq-results')?.addEventListener('mousemove',e=>{
 document.addEventListener('click',e=>{
   if($('#gsearch')&&!$('#gsearch').contains(e.target))cerrarBusqueda();
 });
+$('#top-logo')?.addEventListener('click',()=>irTab('inicio'));
 document.addEventListener('keydown',e=>{
   if(e.key==='/'&&!e.ctrlKey&&!e.metaKey&&document.activeElement?.tagName!=='INPUT'&&document.activeElement?.tagName!=='TEXTAREA'){
     e.preventDefault();$('#gq')?.focus();

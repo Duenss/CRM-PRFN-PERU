@@ -427,3 +427,11 @@ dialog::backdrop{background:rgba(3,4,8,.66);backdrop-filter:blur(8px)}
 .gsearch-vacio{padding:.7rem .6rem;color:var(--mute);font-size:.82rem}
 @media(max-width:900px){.gsearch{min-width:0;max-width:none}.gsearch input{font-size:.8rem}}
 @media(max-width:760px){.gsearch{height:36px;max-width:170px}.gres small{display:none}}
+
+/* Logo de la marca en la barra superior (sustituye al avatar "JP") */
+.toplogo{width:38px;height:38px;flex:0 0 auto;border-radius:50%;display:grid;place-items:center;cursor:pointer;
+  background:radial-gradient(120% 120% at 30% 20%, #F2D98F 0%, #DDB75F 55%, #B98F35 100%);
+  border:1px solid var(--gold-line);box-shadow:0 6px 18px -8px rgba(221,183,95,.55)}
+.toplogo:hover{filter:brightness(1.06)}
+.toplogo .brand-mark{width:20px;height:20px;color:#1A1408;filter:none}
+@media(max-width:760px){.toplogo{width:34px;height:34px}.toplogo .brand-mark{width:18px;height:18px}}
