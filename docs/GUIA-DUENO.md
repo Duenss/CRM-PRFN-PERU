@@ -55,7 +55,9 @@ Guía corta para usar el CRM en el día a día. El panel vive en
 ## 6. Pedidos
 
 - **Nuevo pedido**: elige el cliente (o escribe teléfono/nombre), perfume, tamaño,
-  cantidad, precio, método de pago y adelanto. El total y saldo se calculan solos.
+  cantidad y precio, y pulsa **“+ Agregar este perfume al pedido”**. Puedes añadir **varios
+  perfumes** (cada uno con su tamaño y cantidad) antes de guardar; la lista muestra el total
+  y el saldo, y cada línea se puede quitar.
 - **Comprobante**: abre el pedido y adjunta la captura del Yape/Plin/transferencia.
 - Estados: `esperando_pago` → `comprobante_recibido` → `por_entregar` → `entregado`.
 - Si el bot está apagado, el pedido se guarda en el navegador y se sincroniza al encenderlo.

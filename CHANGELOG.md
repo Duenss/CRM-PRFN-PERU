@@ -47,6 +47,9 @@
 ### Envío masivo
 - Motor de anuncios verificado en simulación: texto con `{nombre}` + PDF + video, estado `enviado` 1/1 y 0 errores.
 
+### Pedidos con varios perfumes
+- El formulario de pedido permite agregar **varios perfumes**, cada uno con su tamaño, cantidad y precio; lista con quitar, total y saldo en vivo.
+
 ### Bajas
 - `BAJA/STOP` se confirma siempre y se guarda también para números que aún no son clientes (`bot/data/bajas.json`); anuncios y selector de contactos los excluyen.
 
