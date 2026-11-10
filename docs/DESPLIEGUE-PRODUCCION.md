@@ -157,6 +157,11 @@ Luego:
 
 ---
 
+
+> **Importante:** el proxy de Pages (Workers) **no puede** llamar a una IP literal
+> (`http://157.173.192.178:...` da error 1003). Usa el **hostname** del nodo:
+> `BOT_URL = http://node.sakurasmp.xyz:25577`.
+
 ## D. Panel en Cloudflare Pages (HTTPS)
 
 El panel es index.html (un solo archivo). Para que funcione en HTTPS sin
