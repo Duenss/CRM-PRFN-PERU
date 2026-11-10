@@ -849,6 +849,14 @@ dialog::backdrop{background:rgba(3,4,8,.66);backdrop-filter:blur(8px)}
 const SUPABASE_URL='https://pcesvmsewfpvmqmfmswn.supabase.co';
 const SUPABASE_KEY='sb_publishable_UHjFrmSZodpuHDpDSh4zWg_pVfhseeS';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+/* Mensajes claros cuando Supabase rechaza una operación. */
+function msgErrorSb(error){
+  const m=String(error&&error.message?error.message:(error||''));
+  if(/row-level security|permission denied|new row violates|violates row-level/i.test(m))return 'Sin permisos en Supabase (RLS). Ejecuta el SQL sql/10_permisos_panel.sql en Supabase → SQL Editor, o avísale al administrador.';
+  if(/JWT|invalid.*token|401/i.test(m))return 'Tu sesión de Supabase venció. Cierra sesión y vuelve a entrar.';
+  if(/does not exist|relation/i.test(m))return 'Falta una tabla en Supabase ('+m+'). Revisa que el esquema esté creado.';
+  return m||'Error de Supabase';
+}
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 /* Formato de WhatsApp (*negrita*, _cursiva_, ~tachado~) para mostrar en el panel. */
@@ -1158,7 +1166,7 @@ $('#cform').onsubmit=async e=>{
 $('#f-del').onclick=async()=>{
   if(!confirm('¿Eliminar este cliente? No se puede deshacer.'))return;
   const{error}=await sb.from('clientes').delete().eq('id',editId);
-  if(error)return alert(error.message);
+  if(error)return alert(msgErrorSb(error));
   $('#dlg').close();toast('Cliente eliminado');await load();
 };
 
@@ -1236,7 +1244,7 @@ $('#imp-go').onclick=async()=>{
   const upd=$('#imp-upd').checked;
   const{error}=await sb.from('clientes').upsert(out,{onConflict:'telefono',ignoreDuplicates:!upd});
   btn.disabled=false;btn.textContent='Importar';
-  if(error){alert(error.message);return}
+  if(error){alert(msgErrorSb(error));return}
   $('#dlgImp').close();toast(`${out.length} clientes importados`);await load();
 };
 
@@ -1331,7 +1339,7 @@ $('#k-list').onclick=e=>{const b=e.target.closest('[data-k]');if(b)abrirCampana(
 async function abrirCampana(id,opts={}){
   openK=campanas.find(x=>x.id===id);if(!openK)return;
   const{data:ev,error}=await sb.from('envios').select('id,estado,cliente_id').eq('campana_id',id);
-  if(error)return alert(error.message);
+  if(error)return alert(msgErrorSb(error));
   const box=$('#k-send');box.hidden=false;
   const total=ev.length,hechos=ev.filter(x=>x.estado!=='pendiente').length;
   const pct=total?Math.round(hechos/total*100):0;
@@ -1350,13 +1358,13 @@ async function abrirCampana(id,opts={}){
   box.innerHTML=cabecera+filas;
   if($('#k-now'))$('#k-now').onclick=async()=>{
     const{error}=await sb.from('campanas').update({fecha_programada:new Date().toISOString()}).eq('id',openK.id);
-    if(error)return alert(error.message);
+    if(error)return alert(msgErrorSb(error));
     toast('El bot la enviará en el próximo minuto');await load();abrirCampana(openK.id);
   };
   if($('#k-cancel'))$('#k-cancel').onclick=async()=>{
     if(!confirm('¿Cancelar la programación? Los envíos quedarán en modo manual.'))return;
     const{error}=await sb.from('campanas').update({estado:'aprobada',fecha_programada:null}).eq('id',openK.id);
-    if(error)return alert(error.message);
+    if(error)return alert(msgErrorSb(error));
     toast('Programación cancelada');await load();abrirCampana(openK.id);
   };
   if(!opts.noScroll)box.scrollIntoView({behavior:'smooth',block:'start'});
@@ -1373,7 +1381,7 @@ $('#k-send').onclick=async e=>{
   btn.disabled=true;
   const id=w?w.dataset.wa:o.dataset.om;
   const{error}=await sb.from('envios').update({estado:w?'enviado':'omitido',fecha_envio:new Date().toISOString()}).eq('id',id);
-  if(error){btn.disabled=false;return alert(error.message)}
+  if(error){btn.disabled=false;return alert(msgErrorSb(error))}
   const{count}=await sb.from('envios').select('id',{count:'exact',head:true}).eq('campana_id',openK.id).eq('estado','pendiente');
   if(count===0){await sb.from('campanas').update({estado:'enviada'}).eq('id',openK.id);openK.estado='enviada'}
   abrirCampana(openK.id);
