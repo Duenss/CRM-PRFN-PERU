@@ -477,7 +477,7 @@ async function responderProductoDirecto({ tel, nombre, clienteId, texto, sesionI
     if (pideImagen) {
       const media = mediaProducto(prod);
       if (media) {
-        const caption = `${saludo}. Aquí tienes *${prod.nombre}*${casa} 📸\n\n${fichaProducto(prod)}`;
+        const caption = `${saludo ? saludo + '. ' : ''}Aquí tienes *${prod.nombre}*${casa} 📸\n\n${fichaProducto(prod)}`;
         const env = await enviarImagen(tel, media, caption, sesionId);
         await logMensaje({ clienteId, telefono: tel, direccion: 'saliente', texto: '📷 ' + caption, origen: 'bot' });
         registrar({ telefono: tel, texto: '📷 ' + caption, direccion: 'saliente', nombre, clienteId, origen: 'bot', waId: env?.waId || '' });

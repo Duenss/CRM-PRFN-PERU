@@ -39,7 +39,7 @@
 
 ### Pruebas del chat
 - `scripts/probar-chat.mjs` + `docs/PRUEBAS-CHAT.md`: guion de pruebas simuladas (sin QR) y reales.
-- Corregido saludo vacío en la respuesta de precios y la IA ya usa la hora de Lima (no saluda "buenas tardes" de noche).
+- Corregido saludo vacío en la respuesta de precios y en la **ficha del perfume** (foto con notas, ocasión y estilo). y la IA ya usa la hora de Lima (no saluda "buenas tardes" de noche).
 - Al recomendar se menciona la promo 3 × S/ 90 y se ofrece pasar con un administrador.
 
 ### Calidad
