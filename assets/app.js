@@ -331,7 +331,6 @@ function irTab(name){
   const c=CRUMBS[name]||['',''];
   if($('#crumb'))$('#crumb').textContent=c[0];
   if($('#crumb-sub'))$('#crumb-sub').textContent=c[1];
-  if(name==='ajustes'){ if(typeof cargarAjustes==='function')cargarAjustes(); if(typeof cargarArchivosInfo==='function')cargarArchivosInfo(); }
   arrancarTareasBase();
   if(name==='bandeja'){cargarBandeja();alertasNuevas=0;actualizarAlertBadge();}
   else if(name==='pedidos')cargarPedidos();
@@ -340,7 +339,7 @@ function irTab(name){
   else if(name==='analiticas')cargarAnaliticas();
   else if(name==='ia')cargarIA();
   else if(name==='inicio')renderInicio();
-  else if(name==='bot'){refrescarQR();cargarLogs();cargarAjustes();}
+  else if(name==='bot'){refrescarQR();cargarLogs();cargarAjustes();cargarArchivosInfo();}
   window.scrollTo({top:0,behavior:'smooth'});
 }
 $('#tabs').onclick=e=>{const b=e.target.closest('button');if(b)irTab(b.dataset.tab)};
