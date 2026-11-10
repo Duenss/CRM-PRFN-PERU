@@ -47,13 +47,12 @@ Cloudflare Pages. Ver `SECURITY.md`.
 | Panel con el bot apagado | Carga en ~4 s con catálogo y plantillas |
 | Smoke test | `node scripts/smoke.mjs` (6/7; falla solo lo pendiente) |
 
-## Pendiente del dueño (2 acciones)
+## Pendiente del dueño
 
-1. **Ejecutar en Supabase → SQL Editor**: `sql/11_arreglar_estado_campanas.sql`  
-   Habilita campañas **programadas** (hoy bloqueadas por un constraint viejo). El panel muestra
-   el aviso hasta que se ejecute.
-2. **Escanear el QR** del WhatsApp de la tienda (Ajustes → Conectar WhatsApp) y elegir un número
-   de prueba para la batería real (`docs/PRUEBAS-CHAT.md`).
+1. ~~Ejecutar `sql/11_arreglar_estado_campanas.sql`~~ **hecho**: el smoke da 7/7 y el bot arranca con `problemas: 0`.
+2. Ejecutar `sql/12_campanas_fecha_hora.sql`: `fecha_programada` era DATE y perdía la hora elegida.
+3. **Escanear el QR** del WhatsApp de la tienda y elegir un número de prueba para la batería real
+   (`docs/PRUEBAS-CHAT.md`).
 
 ## Mantenimiento
 
