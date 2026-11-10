@@ -34,6 +34,9 @@
 - Bienvenida, PDF y video configurables desde Ajustes.
 - Supervisor con auto-reinicio del proceso del bot.
 
+### Bajas
+- `BAJA/STOP` se confirma siempre y se guarda también para números que aún no son clientes (`bot/data/bajas.json`); anuncios y selector de contactos los excluyen.
+
 ### Pruebas del chat
 - `scripts/probar-chat.mjs` + `docs/PRUEBAS-CHAT.md`: guion de pruebas simuladas (sin QR) y reales.
 - Corregido saludo vacío en la respuesta de precios y la IA ya usa la hora de Lima (no saluda "buenas tardes" de noche).

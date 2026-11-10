@@ -54,3 +54,12 @@ Criterios:
 - Máximo 3–4 mensajes por turno (sin contar bienvenida ni PDF).
 - Termina siempre con una pregunta abierta.
 - No inventa precios ni promociones distintas a las configuradas.
+
+## 3. Bajas (BAJA / STOP)
+
+Cualquier chat que escriba exactamente `BAJA`, `STOP`, `NO ME ESCRIBAS`, `NO QUIERO RECIBIR` o
+`ELIMINAR` recibe la confirmación y queda fuera de los envíos masivos:
+
+- Si ya es cliente, se marca `baja` en Supabase.
+- Si todavía no es cliente, se guarda en `bot/data/bajas.json`.
+- El selector de contactos y el preview de anuncios ya no lo muestran.

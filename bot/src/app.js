@@ -16,6 +16,7 @@ import * as anuncios from './anuncios.js';
 import * as seguimiento from './seguimiento.js';
 import { crearAuth, crearAuthPanel, crearLimitador } from './auth.js';
 import { registrarAjustes } from './routes/ajustes.js';
+import { esBaja, marcarBajaLocal } from './bajas.js';
 import { registrarPedidos } from './routes/pedidos.js';
 import { registrarSeguimiento } from './routes/seguimiento.js';
 import { registrarAnuncios } from './routes/anuncios.js';
@@ -824,7 +825,7 @@ function listaDestinatarios(clientes, chats) {
       clienteId: c.id || null,
       consentimiento: !!c.consentimiento,
       activo: c.activo !== false,
-      baja: !!c.baja,
+      baja: !!c.baja || esBaja(tel),
       etiquetas: etiquetasDe(c),
       origen: 'cliente'
     });
@@ -845,7 +846,7 @@ function listaDestinatarios(clientes, chats) {
       clienteId: ch.clienteId || null,
       consentimiento: false,
       activo: true,
-      baja: false,
+      baja: esBaja(tel),
       etiquetas: [],
       origen: 'chat'
     });
@@ -1438,18 +1439,17 @@ async function manejarMensaje(msg, sesionId = null) {
     return;
   }
 
-  // Baja explícita
+  // Baja explícita: se confirma SIEMPRE y se guarda aunque aún no sea cliente.
   if (esTextoReal && /^\s*(baja|stop|no me escribas|no quiero recibir|eliminar)\s*[.!]*\s*$/i.test(texto)) {
-    if (cliente) {
-      try {
-        await marcarBaja(cliente);
-        const r = 'Listo, no volveremos a enviarte promociones. Gracias por avisarnos 🙌';
-        const env = await enviar(tel, r, sesionId);
-        await logMensaje({ clienteId: cliente.id, telefono: tel, direccion: 'saliente', texto: r, origen: 'bot' });
-        registrar({ telefono: tel, texto: r, direccion: 'saliente', nombre: nombreChat, clienteId: cliente.id, origen: 'bot', waId: env?.waId || '' });
-        log(`Baja registrada: ${cliente.nombre} (+${tel}).`);
-      } catch (e) { log('Error al registrar baja: ' + e.message); }
-    }
+    try {
+      if (cliente) await marcarBaja(cliente);
+      else marcarBajaLocal(tel);
+      const r = 'Listo, no volveremos a enviarte promociones. Gracias por avisarnos 🙌';
+      const env = await enviar(tel, r, sesionId);
+      await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'saliente', texto: r, origen: 'bot' });
+      registrar({ telefono: tel, texto: r, direccion: 'saliente', nombre: nombreChat, clienteId: cliente?.id, origen: 'bot', waId: env?.waId || '' });
+      log(`Baja registrada: ${cliente?.nombre || '+' + tel} (+${tel}).`);
+    } catch (e) { log('Error al registrar baja: ' + e.message); }
     return;
   }
 

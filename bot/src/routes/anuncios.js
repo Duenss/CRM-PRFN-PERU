@@ -21,6 +21,7 @@ export function registrarAnuncios(app, ctx) {
       const chats = listar(5000);
       const q = String(req.query.q || '').toLowerCase().trim();
       const lista = listaDestinatarios(clientes, chats)
+        .filter(d => !d.baja)
         .filter(d => !q || String(d.nombre || '').toLowerCase().includes(q) || String(d.telefono).includes(q))
         .sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || '')))
         .slice(0, 500)
