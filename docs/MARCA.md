@@ -49,3 +49,10 @@ Contraste verificado: texto principal 15.7:1 sobre `--s1`; `--mute` 6.0:1; `--mu
 - Botón primario dorado con texto oscuro; secundario “ghost”.
 - Foco visible siempre (`:focus-visible` con contorno `--gold`).
 - Respeto a `prefers-reduced-motion`: sin animaciones ni transiciones.
+
+## Archivos del logotipo
+
+- `assets/img/logo-pf-original.png` — imagen original recibida del dueño (640×640).
+- `assets/img/logo-pf.png` — 512×512 (barra lateral).
+- `assets/img/logo-pf-128.png` — 128×128 (login y barra superior).
+- `assets/img/favicon.png` — 64×64 (pestaña del navegador).
