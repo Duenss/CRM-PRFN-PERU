@@ -34,6 +34,9 @@
 - Bienvenida, PDF y video configurables desde Ajustes.
 - Supervisor con auto-reinicio del proceso del bot.
 
+### Envío masivo
+- Motor de anuncios verificado en simulación: texto con `{nombre}` + PDF + video, estado `enviado` 1/1 y 0 errores.
+
 ### Bajas
 - `BAJA/STOP` se confirma siempre y se guarda también para números que aún no son clientes (`bot/data/bajas.json`); anuncios y selector de contactos los excluyen.
 

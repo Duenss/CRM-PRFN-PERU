@@ -63,3 +63,17 @@ Cualquier chat que escriba exactamente `BAJA`, `STOP`, `NO ME ESCRIBAS`, `NO QUI
 - Si ya es cliente, se marca `baja` en Supabase.
 - Si todavía no es cliente, se guarda en `bot/data/bajas.json`.
 - El selector de contactos y el preview de anuncios ya no lo muestran.
+
+## 4. Envío masivo (simulado)
+
+Con el bot en `MODO_PRUEBA=true` y el horario del bot ampliado (Ajustes → 0–24) se puede
+probar el motor de anuncios sin enviar nada real:
+
+1. Crea un cliente temporal en Supabase (`clientes`) con un número de prueba.
+2. En el panel: **Anuncios** → escribe el mensaje, marca **catálogo** y **video**, filtro
+   **teléfonos** con ese número, y **Enviar ahora**.
+3. El estado pasa de `borrador` → `enviando` → `enviado` con `1/1` y 0 errores.
+4. En la bandeja aparecen tres salientes: el texto (con `{nombre}`), el PDF y el video.
+5. Al terminar, borra el anuncio y el cliente temporal, y devuelve el horario a 9–20.
+
+Verificado el 10/11/2026: texto + catálogo + video entregados en simulación (1/1, 0 errores).
