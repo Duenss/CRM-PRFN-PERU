@@ -1711,6 +1711,23 @@ app.use((req, res, next) => {
 // Límite de peticiones para la API (sin dependencias externas).
 app.use('/api/', crearLimitador({ max: 240, ventanaMs: 60000 }));
 
+// Validación básica de entrada: evita mensajes gigantes o teléfonos absurdos.
+app.use((req, res, next) => {
+  const b = req.body || {};
+  for (const campo of ['texto', 'mensaje', 'caption', 'notas']) {
+    if (typeof b[campo] === 'string' && b[campo].length > 4000) {
+      return res.status(400).json({ error: 'El mensaje es demasiado largo (máximo 4000 caracteres).' });
+    }
+  }
+  if (typeof b.telefono === 'string' && b.telefono.length > 20) {
+    return res.status(400).json({ error: 'Teléfono inválido.' });
+  }
+  if (b.telefono !== undefined && !/^\d{8,15}$/.test(String(b.telefono).replace(/\D/g, ''))) {
+    return res.status(400).json({ error: 'Teléfono inválido.' });
+  }
+  next();
+});
+
 app.get('/', authPanel, (_req, res) => res.redirect('/panel'));
 app.get('/panel', authPanel, (_req, res) => res.sendFile(panelPath));
 app.use('/media/comprobantes', express.static(comprobantesDir, { fallthrough: true, maxAge: '1h' }));

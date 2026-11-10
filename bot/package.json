@@ -9,7 +9,8 @@
   },
   "scripts": {
     "start": "node src/server.js",
-    "mock": "node src/server.js --mock"
+    "mock": "node src/server.js --mock",
+    "test": "node --test \"test/*.test.mjs\""
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.0",
