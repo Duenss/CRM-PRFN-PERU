@@ -71,6 +71,9 @@ node scripts/backup-bot.mjs --server 1938d04a --key <CLAVE_CLIENTE>
 # Copia de seguridad de los datos del bot
 node scripts/backup-bot.mjs --server <ID> --key <CLAVE_CLIENTE>
 
+# Restaurar una copia (reinicia el bot al terminar)
+node scripts/restore-bot.mjs --server <ID> --key <CLAVE_CLIENTE> --from backups/AAAA-MM-DD-HH-MM-SS
+
 # Pruebas de chat simuladas
 node scripts/probar-chat.mjs --url http://node.sakurasmp.xyz:25577 --token <BOT_TOKEN> --tel 51XXXXXXXXX
 ```
