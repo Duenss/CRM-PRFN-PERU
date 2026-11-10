@@ -22,6 +22,7 @@
 - Sonidos configurables (volumen y eventos), antirrebote de 1.5 s, contador de no leídos en el
   título y sonido apagado por defecto.
 - Pedidos con respaldo local si el bot está apagado y sincronización automática.
+- Respuestas rápidas en la bandeja (saludo, catálogo, promo 3×90, pagos, horario) con el nombre del cliente.
 - Selector de contactos para envíos masivos y selector de clientes al crear pedidos.
 - Festivos completos en el calendario; no leídos que no “resucitan” al sincronizar.
 

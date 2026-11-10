@@ -1355,6 +1355,29 @@ $('#in-form')?.addEventListener('submit',async e=>{
 $('#in-text')?.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('#in-form').requestSubmit()}});
 $('#in-text')?.addEventListener('input',e=>{e.target.style.height='auto';e.target.style.height=Math.min(130,e.target.scrollHeight)+'px'});
 
+/* Respuestas rápidas: plantillas con datos del chat para no escribir a mano. */
+const PLANTILLAS_RAPIDAS={
+  saludo:()=>{
+    const nombre=($('#in-name')?.textContent||'').trim();
+    const n=nombre&&!/^\+?\d/.test(nombre)?nombre.split(' ')[0]:'';
+    return (n?'Hola '+n+', ':'Hola, ')+'gracias por escribir a *Perfumería Fina Perú* ✨ ¿En qué te puedo ayudar hoy?';
+  },
+  catalogo:()=>'Claro 😊 Te comparto nuestro catálogo. ¿Buscas una fragancia para *dama* o *caballero*?',
+  promo:()=>'¡Sí! Tenemos la promo de *3 perfumes de 30 ml por S/ 90* 🎁 El pago es al recibir tu pedido, en Lima o provincia. ¿Te paso con un administrador para coordinar?',
+  pagos:()=>'Aceptamos *efectivo*, *Yape*, *Plin* y *transferencia* 💳 Para Yape, Plin o transferencia envías tu comprobante y lo verificamos. ¿Cuál te acomoda?',
+  horario:()=>'Atendemos de *lunes a sábado, de 9:00 a.m. a 8:00 p.m.* (hora Lima) ⏰ ¿Te ayudo con algo más?'
+};
+$('#in-quick')?.addEventListener('click',e=>{
+  const b=e.target.closest('[data-quick]');if(!b)return;
+  const plantilla=PLANTILLAS_RAPIDAS[b.dataset.quick];if(!plantilla)return;
+  const ta=$('#in-text');if(!ta)return;
+  const texto=plantilla();
+  ta.value=ta.value.trim()?ta.value.trim()+'\n'+texto:texto;
+  ta.dispatchEvent(new Event('input'));
+  ta.focus();
+  ta.setSelectionRange(ta.value.length,ta.value.length);
+});
+
 /* ---------- pedidos, plantillas de pago y seguimiento ---------- */
 let pedidosCache=[],inSegActivo=false,alertasNuevas=0,evUltimo=null;
 /* Pedidos guardados en el navegador cuando el bot está apagado. Se suben solos
