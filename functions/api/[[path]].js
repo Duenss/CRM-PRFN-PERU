@@ -25,6 +25,7 @@
 const RUTAS = {
   GET: [
     '/api/health', '/api/estado', '/api/qr', '/api/logs', '/api/eventos', '/api/stream',
+    '/media/comprobantes', '/media/productos',
     '/api/ia', '/api/ajustes', '/api/campanas', '/api/pedidos', '/api/analiticas',
     '/api/estadisticas', '/api/seguimiento', '/api/conversaciones', '/api/clientes', '/api/anuncios'
   ],
@@ -40,6 +41,8 @@ const RUTAS = {
 export function rutaPermitida(metodo, ruta) {
   const lista = RUTAS[metodo];
   if (!lista) return false;
+  // Archivos servidos por el bot (comprobantes y fotos de productos).
+  if (metodo === 'GET' && /^\/media\/(comprobantes|productos)\/[A-Za-z0-9._\-]+$/.test(ruta)) return true;
   if (!/^\/api\/[A-Za-z0-9/_\-]*$/.test(ruta)) return false;
   return lista.some(prefijo => ruta === prefijo || ruta.startsWith(prefijo + '/') || ruta.startsWith(prefijo + '?'));
 }

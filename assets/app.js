@@ -798,6 +798,19 @@ async function tokenSupabase(){
   }catch(e){}
   return sbTokenCache;
 }
+async function botBlob(path,opts={}){
+  // Descarga binaria autenticada (QR, comprobantes): <img src> no manda cabeceras.
+  const {timeoutMs=12000,...rest}=opts;
+  const ctl=new AbortController();
+  const timer=setTimeout(()=>ctl.abort(),timeoutMs);
+  try{
+    const jwt=await tokenSupabase();
+    const cabeceras={...(rest.headers||{}),...(jwt?{Authorization:'Bearer '+jwt}:{}),...(botToken?{'x-bot-token':botToken}:{})};
+    const r=await fetch(botURL+path,{cache:'no-store',...rest,signal:ctl.signal,headers:cabeceras});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    return await r.blob();
+  }finally{clearTimeout(timer)}
+}
 async function botFetch(path,opts={}){
   // Toda petición al bot tiene deadline: un cuelgue nunca deja la UI esperando.
   // `timeoutMs` permite dar más margen a operaciones lentas (sync, envío, IA).
@@ -1019,6 +1032,24 @@ $('#b-prueba-send')?.addEventListener('click',async()=>{
 });
 
 /* ---------- conectar WhatsApp (QR) desde el dashboard ---------- */
+let qrBlobUrl=null,qrBloque='';
+async function cargarQrImagen(sesionId,img){
+  const bloque=String(sesionId)+'|'+Math.floor(Date.now()/15000);
+  if(bloque===qrBloque&&qrBlobUrl){if(img.getAttribute('src')!==qrBlobUrl)img.src=qrBlobUrl;return}
+  const blob=await botBlob('/api/qr?sesion='+encodeURIComponent(sesionId),{timeoutMs:10000});
+  if(qrBlobUrl)URL.revokeObjectURL(qrBlobUrl);
+  qrBlobUrl=URL.createObjectURL(blob);
+  qrBloque=bloque;
+  img.src=qrBlobUrl;
+}
+async function abrirComprobante(archivo){
+  try{
+    const blob=await botBlob('/media/comprobantes/'+encodeURIComponent(archivo),{timeoutMs:15000});
+    const url=URL.createObjectURL(blob);
+    window.open(url,'_blank','noopener,noreferrer');
+    setTimeout(()=>URL.revokeObjectURL(url),60000);
+  }catch(e){toast('No se pudo abrir el comprobante: '+e.message,'error')}
+}
 async function refrescarQR(){
   const est=$('#qr-estado');if(!est)return;
   try{
@@ -1033,9 +1064,9 @@ async function refrescarQR(){
     }else if(qrSes){
       fantasma(est,'<div class="status"><span class="dot" style="background:var(--gold)"></span>Escanea el QR con el WhatsApp de la tienda</div>');
       const img=$('#qr-img');
-      // El QR se sirve como imagen (no viaja en /api/estado); se refresca cada 15 s.
-      const src=botURL+'/api/qr?sesion='+encodeURIComponent(qrSes.id||'1')+'&token='+encodeURIComponent(botToken)+'&t='+Math.floor(Date.now()/15000);
-      if(img.getAttribute('src')!==src)img.src=src;
+      // El QR se descarga con la sesión (fetch + blob): así funciona también tras el
+      // proxy de Cloudflare Pages, donde <img src> no puede mandar el token.
+      await cargarQrImagen(qrSes.id||'1', img);
       $('#qr-wrap').hidden=false;
     }else{
       fantasma(est,'<div class="status"><span class="dot"></span>Iniciando o esperando QR…</div>');
@@ -1658,7 +1689,7 @@ $('#pe-list')?.addEventListener('click',e=>{
   const en=e.target.closest('[data-entregar]');
   if(en){cambiarEstadoPedido(en.dataset.entregar,'entregado','Pedido marcado como entregado');return;}
   const c=e.target.closest('[data-comp]');
-  if(c){const p=pedidosCache.find(x=>x.id===c.dataset.comp);const comp=(p?.comprobantes||[]).slice(-1)[0];if(comp)window.open(botURL+'/media/comprobantes/'+encodeURIComponent(comp.archivo),'_blank');else toast('Este pedido no tiene comprobante.','error');}
+  if(c){const p=pedidosCache.find(x=>x.id===c.dataset.comp);const comp=(p?.comprobantes||[]).slice(-1)[0];if(comp)abrirComprobante(comp.archivo);else toast('Este pedido no tiene comprobante.','error');}
 });
 $('#pe-list')?.addEventListener('click',e=>{
   const d=e.target.closest('[data-local-del]');if(!d)return;
