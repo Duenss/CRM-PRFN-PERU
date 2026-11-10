@@ -10,7 +10,7 @@ import { Cola, dormir, esperaEntreEnvios } from './queue.js';
 import { estadoIA, actualizarIA, pausarIA, estaPausado, promptIA, resumenIA } from './ia.js';
 import { estadoAjustes, actualizarAjustes, esperaMasivaMs, esperaChatMs } from './ajustes.js';
 import { oculto, ocultar, limpiar as limpiarOcultos } from './ocultos.js';
-import { registrar, listar, obtener, marcarLeido, respuestasIA, porDia, resumen as resumenChats, registrarCabecera, importarMensajes, yaExisteWa, actualizarAck, mensajesEntrantes, eliminar as eliminarConversacion, vaciar as vaciarConversaciones, flush as flushConversaciones } from './conversaciones.js';
+import { registrar, listar, obtener, marcarLeido, respuestasIA, porDia, resumen as resumenChats, registrarCabecera, importarMensajes, yaExisteWa, actualizarAck, mensajesEntrantes, eliminar as eliminarConversacion, fijar as fijarChat, archivar as archivarChat, vaciar as vaciarConversaciones, flush as flushConversaciones } from './conversaciones.js';
 import * as pedidos from './pedidos.js';
 import * as anuncios from './anuncios.js';
 // (Las plantillas de pago se eliminaron: las billeteras digitales las verifica el admin.)
@@ -2080,17 +2080,17 @@ async function sincronizarChatsDesdeWhatsApp(sesionId = null) {
   const propios = estadoWa().map(s => String(s.numero || '')).filter(Boolean);
   let chats = 0, grupos = 0, sinNumero = 0, archivados = 0, sinConversacion = 0;
   for (const c of lista) {
-    if (c.esGrupo) { grupos++; continue; }
-    // Chats archivados en WhatsApp: el dueño los escondió, no van a la Bandeja.
+    // Grupos: no van a la Bandeja.
+    if (c.grupo) { grupos++; continue; }
+    // Archivados en WhatsApp: no van a la Bandeja.
     if (c.archived) { archivados++; continue; }
-    if (!/^\d{8,15}$/.test(c.telefono)) { sinNumero++; continue; }
+    if (!/^\d{8,15}$/.test(String(c.telefono || ''))) { sinNumero++; continue; }
     // Chats sin ninguna conversación real (solo avisos/plantillas): se omiten.
     if (c.tieneMensajes === false) { sinConversacion++; continue; }
     // Chats sin conversación legible (ni texto ni multimedia): no se importan.
     if (!String(c.ultimoTexto || '').trim() && !c.noLeidos && !c.pin) { sinConversacion++; continue; }
-    // El chat con el propio número del bot no va a la Bandeja.
-    if (propios.includes(String(c.telefono))) continue;
     if (oculto(c.telefono)) continue; // el dueño lo quitó de la Bandeja
+    const esPropio = propios.includes(String(c.telefono));
     registrarCabecera({
       telefono: c.telefono,
       nombre: c.nombre,
@@ -2103,12 +2103,16 @@ async function sincronizarChatsDesdeWhatsApp(sesionId = null) {
       ultimoEn: c.ultimoEn,
       noLeidos: c.noLeidos,
       pin: c.pin,
-      real: c.real !== false
+      real: c.real !== false,
+      grupo: false,
+      archivado: c.archived === true,
+      propio: esPropio,
+      waId: c.waId || ''
     });
     chats++;
   }
   if (grupos || sinNumero) {
-    log(`Sincronización de chats: ${chats} importados de ${lista.length} (${grupos} grupos, ${sinNumero} sin número, ${archivados} archivados, ${sinConversacion} sin conversación).`);
+    log(`Sincronización de chats: ${chats} importados de ${lista.length} (${grupos} grupos, ${archivados} archivados, ${sinNumero} sin número, ${sinConversacion} sin conversación).`);
   }
   return { lista, chats, grupos, sinNumero, archivados, sinConversacion };
 }
@@ -2198,6 +2202,26 @@ registrarConversaciones(app, {
   auth, normalizar, listar, obtener, marcarLeido, estadoIA, seguimiento, pedidos,
   resumenChats, getClientes, getCliente, config, sesionDisponible, enviar,
   logMensaje, registrar, log
+});
+
+app.post('/api/conversaciones/:telefono/fijar', auth, (req, res) => {
+  const tel = normalizar(req.params.telefono);
+  if (!/^\d{6,25}$/.test(tel)) return res.status(400).json({ error: 'Teléfono inválido.' });
+  try {
+    const fijado = fijarChat(tel, req.body?.fijado !== false);
+    emitir('sync', { motivo: 'chat_fijado', telefono: tel, fijado });
+    res.json({ ok: true, fijado });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/conversaciones/:telefono/archivar', auth, (req, res) => {
+  const tel = normalizar(req.params.telefono);
+  if (!/^\d{6,25}$/.test(tel)) return res.status(400).json({ error: 'Teléfono inválido.' });
+  try {
+    const archivado = archivarChat(tel, req.body?.archivado !== false);
+    emitir('sync', { motivo: 'chat_archivado', telefono: tel, archivado });
+    res.json({ ok: true, archivado });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.delete('/api/conversaciones/:telefono', auth, async (req, res) => {

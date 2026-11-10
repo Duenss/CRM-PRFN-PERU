@@ -237,7 +237,7 @@ function recortar() {
 }
 
 /** Crea/actualiza un chat solo con su cabecera (sincronización desde WhatsApp). */
-export function registrarCabecera({ telefono, nombre = '', nombreWa = '', nombreGuardado = '', pushname = '', verifiedName = '', esEmpresa = null, ultimoTexto = '', ultimoEn = null, noLeidos = 0, pin = false, real = true }) {
+export function registrarCabecera({ telefono, nombre = '', nombreWa = '', nombreGuardado = '', pushname = '', verifiedName = '', esEmpresa = null, ultimoTexto = '', ultimoEn = null, noLeidos = 0, pin = false, real = true, grupo = false, archivado = null, propio = false, waId = '' }) {
   const tel = limpiarTel(telefono);
   if (!tel) return null;
   const chat = chats[tel] || {
@@ -249,6 +249,10 @@ export function registrarCabecera({ telefono, nombre = '', nombreWa = '', nombre
     ultimoEn: ultimoEn || '',
     mensajes: []
   };
+  chat.grupo = grupo === true;
+  if (archivado === true || archivado === false) chat.archivado = archivado;
+  if (propio === true) chat.propio = true;
+  if (waId) chat.waId = String(waId).slice(0, 90);
   if (nombre && (!chat.nombre || chat.nombre === `+${tel}`)) chat.nombre = String(nombre).slice(0, 120);
   // Nombre real que muestra WhatsApp y tipo de contacto (persona o empresa).
   const waName = String(nombreWa || nombre || '').trim();
@@ -364,6 +368,26 @@ export function yaExisteWa(telefono, waId) {
 }
 
 /** Borra todos los chats de la Bandeja (memoria + disco). */
+/** Fija o desfija un chat en la Bandeja (como WhatsApp Web). */
+export function fijar(telefono, valor = true) {
+  const tel = limpiarTel(telefono);
+  const chat = chats[tel];
+  if (!chat) return null;
+  chat.fijado = valor === true;
+  guardar();
+  return chat.fijado;
+}
+
+/** Archiva o desarchiva un chat. */
+export function archivar(telefono, valor = true) {
+  const tel = limpiarTel(telefono);
+  const chat = chats[tel];
+  if (!chat) return null;
+  chat.archivado = valor === true;
+  guardar();
+  return chat.archivado;
+}
+
 /** Borra un chat concreto de la Bandeja. */
 export function eliminar(telefono) {
   const tel = limpiarTel(telefono);
@@ -396,6 +420,11 @@ export function listar(limite = 40) {
       ultimoEn: c.ultimoEn,
       total: c.mensajes.length,
       pin: !!c.pin,
+      fijado: !!(c.fijado || c.pin),
+      grupo: c.grupo === true,
+      archivado: c.archivado === true,
+      propio: c.propio === true,
+      waId: c.waId || '',
       wa: !!c.wa
     }));
 }
@@ -415,6 +444,11 @@ export function obtener(telefono) {
     ultimoTexto: c.ultimoTexto,
     ultimoEn: c.ultimoEn,
     pin: !!c.pin,
+    fijado: !!(c.fijado || c.pin),
+    grupo: c.grupo === true,
+    archivado: c.archivado === true,
+    propio: c.propio === true,
+    waId: c.waId || '',
     wa: !!c.wa,
     mensajes: c.mensajes.filter(m => String(m.texto || '').trim()).slice(-MAX_MENSAJES)
   };

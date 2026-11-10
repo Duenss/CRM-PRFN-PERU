@@ -582,7 +582,7 @@ export async function listarChatsWa(sesionId = null) {
         ts: c.timestamp || ultimo?.timestamp || ultimo?.t || 0,
         tsReal: 0,
         pin: !!(c.pinned === true || c.isPinned === true),
-        archived: c.archived === true || c.isArchived === true,
+        archived: c.archived === true || c.isArchived === true || c.archive === true,
         real: true,
         noLeidos: c.unreadCount || 0
       };
@@ -728,7 +728,7 @@ export async function listarChatsWa(sesionId = null) {
   // (cargando anteriores si hace falta). Así se descartan los chats sin
   // conversación y se muestra el texto real de los demás.
   try {
-    const vacios = crudos.filter(c => !c.esGrupo && !String(c.ultimoTexto || '').trim() && c.id).map(c => c.id);
+    const vacios = crudos.filter(c => !String(c.ultimoTexto || '').trim() && c.id).map(c => c.id);
     if (vacios.length) {
       const enriquecidos = await conTimeout(s.client.pupPage.evaluate(async (ids) => {
         const W = window;
@@ -807,9 +807,13 @@ export async function listarChatsWa(sesionId = null) {
         nombreGuardado: c.nombreGuardado || '',
         esEmpresa: !!c.esEmpresa
       });
+      const idSerial = String(c.id || '');
+      const telGrupo = c.esGrupo ? idSerial.split('@')[0].replace(/\D/g, '') : '';
       return {
-        telefono: telDe({ isGroup: c.esGrupo, number: c.tel }),
-        esGrupo: !!c.esGrupo,
+        telefono: c.esGrupo ? telGrupo : telDe({ isGroup: false, number: c.tel }),
+        waiver: '',
+        grupo: !!c.esGrupo,
+        waId: idSerial,
         nombre: nombreWa,
         nombreWa,
         nombreGuardado: String(c.nombreGuardado || '').trim(),
@@ -821,13 +825,13 @@ export async function listarChatsWa(sesionId = null) {
         ultimoEn: t ? new Date(t * 1000).toISOString() : null,
         noLeidos: c.noLeidos || 0,
         pin: !!c.pin,
-        archived: !!c.archived,
+        archived: c.archived === true,
         tieneMensajes: c.tieneMensajes !== false,
         real: c.real !== false,
         tsReal: c.tsReal || 0
       };
     })
-    .filter(c => !c.esGrupo ? (c.telefono && (c.telefono !== propio || c.pin)) : true);
+    .filter(c => !!c.telefono);
 }
 
 /** Todos los contactos guardados/iniciados en el WhatsApp vinculado. */

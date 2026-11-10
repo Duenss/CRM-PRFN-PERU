@@ -451,3 +451,12 @@ dialog::backdrop{background:rgba(3,4,8,.66);backdrop-filter:blur(8px)}
 .tg-quick{display:flex;gap:.4rem;flex-wrap:wrap;margin:.6rem 0}
 .tg-quick button{min-height:32px;font-size:.78rem;padding:.2rem .6rem}
 .tg-quick button.on{border-color:var(--gold-line);color:var(--gold);background:var(--gold-soft)}
+
+/* Sección de archivados y botones de fijar */
+.arch-head{display:flex;align-items:center;justify-content:space-between;gap:.5rem;padding:.55rem .9rem;background:var(--s1);border-bottom:1px solid var(--line);cursor:pointer;font-size:.8rem;color:var(--mute)}
+.arch-head b{color:var(--ink);font-weight:600}
+.arch-head:hover{background:var(--s2)}
+.in-item .pinbtn{width:20px;height:20px;flex:0 0 auto;display:grid;place-items:center;border-radius:5px;border:1px solid transparent;background:transparent;color:var(--mute2);font-size:.72rem;padding:0;opacity:.45}
+.in-item:hover .pinbtn{opacity:1}
+.in-item .pinbtn.on{opacity:1;color:var(--gold)}
+.in-item .pinbtn:hover{border-color:var(--line);background:var(--s2)}

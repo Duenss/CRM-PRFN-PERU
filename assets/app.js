@@ -1291,10 +1291,11 @@ async function cargarBandeja(){
   }
 }
 function innerFilaChat(c){
-  const nom=c.nombreWa||c.nombre||('+'+c.telefono);
-  const tipo=c.tipo==='empresa'?'<span class="tipo emp">Empresa</span>':c.tipo==='persona'?'<span class="tipo per">Persona</span>':'';
+  const nomBase=c.nombreWa||c.nombre||('+'+c.telefono);
+  const nom=(c.grupo?'👥 ':'')+nomBase+(c.propio?' (Tú)':'');
+  const tipo=c.grupo?'<span class="tipo">Grupo</span>':c.tipo==='empresa'?'<span class="tipo emp">Empresa</span>':c.tipo==='persona'?'<span class="tipo per">Persona</span>':'';
   const ets=(c.etiquetas||[]).map(e=>`<i class="etag ${esc(e.tipo||'')}">${esc(e.texto)}</i>`).join('');
-  return `<div class="ava">${esc(iniciales(nom))}</div><div class="ib"><b>${esc(nom)}${tipo}</b><small>${esc(waPlano((c.ultimoTexto||'').slice(0,44))||'—')}</small>${ets?`<div class="itags">${ets}</div>`:''}</div><div class="imeta"><time>${esc(horaWa(c.ultimoEn))}</time>${inPausados.has(c.telefono)?'<span class="paused">IA off</span>':''}${c.seguimiento?'<span class="paused" style="color:var(--success);border-color:rgba(61,214,140,.5)">Seg</span>':''}${c.noLeidos?`<span class="unread">${c.noLeidos}</span>`:''}<button class="delchat" type="button" data-delchat="${esc(c.telefono)}" title="Quitar este chat de la Bandeja (no lo borra de WhatsApp)" aria-label="Quitar de la Bandeja">✕</button></div>`;
+  return `<div class="ava">${c.grupo?'👥':esc(iniciales(nomBase))}</div><div class="ib"><b>${esc(nom)}${tipo}</b><small>${esc(waPlano((c.ultimoTexto||'').slice(0,44))||'—')}</small>${ets?`<div class="itags">${ets}</div>`:''}</div><div class="imeta"><time>${esc(horaWa(c.ultimoEn))}</time>${inPausados.has(c.telefono)?'<span class="paused">IA off</span>':''}${c.seguimiento?'<span class="paused" style="color:var(--success);border-color:rgba(61,214,140,.5)">Seg</span>':''}${c.noLeidos?`<span class="unread">${c.noLeidos}</span>`:''}<button class="pinbtn${c.fijado?' on':''}" type="button" data-pin="${esc(c.telefono)}" title="${c.fijado?'Desfijar chat':'Fijar chat'}" aria-label="Fijar o desfijar chat">📌</button><button class="delchat" type="button" data-delchat="${esc(c.telefono)}" title="Quitar este chat de la Bandeja (no lo borra de WhatsApp)" aria-label="Quitar de la Bandeja">✕</button></div>`;
 }
 function filaChatHTML(c){
   const on=c.telefono===inTel?' on':'';
@@ -1305,36 +1306,24 @@ function filaChatHTML(c){
  * cambió, su nodo se conserva; si cambió, se actualiza el contenido sin
  * reemplazar el nodo. Evita el repintado completo que causaba "parpadeos".
  */
+let verArchivados=false;
 function pintarLista(){
   const cont=$('#in-list');if(!cont)return;
   const q=($('#in-q')?.value||'').toLowerCase().trim();
   const l=inChats.filter(c=>!q||[c.nombreWa,c.nombre,c.telefono,c.ultimoTexto].join(' ').toLowerCase().includes(q));
-  const html=l.map(filaChatHTML).join('')||'<p class="empty" style="padding:1rem">Sin conversaciones todavía.</p>';
-  if(cont.dataset.sig===html)return;          // nada cambió: no se toca el DOM
-  cont.dataset.sig=html;
-  if(!l.length){cont.innerHTML=html;return}
-  const vacio=cont.querySelector(':scope > .empty');if(vacio)vacio.remove();
-  const existentes=new Map([...cont.querySelectorAll(':scope > [data-tel]')].map(el=>[el.dataset.tel,el]));
-  let previo=null;
-  for(const c of l){
-    let el=existentes.get(String(c.telefono));
-    if(el){
-      existentes.delete(String(c.telefono));
-      const inner=innerFilaChat(c);
-      if(el.innerHTML!==inner)el.innerHTML=inner;
-      const cls='in-item'+(c.telefono===inTel?' on':'');
-      if(el.className!==cls)el.className=cls;
-    }else{
-      el=document.createElement('div');
-      el.className='in-item'+(c.telefono===inTel?' on':'');
-      el.dataset.tel=String(c.telefono);
-      el.innerHTML=innerFilaChat(c);
-    }
-    if(previo){if(previo.nextElementSibling!==el)cont.insertBefore(el,previo.nextSibling)}
-    else if(cont.firstElementChild!==el)cont.insertBefore(el,cont.firstElementChild);
-    previo=el;
+  const fijados=l.filter(c=>c.fijado&&!c.archivado);
+  const archivados=l.filter(c=>c.archivado);
+  const normales=l.filter(c=>!c.fijado&&!c.archivado);
+  let html='';
+  if(archivados.length){
+    html+=`<div class="arch-head" data-arch-toggle="1"><span>📦 <b>Archivados</b> (${archivados.length})</span><span>${verArchivados?'▾':'▸'}</span></div>`;
+    if(verArchivados)html+=archivados.map(filaChatHTML).join('');
   }
-  for(const el of existentes.values())el.remove();
+  html+=[...fijados,...normales].map(filaChatHTML).join('');
+  if(!html)html='<p class="empty" style="padding:1rem">Sin conversaciones todavía.</p>';
+  if(cont.dataset.sig===html)return;
+  cont.dataset.sig=html;
+  cont.innerHTML=html;
 }
 let hiloTel=null,hiloIds=new Set();
 function claveMensaje(m){return m.waId||m.id||((m.en||'')+'|'+(m.direccion||'')+'|'+String(m.texto||'').slice(0,120))}
@@ -1507,6 +1496,9 @@ async function abrirChat(tel){
   const tipo=item?.tipo==='empresa'?' · Empresa':item?.tipo==='persona'?' · Persona':'';
   $('#in-tel').textContent='+'+tel+tipo;
   $('#in-ava').textContent=iniciales(nom);
+  const esGrupoChat=!!item?.grupo;
+  if($('#in-form'))$('#in-form').hidden=esGrupoChat;
+  if($('#in-note'))$('#in-note').hidden=!esGrupoChat;
   pintarEtiquetasChat();
   if(!mismo){
     $('#in-msgs').innerHTML='<p class="empty">Cargando mensajes…</p>';
@@ -1562,21 +1554,36 @@ async function togglePausa(){
   }catch(e){toast('No se pudo cambiar: '+e.message)}
   b.disabled=false;
 }
-$('#in-list')?.addEventListener('click',e=>{
-  if(e.target.closest('[data-delchat]'))return;
-  const it=e.target.closest('[data-tel]');if(it)abrirChat(it.dataset.tel);
-});
 $('#in-list')?.addEventListener('click',async e=>{
-  const b=e.target.closest('[data-delchat]');if(!b)return;
-  e.stopPropagation();
-  const tel=b.dataset.delchat;
-  if(!confirm('¿Quitar este chat de la Bandeja?\nNo se borra de WhatsApp.'))return;
-  try{
-    await botFetch('/api/conversaciones/'+tel+'?mensajes=1',{method:'DELETE',timeoutMs:60000});
-    inChats=inChats.filter(c=>String(c.telefono)!==String(tel));
-    pintarLista();
-    toast('Chat quitado de la Bandeja');
-  }catch(err){toast('No se pudo quitar: '+err.message,'error')}
+  const pin=e.target.closest('[data-pin]');
+  if(pin){
+    e.stopPropagation();
+    const tel=pin.dataset.pin;
+    const item=inChats.find(c=>String(c.telefono)===String(tel));
+    const nuevo=!(item&&item.fijado);
+    try{
+      await botFetch('/api/conversaciones/'+tel+'/fijar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fijado:nuevo})});
+      if(item)item.fijado=nuevo;
+      pintarLista();
+      toast(nuevo?'Chat fijado arriba':'Chat desfijado');
+    }catch(err){toast('No se pudo fijar: '+err.message,'error')}
+    return;
+  }
+  if(e.target.closest('[data-arch-toggle]')){verArchivados=!verArchivados;pintarLista();return}
+  const b=e.target.closest('[data-delchat]');
+  if(b){
+    e.stopPropagation();
+    const tel=b.dataset.delchat;
+    if(!confirm('¿Quitar este chat de la Bandeja?\nNo se borra de WhatsApp.'))return;
+    try{
+      await botFetch('/api/conversaciones/'+tel+'?mensajes=1',{method:'DELETE',timeoutMs:60000});
+      inChats=inChats.filter(c=>String(c.telefono)!==String(tel));
+      pintarLista();
+      toast('Chat quitado de la Bandeja');
+    }catch(err){toast('No se pudo quitar: '+err.message,'error')}
+    return;
+  }
+  const it=e.target.closest('[data-tel]');if(it)abrirChat(it.dataset.tel);
 });
 $('#in-q')?.addEventListener('input',pintarLista);
 $('#in-refresh')?.addEventListener('click',cargarBandeja);
