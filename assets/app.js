@@ -1561,8 +1561,18 @@ function abrirFormPedido(tel='',nombre=''){
   $('#pe-cant').value=1;$('#pe-adelanto').value=0;$('#pe-metodo').value='';$('#pe-notas').value='';
   $('#pe-ml').value='100';$('#pe-precio').value=precioPedidoActual();
   peItems=[];renderPeItems();refrescarActualPe();
+  if($('#pe-entrega'))$('#pe-entrega').value='';
+  if($('#pe-estacion'))$('#pe-estacion').value='';
+  if($('#pe-fecha-entrega'))$('#pe-fecha-entrega').value='';
+  if($('#pe-hora-entrega'))$('#pe-hora-entrega').value='';
+  aplicarEntregaPe();
   $('#pe-form').scrollIntoView({block:'center',behavior:'smooth'});
 }
+function aplicarEntregaPe(){
+  const t=$('#pe-entrega')?.value||'';
+  if($('#pe-estacion-wrap'))$('#pe-estacion-wrap').hidden=t!=='estacion';
+}
+$('#pe-entrega')?.addEventListener('change',aplicarEntregaPe);
 $('#pe-add')?.addEventListener('click',agregarPeItem);
 $('#pe-items')?.addEventListener('click',e=>{
   const b=e.target.closest('[data-pe-del]');if(!b)return;
@@ -1595,6 +1605,10 @@ async function guardarPedido(){
       metodo:$('#pe-metodo').value,
       adelanto:Number($('#pe-adelanto').value)||0,
       notas:$('#pe-notas').value.trim(),
+      entrega:$('#pe-entrega')?.value||'',
+      estacion:($('#pe-entrega')?.value==='estacion'?($('#pe-estacion')?.value||'').trim():''),
+      fechaEntrega:$('#pe-fecha-entrega')?.value||'',
+      horaEntrega:$('#pe-hora-entrega')?.value||'',
       items
     })});
     peItems=[];renderPeItems();
@@ -1609,6 +1623,10 @@ async function guardarPedido(){
       id:nuevoPedidoLocalId(),telefono:tel,
       nombre:$('#pe-nombre').value.trim()||(prod?prod.nombre:items[0].nombre),
       metodo:$('#pe-metodo').value||'',adelanto,notas:$('#pe-notas').value.trim(),
+      entrega:$('#pe-entrega')?.value||'',
+      estacion:($('#pe-entrega')?.value==='estacion'?($('#pe-estacion')?.value||'').trim():''),
+      fechaEntrega:$('#pe-fecha-entrega')?.value||'',
+      horaEntrega:$('#pe-hora-entrega')?.value||'',
       items,
       total,saldo:Math.max(0,total-adelanto),estado:'borrador',local:true,
       actualizado:new Date().toISOString()

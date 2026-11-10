@@ -167,6 +167,16 @@
             </select></div>
             <div><label for="pe-adelanto">Adelanto (S/)</label><input id="pe-adelanto" type="number" min="0" step="0.5" value="0"></div>
           </div>
+          <div class="grid2">
+            <div><label for="pe-entrega">Entrega</label><select id="pe-entrega">
+              <option value="">Por definir</option>
+              <option value="delivery">Delivery (a domicilio)</option>
+              <option value="estacion">Recojo en estación</option>
+            </select></div>
+            <div id="pe-estacion-wrap" hidden><label for="pe-estacion">Estación / punto de recojo</label><input id="pe-estacion" maxlength="120" placeholder="Ej. Estación Central"></div>
+            <div><label for="pe-fecha-entrega">Fecha de entrega</label><input id="pe-fecha-entrega" type="date"></div>
+            <div><label for="pe-hora-entrega">Hora de entrega</label><input id="pe-hora-entrega" type="time"></div>
+          </div>
           <label for="pe-notas">Notas</label><input id="pe-notas" maxlength="300" placeholder="Dirección, referencia, horario de entrega...">
           <p class="muted" id="pe-total">—</p>
           <div class="acts"><button class="ghost" id="pe-cancel" type="button">Cancelar</button><button id="pe-save" type="button">Guardar pedido</button></div>
