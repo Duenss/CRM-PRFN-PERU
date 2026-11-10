@@ -54,3 +54,8 @@ No publiques el detalle en issues públicos.
 - Historial de git: los archivos con secretos se sacaron del índice; si el repo estuvo
   público, considerar reescribir la historia (`git filter-repo`) o asumir las claves viejas
   como comprometidas.
+
+## Variables del proxy en Cloudflare Pages
+
+`BOT_URL`, `BOT_TOKEN`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `OWNER_EMAIL` y `PANEL_ORIGIN`.
+Si cambia una, hay que **volver a desplegar** (Pages no recarga el entorno solo).
