@@ -73,3 +73,17 @@
 - 78 pruebas: incluye lista blanca del proxy, validación del dueño y sanitización de `esc()`.
 - Auditoría axe (WCAG AA) en 1280 y 360 px: **0 violaciones** en las 11 pestañas y el login.
 - 69 pruebas unitarias, 11 e2e y CI de GitHub Actions.
+
+
+### Archivos configurables (PDF y video)
+- En *Ajustes → Mensajes automáticos* el dueño sube su propio PDF del catálogo (hasta 20 MB) y su propio video (hasta 60 MB); reemplazan a los de fábrica en bienvenidas, catálogo y anuncios. Probado: PDF 5.9 MB en 4.9 s desde la interfaz.
+
+### Sincronizar la Bandeja
+- Los chats con **@lid** (número oculto) se importan resolviendo el teléfono real: **76 chats de 85** (8 grupos) y se ponen al día los últimos 25 mensajes de cada chat.
+- Los chats del propio número del bot no entran; “Limpiar Bandeja” borra chats e historial de Supabase sin tocar clientes ni pedidos.
+
+### Logo
+- La barra superior muestra el **logo de Perfumería Fina** (frasco dorado) en lugar del avatar “JP”; al pulsarlo vuelve al Inicio.
+
+### Prueba real de envío
+- Mensaje enviado por el bot al +51 910 418 951: **entregado ✓✓** y reflejado en la Bandeja.
