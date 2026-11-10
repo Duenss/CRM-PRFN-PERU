@@ -307,7 +307,7 @@ async function load(){
 }
 
 /* ---------- pestañas ---------- */
-const CRUMBS={inicio:['Inicio','Resumen'],bandeja:['Bandeja','WhatsApp'],pedidos:['Pedidos','Ventas y pagos'],analiticas:['Analíticas','Consultas y ventas'],campanas:['Campañas','Envíos'],anuncios:['Anuncios','Mensajes masivos'],clientes:['Clientes','Base de datos'],catalogo:['Catálogo','Perfumes'],calendario:['Calendario','Agenda'],ia:['Asistente IA','Automático'],bot:['Ajustes','Conexión']};
+const CRUMBS={bienvenida:['Bienvenida','Mensaje automático'],inicio:['Inicio','Resumen'],bandeja:['Bandeja','WhatsApp'],pedidos:['Pedidos','Ventas y pagos'],analiticas:['Analíticas','Consultas y ventas'],campanas:['Campañas','Envíos'],anuncios:['Anuncios','Mensajes masivos'],clientes:['Clientes','Base de datos'],catalogo:['Catálogo','Perfumes'],calendario:['Calendario','Agenda'],ia:['Asistente IA','Automático'],bot:['Ajustes','Conexión']};
 let tabActual='inicio';
 function arrancarTareasBase(){
   if(!TAREAS.size){
@@ -339,6 +339,7 @@ function irTab(name){
   else if(name==='analiticas')cargarAnaliticas();
   else if(name==='ia')cargarIA();
   else if(name==='inicio')renderInicio();
+  else if(name==='bienvenida'){cargarBienvenida();}
   else if(name==='bot'){refrescarQR();cargarLogs();cargarAjustes();cargarArchivosInfo();}
   window.scrollTo({top:0,behavior:'smooth'});
 }
@@ -1894,6 +1895,84 @@ $('#in-ia')?.addEventListener('click',async()=>{
   }catch(e){toast('No se pudo cambiar la IA: '+e.message,'error')}
 });
 
+
+/* ---------- Módulo Bienvenida (editor + vista previa WhatsApp) ---------- */
+const BW_SUGERIDA = [
+  '{saludo}, {nombre}. ✨ Bienvenido(a) a *Perfumería Fina Perú*, aromas que fascinan.',
+  '',
+  'Nuestras fragancias son *equivalentes de alta calidad* con *50% de esencia*, inspiradas en las casas perfumeras más reconocidas: buena fijación y en envase propio.',
+  '',
+  '💳 En Lima aceptamos todos los medios de pago según tu preferencia: efectivo al recibir, Yape, Plin o transferencia.',
+  '🚚 Envíos a Lima y provincia.',
+  '',
+  '📕 Te envío nuestro catálogo y video para que conozcas las fragancias.',
+  '🌐 Web: https://www.perfumeriafinaperu.com'
+].join('\n');
+
+function remplazarTokensBienvenida(t){
+  const hora = new Date().getHours();
+  const saludo = hora >= 5 && hora < 12 ? 'Buenos días' : hora >= 12 && hora < 19 ? 'Buenas tardes' : 'Buenas noches';
+  return String(t || '').replaceAll('{saludo}', saludo).replaceAll('{nombre}', 'Juan');
+}
+function renderPreviewBienvenida(){
+  const cont=$('#bw-preview');if(!cont)return;
+  const texto=remplazarTokensBienvenida($('#bw-texto')?.value||'');
+  const pdf=!!$('#bw-pdf')?.checked, video=!!$('#bw-video')?.checked;
+  const burbuja = (html, extra='') => '<div class="wa-bubble'+(extra?' '+extra:'')+'">'+html+'<span class="wa-meta">'+new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'})+'<span class="tick">✓✓</span></span></div>';
+  const cuerpo = esc(texto).replace(/\*([^*\n]+)\*/g,'<b>$1</b>').replace(/(^|[\s(>])_([^_\n]+)_/g,'$1<i>$2</i>').replace(/~([^~\n]+)~/g,'<s>$1</s>').replace(/\n/g,'<br>');
+  let html = '';
+  if(!String(texto).trim()) html += '<p class="wa-empty" style="margin:auto">Escribe la bienvenida para verla aquí.</p>';
+  else html += burbuja(cuerpo);
+  if($('#bw-texto')?.value?.includes('{saludo}')||$('#bw-texto')?.value?.includes('{nombre}')){}
+  html += burbuja('Claro, estimado. A continuación le envío un PDF con nuestras fragancias 📄<br><br>• Páginas <b>4 a 28</b>: perfumes de Diseñador<br>• Páginas <b>30 a 35</b>: perfumes de Árabes<br>• Páginas <b>37 a 41</b>: perfumes de Nicho', '');
+  if(pdf) html += '<div class="wa-bubble media"><div class="wa-ico">📕</div><div><div class="wa-nom">Catálogo Perfumería Fina (PDF)</div><small style="opacity:.7">Documento PDF</small></div><span class="wa-meta">'+new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'})+'</span></div>';
+  if(video) html += '<div class="wa-bubble media"><div class="wa-ico">🎬</div><div><div class="wa-nom">Así es Perfumería Fina Perú</div><small style="opacity:.7">Video · 1.4 MB</small></div><span class="wa-meta">'+new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'})+'</span></div>';
+  cont.innerHTML=html;
+}
+function actualizarContadorBienvenida(){
+  const t=$('#bw-texto');const el=$('#bw-count');
+  if(t&&el)el.textContent=String(t.value||'').length+'/600';
+}
+async function cargarBienvenida(){
+  try{
+    const r=await botFetch('/api/ajustes');
+    const a=r.ajustes||{};
+    if($('#bw-texto'))$('#bw-texto').value=a.bienvenidaTexto||BW_SUGERIDA;
+    if($('#bw-pdf'))$('#bw-pdf').checked=a.enviarCatalogo!==false;
+    if($('#bw-video'))$('#bw-video').checked=a.enviarVideo===true;
+    actualizarContadorBienvenida();renderPreviewBienvenida();
+    if($('#bw-status'))$('#bw-status').textContent='Última actualización: '+(a.actualizado?fmtFechaHora(a.actualizado):'—');
+  }catch(e){if($('#bw-status'))$('#bw-status').textContent='No se pudo cargar (revisa la conexión).'}
+}
+$('#bw-texto')?.addEventListener('input',()=>{actualizarContadorBienvenida();renderPreviewBienvenida()});
+$('#bw-pdf')?.addEventListener('change',renderPreviewBienvenida);
+$('#bw-video')?.addEventListener('change',renderPreviewBienvenida);
+document.querySelectorAll('[data-bw-token]').forEach(b=>b.addEventListener('click',()=>{
+  const t=$('#bw-texto');if(!t)return;
+  const token=b.dataset.bwToken;
+  const ini=t.selectionStart??t.value.length, fin=t.selectionEnd??t.value.length;
+  t.value=t.value.slice(0,ini)+token+t.value.slice(fin);
+  t.focus();t.selectionStart=t.selectionEnd=ini+token.length;
+  actualizarContadorBienvenida();renderPreviewBienvenida();
+}));
+$('#bw-reset')?.addEventListener('click',()=>{const t=$('#bw-texto');if(t){t.value=BW_SUGERIDA;actualizarContadorBienvenida();renderPreviewBienvenida();toast('Texto sugerido restaurado (sin guardar)')}});
+$('#bw-refresh')?.addEventListener('click',cargarBienvenida);
+$('#bw-save')?.addEventListener('click',async()=>{
+  const b=$('#bw-save');b.disabled=true;
+  try{
+    const r=await botFetch('/api/ajustes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      bienvenidaTexto:($('#bw-texto')?.value||'').trim(),
+      enviarCatalogo:!!$('#bw-pdf')?.checked,
+      enviarVideo:!!$('#bw-video')?.checked
+    })});
+    const a=r.ajustes||{};
+    if($('#bw-texto'))$('#bw-texto').value=a.bienvenidaTexto??$('#bw-texto').value;
+    if($('#bw-status'))$('#bw-status').textContent='Guardado ✅ · '+(a.bienvenidaTexto||'').length+' caracteres';
+    toast('Bienvenida guardada');
+  }catch(e){toast('No se guardó: '+e.message,'error')}
+  b.disabled=false;
+});
+
 function actualizarBotonSeg(){
   const b=$('#in-seg');if(!b)return;
   b.textContent='Seguimiento: '+(inSegActivo?'on':'off');
@@ -2332,7 +2411,8 @@ const SINONIMOS_BUSQUEDA={
   catalogo:['catalogo','perfumes','perfume','productos','fragancias','precios'],
   calendario:['calendario','fechas','festivos','cumpleanos','agenda'],
   ia:['ia','asistente','inteligencia','bot'],
-  bot:['ajustes','configuracion','conexion','qr','whatsapp','limites','sonidos','horario','postventa','seguimiento']
+  bot:['ajustes','configuracion','conexion','qr','whatsapp','limites','sonidos','horario','postventa','seguimiento'],
+  bienvenida:['bienvenida','saludo','mensaje de bienvenida','welcome','pdf','video']
 };
 function buscarGlobal(q){
   const t=String(q||'').toLowerCase().trim();

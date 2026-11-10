@@ -43,6 +43,7 @@
       <button data-tab="calendario" aria-label="Calendario"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg><span class="nl">Calendario</span></button>
       <p class="navgroup">Asistente</p>
       <button data-tab="ia" aria-label="Asistente IA"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8z"/><path d="M18.5 15.2l.8 1.9 1.9.8-1.9.8-.8 1.9-.8-1.9-1.9-.8 1.9-.8z"/></svg><span class="nl">Asistente IA</span></button>
+      <button data-tab="bienvenida" aria-label="Bienvenida"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 12h5"/></svg><span class="nl">Bienvenida</span></button>
       <button data-tab="bot" aria-label="Ajustes"><svg viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V4M8 14h.01M16 14h.01M9 18h6"/></svg><span class="nl">Ajustes</span></button>
     </nav>
     <button class="ghost" id="out">Salir</button>
@@ -385,6 +386,35 @@
       <h2>Próximos recordatorios</h2><div id="cal-up"></div>
     </section>
 
+    <section class="tab" id="t-bienvenida" hidden>
+      <div class="pagehead">
+        <div><h1>Mensaje de bienvenida</h1><p class="muted">Es lo primero que recibe el cliente, junto con el catálogo, el PDF y el video.</p></div>
+        <div class="bar" style="margin:0"><button class="ghost" id="bw-refresh" type="button">Actualizar</button></div>
+      </div>
+      <div class="grid2">
+        <div class="card" style="padding:1rem">
+          <div class="card-h" style="padding:0 0 .6rem"><b>Texto de la bienvenida</b><span class="muted" id="bw-count">0/600</span></div>
+          <label for="bw-texto">Mensaje (admite <b>{saludo}</b> y <b>{nombre}</b>)</label>
+          <textarea id="bw-texto" rows="10" maxlength="600" style="resize:vertical"></textarea>
+          <div class="acts" style="justify-content:flex-start;flex-wrap:wrap;margin:.5rem 0">
+            <button class="ghost" type="button" data-bw-token="{saludo}">+ {saludo}</button>
+            <button class="ghost" type="button" data-bw-token="{nombre}">+ {nombre}</button>
+            <button class="ghost" type="button" data-bw-token="https://www.perfumeriafinaperu.com">+ Web</button>
+            <button class="ghost" type="button" data-bw-token="*50% de esencia*">+ negrita</button>
+            <button class="ghost" type="button" data-bw-token="✨">+ ✨</button>
+            <button class="ghost" type="button" data-bw-token="💳">+ 💳</button>
+          </div>
+          <label class="ck" style="display:flex;gap:.5rem;align-items:center;margin:.5rem 0 0"><input type="checkbox" id="bw-pdf" style="width:auto"> <span>Enviar el <b>PDF</b> con la bienvenida y el catálogo</span></label>
+          <label class="ck" style="display:flex;gap:.5rem;align-items:center;margin:.2rem 0 .6rem"><input type="checkbox" id="bw-video" style="width:auto"> <span>Enviar el <b>video</b> con la bienvenida y el catálogo</span></label>
+          <div class="acts"><button class="ghost" id="bw-reset" type="button">Restaurar texto sugerido</button><button id="bw-save" type="button">Guardar bienvenida</button></div>
+          <p class="muted" id="bw-status" style="margin-top:.6rem">—</p>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden">
+          <div class="card-h" style="padding:.85rem 1rem"><b>Vista previa en WhatsApp</b><span class="muted">así lo verá el cliente</span></div>
+          <div class="wa-preview" id="bw-preview"></div>
+        </div>
+      </div>
+    </section>
     <section class="tab" id="t-bot" hidden>
       <div class="pagehead"><div><h1>Ajustes de conexión</h1><p class="muted">Dirección del bot, estado del número y reglas de envío.</p></div></div>
       <div class="box">
