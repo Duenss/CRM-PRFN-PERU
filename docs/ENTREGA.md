@@ -81,3 +81,17 @@ node scripts/probar-chat.mjs --url http://node.sakurasmp.xyz:25577 --token <BOT_
 Despliegue: el panel se publica solo al hacer `git push` (Cloudflare Pages); el bot se actualiza
 subiendo `bot/src/**` por SFTP y reiniciando desde el panel de Pterodactyl
 (ver `docs/DESPLIEGUE-PRODUCCION.md`).
+
+## Estado actual (bloqueo)
+
+Todo lo que se puede verificar sin el WhatsApp real está hecho y comprobado. Para cerrar la
+entrega faltan dos acciones del dueño, que **no puede hacer la IA**:
+
+1. Ejecutar `sql/11_arreglar_estado_campanas.sql` en Supabase (SQL Editor). Sin eso, las
+   campañas **programadas** siguen rechazadas por un constraint viejo y el smoke da 6/7.
+2. Escanear el QR del WhatsApp de la tienda en el panel (Ajustes → Conectar WhatsApp) e
+   indicar el número de prueba. Sin la sesión de WhatsApp no se pueden hacer las pruebas
+   reales de `docs/PRUEBAS-CHAT.md`.
+
+Mientras esas dos acciones no se hagan, el sistema queda operativo para el resto
+(clientes, catálogo, pedidos, anuncios con IA, calendario, ajustes, seguridad y respaldos).
