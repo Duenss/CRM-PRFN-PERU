@@ -1482,6 +1482,16 @@ function cerrarChat(){
   pintarLista();
 }
 $('#in-close')?.addEventListener('click',cerrarChat);
+$('#in-resync')?.addEventListener('click',async()=>{
+  if(!inTel)return;
+  const b=$('#in-resync');b.disabled=true;
+  try{
+    const r=await botFetch('/api/conversaciones/'+inTel+'/importar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({limite:200}),timeoutMs:180000});
+    toast('Historial actualizado ('+(r.leidos||0)+' mensajes leídos, '+(r.nuevos||0)+' nuevos)');
+    await abrirChat(inTel);
+  }catch(e){toast('No se pudo actualizar: '+e.message,'error')}
+  b.disabled=false;
+});
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape' && $('#in-thread') && !$('#in-thread').hidden) cerrarChat();
 });

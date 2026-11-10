@@ -492,6 +492,56 @@ export function idMensaje(msg) {
 }
 
 /** Dado el id de un chat (@lid o @c.us), devuelve el teléfono real (solo dígitos) o ''. */
+// ---------- Lecturas de WhatsApp Web seguras ----------
+// Una sola lectura a la vez (Chromium no admite bien dos evaluaciones en
+// paralelo), esperando a que la página esté lista y reintentando si WhatsApp
+// Web se recarga (error "Target closed").
+let colaPagina = Promise.resolve();
+function enColaPagina(fn) {
+  const p = colaPagina.then(fn, fn);
+  colaPagina = p.then(() => {}, () => {});
+  return p;
+}
+
+/** Espera a que WhatsApp Web termine de cargar (readyState + lista de chats). */
+async function esperarPagina(s, esperaMax = 25000) {
+  const fin = Date.now() + esperaMax;
+  while (Date.now() < fin) {
+    const page = s && s.client && s.client.pupPage;
+    if (page && (!page.isClosed || !page.isClosed())) {
+      try {
+        const ok = await page.evaluate(() => document.readyState === 'complete' && !!document.querySelector('#pane-side'));
+        if (ok) return true;
+      } catch { /* recargando */ }
+    }
+    await new Promise(r => setTimeout(r, 500));
+  }
+  return false;
+}
+
+/** Evalúa en la página con cola, timeout y reintentos ante "Target closed". */
+async function evalPagina(s, fn, arg, timeout = 30000, etiqueta = 'WhatsApp Web', intentos = 3) {
+  let ultimo = null;
+  for (let i = 1; i <= intentos; i++) {
+    try {
+      return await enColaPagina(async () => {
+        const page = s && s.client && s.client.pupPage;
+        if (!page || (page.isClosed && page.isClosed())) throw new Error('página de WhatsApp cerrada');
+        return await conTimeout(page.evaluate(fn, arg), timeout, etiqueta);
+      });
+    } catch (e) {
+      ultimo = e;
+      const msg = String((e && e.message) || e);
+      if (i < intentos && /target closed|session closed|detached|protocol error|página de whatsapp cerrada/i.test(msg)) {
+        await new Promise(r => setTimeout(r, 1200 * i));
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw ultimo || new Error('No se pudo leer WhatsApp Web');
+}
+
 export async function resolverTelefonoWa(widSerializado, sesionId = null) {
   const wid = String(widSerializado || '');
   if (!wid) return '';
@@ -500,7 +550,7 @@ export async function resolverTelefonoWa(widSerializado, sesionId = null) {
   const s = sesionParaEnviar(sesionId) || [...sesiones.values()].find(x => x.client && x.client.pupPage);
   if (!s) return '';
   try {
-    const real = await conTimeout(s.client.pupPage.evaluate(async (wid) => {
+    const real = await evalPagina(s, async (wid) => {
       const W = window;
       try {
         const apiContact = W.require('WAWebApiContact');
@@ -516,7 +566,7 @@ export async function resolverTelefonoWa(widSerializado, sesionId = null) {
         }
       } catch (e) {}
       return '';
-    }, wid), 15000, 'resolver teléfono');
+    }, wid, 15000, 'resolver teléfono');
     return real ? normalizar(real) : '';
   } catch (e) {
     return '';
@@ -546,6 +596,23 @@ function nombreMostradoWa({ titulo = '', pushname = '', verifiedName = '', nombr
 export async function listarChatsWa(sesionId = null) {
   const s = sesionParaEnviar(sesionId);
   if (!s) throw new Error('Ningún WhatsApp está conectado');
+
+  await esperarPagina(s);
+
+  // WhatsApp Web carga la lista de chats por partes. Se baja la lista para
+  // que cargue todo el historial conocido (así aparecen todos los chats, no
+  // solo los primeros que ya estaban en memoria).
+  try {
+    await evalPagina(s, async () => {
+      const pane = document.querySelector('#pane-side');
+      if (!pane) return;
+      for (let i = 0; i < 12; i++) {
+        pane.scrollTop = pane.scrollHeight;
+        await new Promise(r => setTimeout(r, 350));
+        if (pane.scrollTop === 0) break;
+      }
+    }, undefined, 20000, 'cargar lista de chats');
+  } catch { /* si no se puede, se sigue con lo cargado */ }
 
   let crudos;
   try {
@@ -592,7 +659,7 @@ export async function listarChatsWa(sesionId = null) {
     // cuando un solo chat no se puede serializar. Leemos la colección directo,
     // toleramos chats problemáticos y resolvemos el número real de cada chat
     // (los chats nuevos usan identificadores @lid y no traen el teléfono).
-    crudos = await conTimeout(s.client.pupPage.evaluate(async () => {
+    crudos = await evalPagina(s, async () => {
       const out = [];
       const W = window;
       let apiContact, widFactory;
@@ -720,7 +787,7 @@ export async function listarChatsWa(sesionId = null) {
         }
       } catch (e) {}
       return out;
-    }), 45000, 'getChats (respaldo)');
+    }, undefined, 45000, 'getChats (respaldo)');
   }
 
   // WhatsApp Web no trae el último mensaje de todos los chats hasta abrirlos.
@@ -730,7 +797,7 @@ export async function listarChatsWa(sesionId = null) {
   try {
     const vacios = crudos.filter(c => !String(c.ultimoTexto || '').trim() && c.id).map(c => c.id);
     if (vacios.length) {
-      const enriquecidos = await conTimeout(s.client.pupPage.evaluate(async (ids) => {
+      const enriquecidos = await evalPagina(s, async (ids) => {
         const W = window;
         const out = {};
         let ChatCol = null;
@@ -770,7 +837,7 @@ export async function listarChatsWa(sesionId = null) {
           } catch (e) { /* chat problemático */ }
         }
         return out;
-      }, vacios), 90000, 'enriquecer chats');
+      }, vacios, 90000, 'enriquecer chats');
       let puestos = 0;
       for (const c of crudos) {
         if (c.id && enriquecidos && enriquecidos[c.id] && !String(c.ultimoTexto || '').trim()) {
@@ -857,12 +924,13 @@ export async function historialWa(telefono, limite = 50, sesionId = null) {
   const s = sesionParaEnviar(sesionId);
   if (!s) throw new Error('Ningún WhatsApp está conectado');
   const limpio = String(telefono || '').replace(/\D/g, '');
+  await esperarPagina(s);
   const numId = await conTimeout(s.client.getNumberId(limpio), 20000, 'getNumberId');
   if (!numId) throw new Error(`El número +${limpio} no tiene WhatsApp`);
   const chatId = numId._serialized;
   // Se lee directo de la página y sin serializar: `getChatById`/`fetchMessages`
   // de whatsapp-web.js fallan ("r") al serializar chats en la versión actual.
-  const msgs = await conTimeout(s.client.pupPage.evaluate(async ({ chatId, limite }) => {
+  const msgs = await evalPagina(s, async ({ chatId, limite }) => {
     const W = window;
     const filtro = m => !m.isNotification;
     let chat = null;
@@ -909,7 +977,7 @@ export async function historialWa(telefono, limite = 50, sesionId = null) {
         };
       })
       .filter(Boolean);
-  }, { chatId, limite }), 30000, 'historialWa');
+  }, { chatId, limite }, 45000, 'historialWa');
   return msgs || [];
 }
 
@@ -1015,7 +1083,7 @@ export async function descargarMediaWa(msg, sesionId = null) {
     type: d.type || '',
     mimetype: d.mimetype || ''
   };
-  return await conTimeout(s.client.pupPage.evaluate(async ({ id: msgId, chatId, idRaw, ts, datos }) => {
+  return await evalPagina(s, async ({ id: msgId, chatId, idRaw, ts, datos }) => {
     const W = window;
     try {
       const col = W.require('WAWebCollections');
@@ -1074,5 +1142,5 @@ export async function descargarMediaWa(msg, sesionId = null) {
     } catch (e) {
       return { error: (e && (e.message || String(e))) || 'error al descargar', tipo: datos.type, hallado: false };
     }
-  }, { id, chatId, idRaw, ts, datos }), 60000, 'descargar multimedia');
+  }, { id, chatId, idRaw, ts, datos }, 60000, 'descargar multimedia');
 }

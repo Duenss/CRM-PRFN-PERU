@@ -2087,8 +2087,6 @@ async function sincronizarChatsDesdeWhatsApp(sesionId = null) {
     if (!/^\d{8,15}$/.test(String(c.telefono || ''))) { sinNumero++; continue; }
     // Chats sin ninguna conversación real (solo avisos/plantillas): se omiten.
     if (c.tieneMensajes === false) { sinConversacion++; continue; }
-    // Chats sin conversación legible (ni texto ni multimedia): no se importan.
-    if (!String(c.ultimoTexto || '').trim() && !c.noLeidos && !c.pin) { sinConversacion++; continue; }
     if (oculto(c.telefono)) continue; // el dueño lo quitó de la Bandeja
     const esPropio = propios.includes(String(c.telefono));
     registrarCabecera({
@@ -2537,7 +2535,7 @@ let historialesEnCurso = false;
 let bandejaVaciadaEn = 0;
 let historialesHechos = false;
 
-async function actualizarHistorialesConocidos({ limite = 25, maxChats = 120, forzar = false } = {}) {
+async function actualizarHistorialesConocidos({ limite = 100, maxChats = 150, forzar = false } = {}) {
   if (config.modoPrueba || historialesEnCurso || !hayConexion()) return;
   if (!forzar && Date.now() - bandejaVaciadaEn < 120000) return; // Bandeja recién vaciada
   historialesEnCurso = true;
@@ -2557,7 +2555,7 @@ async function actualizarHistorialesConocidos({ limite = 25, maxChats = 120, for
         // Un chat problemático no debe detener la puesta al día de los demás.
         log(`No se pudo actualizar el historial de +${c.telefono}: ${e.message}`);
       }
-      await dormir(250);
+      await dormir(200);
     }
     log(`Historiales al día: ${actualizados}/${chats.length} chats actualizados (últimos ${limite} mensajes).`);
     emitir('sync', { motivo: 'historiales', chats: actualizados, total: chats.length });
