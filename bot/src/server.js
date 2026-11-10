@@ -40,10 +40,16 @@ function arrancar() {
 
 for (const senal of ['SIGINT', 'SIGTERM']) {
   process.on(senal, () => {
+    if (saliendo) return;
     saliendo = true;
+    // Se reenvía la señal al bot y se espera a que TERMINE de guardar la sesión
+    // de WhatsApp (cierra Chromium) antes de salir. Con 5 s se cortaba a medias
+    // y se perdía la sesión (había que escanear el QR otra vez).
     try { hijo?.kill(senal); } catch { /* ya terminó */ }
-    // Si el hijo no responde en 5s, cerramos igual.
-    setTimeout(() => process.exit(0), 5000).unref();
+    const tope = setTimeout(() => process.exit(0), 25000);
+    tope.unref?.();
+    if (hijo) hijo.once('exit', () => { clearTimeout(tope); process.exit(0); });
+    else process.exit(0);
   });
 }
 
