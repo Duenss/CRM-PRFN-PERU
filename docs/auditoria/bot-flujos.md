@@ -1087,7 +1087,7 @@ process.on('SIGINT', async () => {
   process.exit(0);
 });
 ```
-`bot/Dockerfile:24` arranca con `CMD ["node", "src/server.js"]` (Docker envía `SIGTERM`, no `SIGINT`). Los guards de escritura diferida (`conversaciones.js:26`, `pedidos.js:44`) se pierden al salir.
+`Dockerfile` (raíz) arranca con `CMD ["node", "src/server.js"]` (Docker envía `SIGTERM`, no `SIGINT`). Los guards de escritura diferida (`conversaciones.js:26`, `pedidos.js:44`) se pierden al salir.
 
 **Causa raíz.** No hay handler de `SIGTERM`, no se cancelan timers, no se hace `flush()` de los debounces ni `destroy()` de Chrome con timeout.
 

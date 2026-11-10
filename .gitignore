@@ -45,3 +45,6 @@ deploy/pterodactyl/*.env.*
 # temporales de diagnostico
 bot/.tmp-*
 docs/auditoria/capturas/responsive/
+
+# imagenes generadas del catalogo
+docs/catalogo/preview-*.png
