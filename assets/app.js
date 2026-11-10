@@ -992,6 +992,7 @@ async function cargarAjustes(){
     cargarArchivosInfo();
     if($('#aj-video'))$('#aj-video').checked=!!a.enviarVideo;
     if($('#aj-importar-chats'))$('#aj-importar-chats').checked=a.importarChats!==false;
+    if($('#aj-limpieza'))$('#aj-limpieza').value=a.limpiezaAlDesconectar||'preguntar';
     const es=$('#aj-status');if(es)es.textContent=`Actualizado: ${fmtFechaHora(a.actualizado)}`;
   }catch(e){const es=$('#aj-status');if(es)es.textContent='No se pudieron cargar los ajustes (revisa la conexión).';}
 }
@@ -1007,7 +1008,8 @@ $('#aj-save')?.addEventListener('click',async()=>{
       bienvenidaTexto:($('#aj-bienvenida')?.value||'').trim(),
       enviarCatalogo:!!$('#aj-pdf')?.checked,
       enviarVideo:!!$('#aj-video')?.checked,
-      importarChats:!!$('#aj-importar-chats')?.checked
+      importarChats:!!$('#aj-importar-chats')?.checked,
+      limpiezaAlDesconectar:$('#aj-limpieza')?.value||'preguntar'
     };
     const r=await botFetch('/api/ajustes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const a=r.ajustes||body;
