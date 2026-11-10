@@ -727,6 +727,22 @@ dialog::backdrop{background:rgba(3,4,8,.66);backdrop-filter:blur(8px)}
         <p id="b-status" class="muted" style="margin-top:1rem">Sin comprobar.</p>
       </div>
       <div class="box">
+        <h2>Límites y tiempos (anti-baneo)</h2>
+        <p class="muted" style="font-size:.8rem;margin-top:0">Se guardan en el bot y se aplican al instante. <b>0 = sin límite</b>. El bot siempre trabaja <b>chat por chat</b>, nunca todos de golpe.</p>
+        <div class="grid2">
+          <div><label for="aj-max-dia">Mensajes por día (0 = sin límite)</label><input id="aj-max-dia" type="number" min="0" step="1" placeholder="0"></div>
+          <div><label for="aj-max-resp">Respuestas por chat (0 = sin límite)</label><input id="aj-max-resp" type="number" min="0" step="1" placeholder="0"><small class="muted" style="font-size:.72rem">No cuenta el mensaje de saludo/bienvenida.</small></div>
+          <div><label for="aj-min">Intervalo entre mensajes — mínimo (seg)</label><input id="aj-min" type="number" min="1" step="1" placeholder="25"></div>
+          <div><label for="aj-max">Intervalo entre mensajes — máximo (seg)</label><input id="aj-max" type="number" min="1" step="1" placeholder="40"></div>
+          <div><label for="aj-chats">Intervalo entre chats (seg)</label><input id="aj-chats" type="number" min="0" step="1" placeholder="5"><small class="muted" style="font-size:.72rem">Espera antes de responder a otra conversación.</small></div>
+          <div><label for="aj-masivo">Intervalo envío masivo (seg)</label><input id="aj-masivo" type="number" min="1" step="1" placeholder="30"><small class="muted" style="font-size:.72rem">Entre cada mensaje de campaña/anuncio.</small></div>
+          <div><label for="aj-hora-ini">Hora de inicio (Lima)</label><input id="aj-hora-ini" type="number" min="0" max="23" step="1" placeholder="9"></div>
+          <div><label for="aj-hora-fin">Hora de fin (Lima)</label><input id="aj-hora-fin" type="number" min="1" max="24" step="1" placeholder="20"></div>
+        </div>
+        <div class="acts"><button id="aj-save" type="button">Guardar límites y tiempos</button></div>
+        <p class="muted" id="aj-status" style="margin-top:.6rem">—</p>
+      </div>
+      <div class="box">
         <h2>Envío manual (botón WhatsApp)</h2>
         <p class="muted">Cuando uses <b>Enviar por WhatsApp</b> en Campañas, elige dónde abrirlo. En <b>Web</b> se abre en una pestaña de este mismo navegador: si ya iniciaste sesión de WhatsApp Web no te pedirá QR (solo la primera vez). En <b>App</b> se abre la aplicación de escritorio si la tienes instalada.</p>
         <label for="b-wa">Abrir en</label>
@@ -1085,7 +1101,7 @@ function irTab(name){
   else if(name==='analiticas')cargarAnaliticas();
   else if(name==='ia')cargarIA();
   else if(name==='inicio')renderInicio();
-  else if(name==='bot'){refrescarQR();cargarLogs();}
+  else if(name==='bot'){refrescarQR();cargarLogs();cargarAjustes();}
   window.scrollTo({top:0,behavior:'smooth'});
 }
 $('#tabs').onclick=e=>{const b=e.target.closest('button');if(b)irTab(b.dataset.tab)};
@@ -1639,6 +1655,39 @@ function aplicarEventoSSE(d){
   if(d.tipo==='hola')return;
   manejarEvento(d); // derivacion / comprobante / seguimiento
 }
+/* ---------- límites y tiempos (anti-baneo) ---------- */
+async function cargarAjustes(){
+  try{
+    const j=await botFetch('/api/ajustes');
+    const a=j.ajustes||{};
+    const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v??'';};
+    set('aj-max-dia',a.maxPorDia);set('aj-max-resp',a.maxRespuestasPorChat);
+    set('aj-min',a.intervaloMin);set('aj-max',a.intervaloMax);
+    set('aj-chats',a.intervaloEntreChats);set('aj-masivo',a.intervaloMasivo);
+    set('aj-hora-ini',a.horaInicio);set('aj-hora-fin',a.horaFin);
+    const es=$('#aj-status');if(es)es.textContent=`Actualizado: ${fmtFechaHora(a.actualizado)}`;
+  }catch(e){const es=$('#aj-status');if(es)es.textContent='No se pudieron cargar los ajustes (revisa la conexión).';}
+}
+$('#aj-save')?.addEventListener('click',async()=>{
+  const b=$('#aj-save');b.disabled=true;
+  try{
+    const num=id=>{const v=Number(document.getElementById(id)?.value);return Number.isFinite(v)?Math.max(0,v):0;};
+    const body={
+      maxPorDia:num('aj-max-dia'),maxRespuestasPorChat:num('aj-max-resp'),
+      intervaloMin:num('aj-min'),intervaloMax:num('aj-max'),
+      intervaloEntreChats:num('aj-chats'),intervaloMasivo:num('aj-masivo'),
+      horaInicio:num('aj-hora-ini'),horaFin:num('aj-hora-fin')
+    };
+    const r=await botFetch('/api/ajustes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const a=r.ajustes||body;
+    const es=$('#aj-status');
+    if(es)es.textContent=`Guardado ✅ · mensajes ${a.intervaloMin}-${a.intervaloMax}s · entre chats ${a.intervaloEntreChats}s · masivo ${a.intervaloMasivo}s · día ${a.maxPorDia||'sin límite'} · respuestas/chat ${a.maxRespuestasPorChat||'sin límite'}`;
+    toast('Límites y tiempos guardados');
+    actualizarOrbe?.();
+  }catch(e){toast('No se guardó: '+e.message,'error')}
+  b.disabled=false;
+});
+
 $('#b-test').onclick=async()=>{
   guardarBot();
   const s=$('#b-status');s.textContent='Comprobando…';

@@ -8,6 +8,7 @@ import { iniciarWhatsApp, enviar, enviarImagen, enviarArchivo, estadoWa, cerrarS
 import { redactarRespuesta, transcribirAudio, redactarBorradores, redactarAnuncio, productoPorId, productoMencionado } from './ai.js';
 import { Cola, dormir, esperaEntreEnvios } from './queue.js';
 import { estadoIA, actualizarIA, pausarIA, estaPausado, promptIA, resumenIA } from './ia.js';
+import { estadoAjustes, actualizarAjustes, esperaMasivaMs, esperaChatMs } from './ajustes.js';
 import { registrar, listar, obtener, marcarLeido, respuestasIA, porDia, resumen as resumenChats, registrarCabecera, importarMensajes, yaExisteWa, actualizarAck, mensajesEntrantes, flush as flushConversaciones } from './conversaciones.js';
 import * as pedidos from './pedidos.js';
 import * as anuncios from './anuncios.js';
@@ -934,7 +935,7 @@ async function enviarAnuncio(id) {
         anuncio = anuncios.progreso(id, { total: lista.length, enviados, errores, estado: 'enviando', enviadosA: [...yaEnviados] });
       }
       emitir('anuncio', { id, titulo: anuncio.titulo, estado: 'enviando', enviados, total: lista.length, errores });
-      await dormir(esperaEntreEnvios());
+      await dormir(esperaMasivaMs());
     } catch (e) {
       errores++;
       log(`Anuncio "${anuncio.titulo}": falló el envío a +${d.telefono}: ${e.message}`);
@@ -1185,7 +1186,7 @@ async function enviarCampana(id) {
         }
       }
 
-      await dormir(esperaEntreEnvios(config.delayMin, config.delayMax));
+      await dormir(esperaChatMs());
     }
     motivo = 'completada';
   } catch (e) {
@@ -1209,6 +1210,17 @@ const yaRespondidos = new Set();
 const ultimoProducto = new Map();
 // Última respuesta por teléfono: frena ráfagas sin bloquear (cooldown corto).
 const cooldown = new Map();
+// Momento de la última respuesta automática, para espaciar respuestas entre
+// chats distintos (el bot nunca contesta a todos de golpe).
+let ultimaRespuestaGlobal = 0;
+async function esperarTurnoChat() {
+  const gap = Math.max(0, Number(estadoAjustes().intervaloEntreChats) || 0) * 1000;
+  if (gap > 0) {
+    const espera = gap - (Date.now() - ultimaRespuestaGlobal);
+    if (espera > 0) await dormir(espera);
+  }
+  ultimaRespuestaGlobal = Date.now();
+}
 
 /** Texto de un mensaje o un marcador si es multimedia. */
 function textoDe(msg) {
@@ -1493,6 +1505,10 @@ async function manejarMensaje(msg, sesionId = null) {
     return;
   }
   cooldown.set(tel, Date.now());
+
+  // El bot atiende chat por chat: respeta el intervalo configurado entre
+  // respuestas a conversaciones distintas (anti-baneo).
+  await esperarTurnoChat();
 
   try {
     log(`Pensando respuesta para +${tel}...`);
@@ -2057,6 +2073,20 @@ app.get('/api/stream', auth, (req, res) => {
 });
 
 /* ---------------- Asistente IA ---------------- */
+app.get('/api/ajustes', auth, (_req, res) => res.json({ ajustes: estadoAjustes() }));
+
+app.post('/api/ajustes', auth, (req, res) => {
+  try {
+    const a = actualizarAjustes(req.body || {});
+    // El límite de respuestas por chat vive en el estado de la IA.
+    try { actualizarIA({ maxPorConversacion: a.maxRespuestasPorChat }); } catch { /* opcional */ }
+    log(`Ajustes actualizados: día=${a.maxPorDia || 'sin límite'} · respuestas/chat=${a.maxRespuestasPorChat || 'sin límite'} · mensajes=${a.intervaloMin}-${a.intervaloMax}s · entre chats=${a.intervaloEntreChats}s · masivo=${a.intervaloMasivo}s`);
+    res.json({ ok: true, ajustes: a });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
 app.get('/api/ia', auth, (_req, res) => res.json(estadoIA()));
 
 app.post('/api/ia', auth, (req, res) => {
@@ -2565,7 +2595,7 @@ async function revisarSeguimientos() {
         log(`No se pudo enviar el seguimiento a +${t.telefono}: ${e.message}`);
         break;
       }
-      await dormir(esperaEntreEnvios(config.delayMin, config.delayMax));
+      await dormir(esperaChatMs());
     }
   } finally {
     revisandoSeg = false;

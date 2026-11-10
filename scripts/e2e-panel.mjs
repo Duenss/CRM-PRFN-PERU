@@ -573,6 +573,19 @@ function createBotMock() {
     /* pagos */
     if (p === '/api/pagos') return json(res, 200, { plantillas: [] });
 
+    /* ajustes de límites y tiempos */
+    if (p === '/api/ajustes') {
+      return json(res, 200, {
+        ajustes: {
+          maxPorDia: 0, maxRespuestasPorChat: 0,
+          intervaloMin: 25, intervaloMax: 40,
+          intervaloEntreChats: 5, intervaloMasivo: 30,
+          horaInicio: 9, horaFin: 20,
+          actualizado: new Date().toISOString()
+        }
+      });
+    }
+
     /* anuncios */
     if (p === '/api/anuncios') {
       return json(res, 200, {
