@@ -2083,6 +2083,9 @@ app.post('/api/sincronizar', auth, async (req, res) => {
       const r = await sincronizarChatsDesdeWhatsApp(req.body?.sesion || null);
       salida.chatsTotal = r.lista.length;
       salida.chats = r.chats;
+      // Chats nuevos: poner al día sus últimos mensajes en segundo plano para que
+      // la Bandeja no quede con conversaciones vacías tras sincronizar.
+      if (salida.chats > 0) setTimeout(() => { actualizarHistorialesConocidos().catch(() => {}); }, 1200);
       salida.grupos = r.grupos || 0;
       salida.sinNumero = r.sinNumero || 0;
       if (req.body?.diagnostico) {
