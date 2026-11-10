@@ -289,15 +289,20 @@ async function load(){
   if(p.error)throw new Error(p.error.message);
   if(c.error||t.error||k.error)console.warn('Aviso al cargar:',(c.error||t.error||k.error).message);
   clientes=c.data||[];
-  // Respaldo: si la sesión/RLS no deja ver clientes, los pide al bot (servicio).
-  if(!clientes.length){
-    try{const j=await botFetch('/api/clientes');if(j.clientes?.length)clientes=j.clientes;}catch(e){}
-  }
   productos=(p.data||[]).filter(x=>x.activo!==false);
   plantillas=t.data||[];campanas=k.data||[];
   $('#k-pla').innerHTML='<option value="">Escribir desde cero</option>'+plantillas.map(x=>`<option value="${esc(x.id)}">${esc(x.nombre)}</option>`).join('');
   $('#k-prod').innerHTML=productos.map(x=>`<option value="${esc(x.id)}">${esc(x.nombre)} (${esc(x.casa_inspirada||'')})</option>`).join('');
   renderClientes();renderCatalogo();renderCampanas();infoDest();renderInicio();renderCalendario();prev();
+  // Respaldo si RLS/sesión no deja ver clientes: se pide al bot SIN bloquear la UI,
+  // así el panel abre rápido aunque el bot esté apagado.
+  if(!clientes.length){
+    botFetch('/api/clientes',{timeoutMs:5000}).then(j=>{
+      if(j && j.clientes && j.clientes.length && !clientes.length){
+        clientes=j.clientes;renderClientes();renderCalendario();renderInicio();
+      }
+    }).catch(()=>{});
+  }
 }
 
 /* ---------- pestañas ---------- */

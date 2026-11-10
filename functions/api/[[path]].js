@@ -137,7 +137,9 @@ export async function onRequest(context) {
       method: metodo,
       headers,
       body: conCuerpo ? request.body : undefined,
-      redirect: 'manual'
+      redirect: 'manual',
+      // Si el bot está apagado no queremos colgar la petición: falla en 8 s.
+      signal: AbortSignal.timeout(8000)
     });
 
     const salida = new Headers(respuesta.headers);
