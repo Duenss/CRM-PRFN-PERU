@@ -9,7 +9,7 @@ import { redactarRespuesta, transcribirAudio, redactarBorradores, redactarAnunci
 import { Cola, dormir, esperaEntreEnvios } from './queue.js';
 import { estadoIA, actualizarIA, pausarIA, estaPausado, promptIA, resumenIA } from './ia.js';
 import { estadoAjustes, actualizarAjustes, esperaMasivaMs, esperaChatMs } from './ajustes.js';
-import { registrar, listar, obtener, marcarLeido, respuestasIA, porDia, resumen as resumenChats, registrarCabecera, importarMensajes, yaExisteWa, actualizarAck, mensajesEntrantes, flush as flushConversaciones } from './conversaciones.js';
+import { registrar, listar, obtener, marcarLeido, respuestasIA, porDia, resumen as resumenChats, registrarCabecera, importarMensajes, yaExisteWa, actualizarAck, mensajesEntrantes, vaciar as vaciarConversaciones, flush as flushConversaciones } from './conversaciones.js';
 import * as pedidos from './pedidos.js';
 import * as anuncios from './anuncios.js';
 // (Las plantillas de pago se eliminaron: las billeteras digitales las verifica el admin.)
@@ -1382,6 +1382,10 @@ async function manejarMensaje(msg, sesionId = null) {
     if (yaRespondidos.size > 1200) yaRespondidos.delete(yaRespondidos.values().next().value);
   }
 
+  const tipoNotif = String(msg.type || '');
+  // Notificaciones internas de WhatsApp (cifrado, plantillas, protocolo): se ignoran en silencio.
+  if (['e2e_notification', 'notification_template', 'notification', 'gp2', 'protocol_message', 'ciphertext'].includes(tipoNotif)) return;
+
   let texto = textoDe(msg);
   if (!texto) {
     log(`Mensaje sin texto de +${tel} (tipo: ${String(msg.type || 'desconocido')}); se ignora.`);
@@ -2021,9 +2025,12 @@ app.get('/api/estadisticas', auth, (req, res) => {
  */
 async function sincronizarChatsDesdeWhatsApp(sesionId = null) {
   const lista = await conTimeout(listarChatsWa(sesionId), 90000, 'listar chats de WhatsApp');
+  const propios = estadoWa().map(s => String(s.numero || '')).filter(Boolean);
   let chats = 0;
   for (const c of lista) {
     if (c.esGrupo || !/^\d{8,15}$/.test(c.telefono)) continue;
+    // El chat con el propio número del bot no va a la Bandeja.
+    if (propios.includes(String(c.telefono))) continue;
     registrarCabecera({
       telefono: c.telefono,
       nombre: c.nombre,
@@ -2121,6 +2128,23 @@ registrarConversaciones(app, {
   auth, normalizar, listar, obtener, marcarLeido, estadoIA, seguimiento, pedidos,
   resumenChats, getClientes, getCliente, config, sesionDisponible, enviar,
   logMensaje, registrar, log
+});
+
+app.delete('/api/conversaciones', auth, async (req, res) => {
+  try {
+    vaciarConversaciones();
+    let borroMensajes = false;
+    if (String(req.query.mensajes || '') === '1' && sb) {
+      const r = await sb.from('mensajes').delete().not('id', 'is', null);
+      if (r && r.error) throw new Error(r.error.message || String(r.error));
+      borroMensajes = true;
+    }
+    log(`Bandeja vaciada desde el panel${borroMensajes ? ' · mensajes de Supabase borrados' : ''}.`);
+    emitir('sync', { motivo: 'bandeja_vaciada' });
+    res.json({ ok: true, mensajesBorrados: borroMensajes });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.post('/api/revisar', auth, async (_req, res) => {

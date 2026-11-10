@@ -35,7 +35,7 @@ const RUTAS = {
     '/api/borradores', '/api/seguimiento', '/api/conversaciones'
   ],
   PATCH: ['/api/pedidos', '/api/anuncios'],
-  DELETE: ['/api/anuncios']
+  DELETE: ['/api/anuncios', '/api/conversaciones']
 };
 
 export function rutaPermitida(metodo, ruta) {

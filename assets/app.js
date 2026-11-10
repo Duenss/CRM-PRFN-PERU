@@ -988,6 +988,17 @@ $('#aj-save')?.addEventListener('click',async()=>{
   b.disabled=false;
 });
 
+$('#b-clear-inbox')?.addEventListener('click',async()=>{
+  if(!confirm('¿Vaciar la Bandeja? Se borran todos los chats y el historial de mensajes de Supabase.\nNo afecta clientes, pedidos ni catálogo.'))return;
+  const b=$('#b-clear-inbox');b.disabled=true;
+  try{
+    const r=await botFetch('/api/conversaciones?mensajes=1',{method:'DELETE',timeoutMs:120000});
+    if($('#b-clear-status'))$('#b-clear-status').textContent='Bandeja vaciada'+(r.mensajesBorrados?' · historial de Supabase borrado':'')+'. Sincroniza cuando quieras.';
+    toast('Bandeja vaciada');
+    await cargarBandeja();
+  }catch(e){toast('No se pudo vaciar: '+e.message,'error')}
+  b.disabled=false;
+});
 $('#b-test').onclick=async()=>{
   guardarBot();
   const s=$('#b-status');s.textContent='Comprobando…';

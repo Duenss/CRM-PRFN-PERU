@@ -363,6 +363,13 @@ export function yaExisteWa(telefono, waId) {
   return c.mensajes.some(m => m.waId === waId);
 }
 
+/** Borra todos los chats de la Bandeja (memoria + disco). */
+export function vaciar() {
+  chats = {};
+  guardar();
+  return true;
+}
+
 export function listar(limite = 40) {
   return Object.values(chats)
     .sort((a, b) => (Number(!!b.pin) - Number(!!a.pin)) || (tiempo(b) - tiempo(a)))
