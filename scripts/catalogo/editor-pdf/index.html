@@ -32,11 +32,11 @@
   .hoja{position:relative;line-height:0;box-shadow:0 20px 60px rgba(0,0,0,.6);user-select:none}
   .hoja img{display:block;max-width:none;pointer-events:none}
   .caja{position:absolute;cursor:move;border:1.5px dashed transparent;transition:background .12s,border-color .12s}
-  .caja.texto{background:rgba(110,170,255,.09);border-color:rgba(110,170,255,.5)}
+  .caja.texto{background:rgba(110,170,255,.09);border-color:rgba(110,170,255,.5);z-index:2}
   .caja.texto:hover{background:rgba(110,170,255,.26)}
-  .caja.imagen{background:rgba(255,170,70,.09);border-color:rgba(255,170,70,.55)}
+  .caja.imagen{background:rgba(255,170,70,.09);border-color:rgba(255,170,70,.55);z-index:1}
   .caja.imagen:hover{background:rgba(255,170,70,.24)}
-  .caja.sel{background:rgba(214,182,120,.32)!important;border-color:var(--gold)!important;border-style:solid;z-index:5}
+  .caja.sel{background:rgba(214,182,120,.32)!important;border-color:var(--gold)!important;border-style:solid;z-index:10}
   .caja .asa{position:absolute;right:-5px;bottom:-5px;width:11px;height:11px;background:var(--gold);border-radius:2px;cursor:nwse-resize;display:none}
   .caja.sel .asa{display:block}
   .regla{position:absolute;left:0;right:0;top:0;height:0;pointer-events:none}
@@ -156,8 +156,8 @@ function pintarCajas() {
   hoja.querySelectorAll(".caja").forEach((c) => c.remove());
   escalaActual = imgPagina.clientWidth / capa.ancho;
 
-  capa.textos.forEach((t, i) => hoja.appendChild(crearCaja("texto", t, i)));
   capa.imagenes.forEach((im, i) => hoja.appendChild(crearCaja("imagen", im, i)));
+  capa.textos.forEach((t, i) => hoja.appendChild(crearCaja("texto", t, i)));
 
   if (seleccion) {
     const previa = hoja.querySelector(`.caja[data-tipo="${seleccion.tipo}"][data-i="${seleccion.i}"]`);

@@ -171,15 +171,21 @@ def textos_de_pagina(page):
 def imagenes_de_pagina(page):
     """Devuelve las imágenes colocadas en la página (con xref y caja)."""
     salida = []
+    area_pagina = abs(page.rect.width * page.rect.height) or 1
     for info in page.get_image_info(xrefs=True):
         if info["width"] < 60 or info["height"] < 60:
             continue
+        bbox = info["bbox"]
+        area_imagen = abs((bbox[2] - bbox[0]) * (bbox[3] - bbox[1]))
         salida.append({
             "xref": info.get("xref"),
-            "bbox": [round(v, 2) for v in info["bbox"]],
+            "bbox": [round(v, 2) for v in bbox],
             "w": info["width"],
             "h": info["height"],
+            "fondo": area_imagen > area_pagina * 0.75,
         })
+    # Las imágenes de fondo van al final (el cliente las pone detrás).
+    salida.sort(key=lambda i: i["fondo"])
     return salida
 
 
