@@ -79,6 +79,14 @@ export function normalizarFiltro(filtro = {}) {
   return { tipo, etiquetas, telefonos };
 }
 
+export function normalizarAdjuntos(lista) {
+  const permitidos = ['catalogo', 'video'];
+  return (Array.isArray(lista) ? lista : String(lista || '').split(','))
+    .map(a => String(a || '').trim().toLowerCase())
+    .filter(a => permitidos.includes(a))
+    .slice(0, 2);
+}
+
 export function crear(datos = {}) {
   const titulo = String(datos.titulo || '').trim().slice(0, 80);
   const texto = String(datos.texto || '').trim().slice(0, 1200);
@@ -90,6 +98,7 @@ export function crear(datos = {}) {
     texto,
     filtro: normalizarFiltro(datos.filtro),
     incluirSinConsentimiento: datos.incluirSinConsentimiento === true,
+    adjuntos: normalizarAdjuntos(datos.adjuntos),
     estado: 'borrador',
     stats: { total: 0, enviados: 0, omitidos: 0, errores: 0 },
     creado: ahora(),
@@ -130,6 +139,7 @@ export function actualizar(id, cambios = {}) {
     a.texto = t;
   }
   if (cambios.filtro !== undefined) a.filtro = normalizarFiltro(cambios.filtro);
+  if (cambios.adjuntos !== undefined) a.adjuntos = normalizarAdjuntos(cambios.adjuntos);
   if (typeof cambios.incluirSinConsentimiento === 'boolean') a.incluirSinConsentimiento = cambios.incluirSinConsentimiento;
   if (cambios.estado !== undefined && ESTADOS.includes(String(cambios.estado))) a.estado = String(cambios.estado);
   a.actualizado = ahora();

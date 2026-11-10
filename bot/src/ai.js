@@ -474,7 +474,8 @@ async function gemini(prompt, opts = {}) {
   for (const model of modelos) {
     // Gemini 3 gasta tokens "pensando" y corta el JSON; se desactiva el razonamiento.
     for (const conThinking of [true, false]) {
-      const generationConfig = { temperature, maxOutputTokens, responseMimeType: 'application/json' };
+      const generationConfig = { temperature, maxOutputTokens };
+      if (opts.json !== false) generationConfig.responseMimeType = 'application/json';
       if (conThinking) generationConfig.thinkingConfig = { thinkingBudget: 0 };
       let r;
       try {
@@ -696,6 +697,43 @@ export function parseBorradoresEstructurados(txt) {
  * Si falta GEMINI_API_KEY, la IA falla o devuelve algo inválido, cae a
  * `borradoresDeRespaldo` (textos ya formateados con el catálogo real).
  */
+/**
+ * Redacta un anuncio masivo (mensaje único para todos los clientes/chats).
+ * Devuelve texto plano listo para WhatsApp.
+ */
+export async function redactarAnuncio({ objetivo = '', tono = 'cercano y profesional', catalogo = false, video = false } = {}) {
+  const prompt = `Escribe UN mensaje de WhatsApp para enviar a todos los clientes de *Perfumería Fina Perú* (Perú).
+
+Objetivo del dueño: ${String(objetivo || 'promoción del día con nuestro catálogo de fragancias').slice(0, 400)}
+Tono: ${String(tono || 'cercano y profesional').slice(0, 60)}
+${catalogo ? 'Al final del mensaje se enviará automáticamente el catálogo PDF en Navidad 2026.' : ''}
+${video ? 'También se adjuntará un video explicativo.' : ''}
+
+Reglas:
+- Español peruano, cercano y profesional. Máximo 90 palabras.
+- Estructura: saludo breve, beneficio/oferta, 2 o 3 viñetas con "•", cierre con llamada a la acción.
+- Usa *negrita* para nombres y precios (formato WhatsApp: UN asterisco).
+- No inventes precios, stock, promociones ni fechas que no estén en el objetivo.
+- Nada de markdown de web, ni bloques de código, ni emojis excesivos (máximo 3).
+- Devuelve SOLO el texto del mensaje, sin comillas ni explicaciones.`;
+  let texto = '';
+  if (config.geminiKey) {
+    try {
+      texto = await gemini(prompt, { system: SYS, temperature: 0.8, maxOutputTokens: 600, json: false });
+    } catch (e) {
+      if (!config.groqKey) throw e;
+      texto = await groqChat(prompt, { temperature: 0.8, maxOutputTokens: 600 });
+    }
+  } else if (config.groqKey) {
+    texto = await groqChat(prompt, { temperature: 0.8, maxOutputTokens: 600 });
+  } else {
+    throw new Error('No hay clave de IA configurada (GEMINI_API_KEY o GROQ_API_KEY).');
+  }
+  texto = String(texto || '').trim().replace(/^```[a-z]*\s*/i, '').replace(/```\s*$/i, '').trim();
+  if (!texto) throw new Error('La IA no devolvió texto.');
+  return texto.slice(0, 1200);
+}
+
 export async function redactarBorradores({ objetivo = 'promo', condiciones = '', segmento = [], productos = [] } = {}) {
   const [cfg, todos] = await Promise.all([getConfiguracion(), getProductos()]);
   const ids = new Set((Array.isArray(productos) ? productos : []).map(x => String(x || '').trim()).filter(Boolean));

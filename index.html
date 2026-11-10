@@ -653,12 +653,18 @@ dialog::backdrop{background:rgba(3,4,8,.66);backdrop-filter:blur(8px)}
           <div style="padding:1rem">
             <label for="anu-titulo">Título interno</label><input id="anu-titulo" maxlength="80" placeholder="Ej. Promo Navidad">
             <label for="anu-texto">Mensaje</label><textarea id="anu-texto" maxlength="1200" rows="6" placeholder="Hola {nombre} 🎄 En Perfumería Fina tenemos..."></textarea>
-            <p class="muted" style="margin:.3rem 0 .8rem;font-size:.78rem">Usa <b>{nombre}</b> para personalizar. Formato WhatsApp: *negrita*, _cursiva_, viñetas con •.</p>
+            <p class="muted" style="margin:.3rem 0 .6rem;font-size:.78rem">Usa <b>{nombre}</b> para personalizar. Formato WhatsApp: *negrita*, _cursiva_, viñetas con •.</p>
+            <div class="grid2">
+              <div><label for="anu-objetivo">Idea para la IA (opcional)</label><input id="anu-objetivo" maxlength="200" placeholder="Ej. promo navideña en árabes, 2x1, envío gratis"></div>
+              <div style="display:flex;align-items:flex-end"><button class="ai" id="anu-ia" type="button" style="width:100%">✨ Generar con IA</button></div>
+            </div>
+            <label style="display:flex;gap:.5rem;align-items:center;margin:.7rem 0 .2rem"><input type="checkbox" id="anu-adj-catalogo" style="width:auto"> <span>📕 Adjuntar catálogo PDF (Navidad 2026)</span></label>
+            <label style="display:flex;gap:.5rem;align-items:center;margin:.1rem 0 .5rem"><input type="checkbox" id="anu-adj-video" style="width:auto"> <span>🎬 Adjuntar video explicativo del CRM</span></label>
             <div class="grid2">
               <div>
                 <label for="anu-filtro">Destinatarios</label>
                 <select id="anu-filtro">
-                  <option value="todos">Todos los clientes</option>
+                  <option value="todos">Todos (clientes + chats)</option>
                   <option value="etiquetas">Por etiquetas</option>
                   <option value="telefonos">Seleccionados (números)</option>
                 </select>
@@ -669,7 +675,7 @@ dialog::backdrop{background:rgba(3,4,8,.66);backdrop-filter:blur(8px)}
               <label for="anu-tels">Números (uno por línea o separados por coma)</label>
               <textarea id="anu-tels" rows="3" placeholder="51933221690, 51987654321"></textarea>
             </div>
-            <label style="display:flex;gap:.5rem;align-items:center;margin:.7rem 0 .3rem"><input type="checkbox" id="anu-sin-consent" style="width:auto"> <span class="muted">Incluir clientes sin consentimiento (no recomendado)</span></label>
+            <label style="display:flex;gap:.5rem;align-items:center;margin:.7rem 0 .3rem"><input type="checkbox" id="anu-sin-consent" style="width:auto"> <span class="muted">Enviar a TODOS sin consentimiento (incluye chats que nunca aceptaron)</span></label>
             <p class="muted" id="anu-preview">—</p>
             <div class="acts"><button class="ghost" id="anu-guardar" type="button">Guardar borrador</button><button id="anu-enviar" type="button">Enviar ahora</button></div>
           </div>
@@ -2264,7 +2270,7 @@ function pedirPreviewAnuncio(){
     const p=$('#anu-preview');if(!p)return;
     try{
       const r=await botFetch('/api/anuncios/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filtro:filtroAnuncioForm(),incluirSinConsentimiento:!!$('#anu-sin-consent')?.checked})});
-      p.textContent=`Llegará a ${r.total} cliente(s)${r.sinConsentimiento?` · ${r.sinConsentimiento} sin consentimiento quedan fuera`:''}.`;
+      p.textContent=`Llegará a ${r.total} destinatario(s)${r.soloChats?` · ${r.soloChats} solo desde chats`:''}${r.sinConsentimiento?` · ${r.sinConsentimiento} sin consentimiento`:''}.`;
     }catch(e){p.textContent='No se pudo calcular los destinatarios.'}
   },350);
 }
@@ -2283,10 +2289,11 @@ function renderAnuncios(){
   l.innerHTML=anunciosCache.map(a=>{
     const s=a.stats||{};
     const pct=s.total?Math.round((s.enviados||0)/s.total*100):0;
-    const seg=a.filtro?.tipo==='etiquetas'?`Etiquetas: ${esc((a.filtro.etiquetas||[]).join(', ')||'—')}`:a.filtro?.tipo==='telefonos'?`${(a.filtro.telefonos||[]).length} números`:'Todos los clientes';
+    const seg=a.filtro?.tipo==='etiquetas'?`Etiquetas: ${esc((a.filtro.etiquetas||[]).join(', ')||'—')}`:a.filtro?.tipo==='telefonos'?`${(a.filtro.telefonos||[]).length} números`:'Todos (clientes + chats)';
+    const ADJ=(a.adjuntos||[]).length?' · '+a.adjuntos.map(x=>x==='catalogo'?'📕 catálogo':'🎬 video').join(' + '):'';
     return `<div class="lrow"><div class="lt">
       <b>${esc(a.id)} · ${esc(a.titulo)} <i class="tag ${a.estado==='enviado'?'ok':a.estado==='enviando'?'warn':''}">${ESTADO_ANU[a.estado]||a.estado}</i></b>
-      <small>${seg} · ${s.enviados||0}/${s.total||0} enviados${s.errores?` · ${s.errores} errores`:''}${a.incluirSinConsentimiento?' · incluye sin consentimiento':''}</small>
+      <small>${seg} · ${s.enviados||0}/${s.total||0} enviados${s.errores?` · ${s.errores} errores`:''}${a.incluirSinConsentimiento?' · incluye sin consentimiento':''}${ADJ}</small>
       <small>${esc(fmtFechaHora(a.actualizado))}</small>
       ${s.total?`<div class="an-track" style="margin-top:.35rem"><i style="width:${Math.max(2,pct)}%"></i></div>`:''}
       <small class="muted" style="display:block;white-space:pre-wrap;margin-top:.3rem">${esc(String(a.texto||'').slice(0,160))}</small>
@@ -2303,7 +2310,8 @@ function datosAnuncioForm(){
     titulo:($('#anu-titulo')?.value||'').trim(),
     texto:($('#anu-texto')?.value||'').trim(),
     filtro:filtroAnuncioForm(),
-    incluirSinConsentimiento:!!$('#anu-sin-consent')?.checked
+    incluirSinConsentimiento:!!$('#anu-sin-consent')?.checked,
+    adjuntos:[$('#anu-adj-catalogo')?.checked?'catalogo':null,$('#anu-adj-video')?.checked?'video':null].filter(Boolean)
   };
 }
 function limpiarFormAnuncio(){
@@ -2313,6 +2321,8 @@ function limpiarFormAnuncio(){
   if($('#anu-tags'))$('#anu-tags').value='';
   if($('#anu-tels'))$('#anu-tels').value='';
   if($('#anu-sin-consent'))$('#anu-sin-consent').checked=false;
+  if($('#anu-adj-catalogo'))$('#anu-adj-catalogo').checked=false;
+  if($('#anu-adj-video'))$('#anu-adj-video').checked=false;
   if($('#anu-filtro'))$('#anu-filtro').value='todos';
   actualizarWrapsAnuncio();vistaAnuncio();
 }
@@ -2338,6 +2348,19 @@ $('#anu-tags')?.addEventListener('input',pedirPreviewAnuncio);
 $('#anu-tels')?.addEventListener('input',pedirPreviewAnuncio);
 $('#anu-sin-consent')?.addEventListener('change',pedirPreviewAnuncio);
 $('#anu-texto')?.addEventListener('input',()=>{vistaAnuncio()});
+$('#anu-ia')?.addEventListener('click',async()=>{
+  const b=$('#anu-ia');if(!b)return;
+  const original=b.textContent;b.disabled=true;b.textContent='Generando…';
+  try{
+    const r=await botFetch('/api/anuncios/ia',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      objetivo:$('#anu-objetivo')?.value||'',
+      catalogo:!!$('#anu-adj-catalogo')?.checked,
+      video:!!$('#anu-adj-video')?.checked
+    })});
+    if(r.texto){$('#anu-texto').value=r.texto;vistaAnuncio();toast('Mensaje generado con IA ✨')}
+  }catch(e){toast('La IA no pudo generar: '+e.message,'error')}
+  b.textContent=original;b.disabled=false;
+});
 $('#anu-guardar')?.addEventListener('click',()=>guardarAnuncio());
 $('#anu-enviar')?.addEventListener('click',async()=>{
   const b=$('#anu-enviar');b.disabled=true;
@@ -2369,6 +2392,8 @@ $('#anu-list')?.addEventListener('click',async e=>{
     $('#anu-tags').value=(a.filtro?.etiquetas||[]).join(', ');
     $('#anu-tels').value=(a.filtro?.telefonos||[]).join(', ');
     $('#anu-sin-consent').checked=!!a.incluirSinConsentimiento;
+    if($('#anu-adj-catalogo'))$('#anu-adj-catalogo').checked=(a.adjuntos||[]).includes('catalogo');
+    if($('#anu-adj-video'))$('#anu-adj-video').checked=(a.adjuntos||[]).includes('video');
     anuEditId=a.id;
     actualizarWrapsAnuncio();vistaAnuncio();
     toast('Anuncio cargado en el formulario');
