@@ -93,3 +93,6 @@
 
 ### “Hola” / “Hola información”
 - En la primera interacción, un simple saludo o “información” envía **bienvenida + catálogo PDF + video** (video activado). Verificado en simulación: 4 mensajes salientes (bienvenida, explicación de páginas, PDF y video).
+
+### Etiquetas desde el chat
+- En la Bandeja, cada chat tiene **“＋ Etiquetas”**: chips rápidos (VIP, frecuente, promo…) o texto libre separado por comas. Se guardan en el cliente (Supabase) al instante. Verificado: etiquetas `vip, frecuente` guardadas y visibles en el chat.
