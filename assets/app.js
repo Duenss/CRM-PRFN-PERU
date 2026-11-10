@@ -2051,3 +2051,115 @@ $('#ia-chats')?.addEventListener('click',async e=>{
 
 iniciarScheduler();
 boot();
+
+
+/* ---------- buscador global (funciones, perfumes y clientes) ---------- */
+const SINONIMOS_BUSQUEDA={
+  inicio:['inicio','resumen','panel','dashboard','hola'],
+  bandeja:['bandeja','chats','chat','mensajes','conversaciones','whatsapp','inbox'],
+  pedidos:['pedidos','pedido','ventas','pagos','comprobante','entregas'],
+  analiticas:['analiticas','estadisticas','reportes','ventas'],
+  campanas:['campanas','campana','promociones','envios','plantillas'],
+  anuncios:['anuncios','anuncio','masivo','promocion','promos','difusion'],
+  clientes:['clientes','cliente','contactos','directorio'],
+  catalogo:['catalogo','perfumes','perfume','productos','fragancias','precios'],
+  calendario:['calendario','fechas','festivos','cumpleanos','agenda'],
+  ia:['ia','asistente','inteligencia','bot'],
+  bot:['ajustes','configuracion','conexion','qr','whatsapp','limites','sonidos','horario','postventa','seguimiento']
+};
+function buscarGlobal(q){
+  const t=String(q||'').toLowerCase().trim();
+  if(!t)return [];
+  const res=[];
+  // 1) Secciones del panel (por nombre o sinónimo)
+  document.querySelectorAll('#tabs button[data-tab]').forEach(b=>{
+    const id=b.dataset.tab;
+    const nombre=((b.querySelector('.nl')?.textContent)||b.getAttribute('aria-label')||'').trim();
+    const claves=[id,...(SINONIMOS_BUSQUEDA[id]||[])];
+    if(nombre.toLowerCase().includes(t)||claves.some(k=>k.includes(t))){
+      res.push({tipo:'Funcion',titulo:nombre,sub:'Abrir sección',accion:()=>irTab(id)});
+    }
+  });
+  // 2) Perfumes del catálogo
+  for(const p of (typeof productos!=='undefined'?productos:[])){
+    const texto=[p.nombre,p.casa_inspirada,p.categoria,p.genero,p.notas].join(' ').toLowerCase();
+    if(texto.includes(t)){
+      res.push({tipo:'Perfume',titulo:p.nombre,sub:(p.casa_inspirada||'')+' · 50 ml S/ '+(p.precio_50ml??'—'),accion:()=>{
+        irTab('catalogo');
+        if($('#pq'))$('#pq').value=p.nombre;
+        if($('#p-cat'))$('#p-cat').value='';
+        if($('#p-gen'))$('#p-gen').value='';
+        renderCatalogo();
+      }});
+    }
+    if(res.length>=14)break;
+  }
+  // 3) Clientes
+  for(const c of (typeof clientes!=='undefined'?clientes:[])){
+    if([c.nombre,c.telefono].join(' ').toLowerCase().includes(t)){
+      res.push({tipo:'Cliente',titulo:c.nombre||('+'+c.telefono),sub:'+'+c.telefono,accion:()=>{
+        irTab('clientes');
+        if($('#cq'))$('#cq').value=c.nombre||c.telefono;
+        renderClientes();
+      }});
+    }
+    if(res.length>=20)break;
+  }
+  return res.slice(0,12);
+}
+let gIdx=-1,gRes=[];
+function cerrarBusqueda(){
+  const box=$('#gq-results');if(!box)return;
+  box.hidden=true;gIdx=-1;gRes=[];
+  $('#gq')?.setAttribute('aria-expanded','false');
+}
+function pintarBusqueda(){
+  const box=$('#gq-results');if(!box)return;
+  const q=$('#gq')?.value||'';
+  gRes=buscarGlobal(q);
+  if(!gRes.length){
+    box.innerHTML=q.trim()?'<div class="gsearch-vacio">Sin resultados para “'+esc(q.trim())+'”.</div>':'';
+    box.hidden=!q.trim();
+    $('#gq')?.setAttribute('aria-expanded',box.hidden?'false':'true');
+    return;
+  }
+  box.innerHTML=gRes.map((r,i)=>'<div class="gres'+(i===gIdx?' on':'')+'" role="option" data-g="'+i+'"><div class="g-info"><b>'+esc(r.titulo)+'</b><small>'+esc(r.sub)+'</small></div><span class="g-tipo">'+esc(r.tipo)+'</span></div>').join('');
+  box.hidden=false;
+  $('#gq')?.setAttribute('aria-expanded','true');
+}
+function elegirBusqueda(i){
+  const r=gRes[i];if(!r)return;
+  cerrarBusqueda();
+  const input=$('#gq');if(input)input.value='';
+  try{r.accion()}catch(e){toast('No se pudo abrir: '+e.message,'error')}
+}
+let gTimer=null;
+$('#gq')?.addEventListener('input',()=>{
+  clearTimeout(gTimer);
+  gTimer=setTimeout(()=>{gIdx=-1;pintarBusqueda()},120);
+});
+$('#gq')?.addEventListener('focus',()=>{if($('#gq')?.value.trim())pintarBusqueda()});
+$('#gq')?.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){cerrarBusqueda();$('#gq')?.blur();return}
+  if(!gRes.length)return;
+  if(e.key==='ArrowDown'){e.preventDefault();gIdx=(gIdx+1)%gRes.length;pintarBusqueda()}
+  else if(e.key==='ArrowUp'){e.preventDefault();gIdx=(gIdx-1+gRes.length)%gRes.length;pintarBusqueda()}
+  else if(e.key==='Enter'){e.preventDefault();elegirBusqueda(gIdx<0?0:gIdx)}
+});
+$('#gq-results')?.addEventListener('click',e=>{
+  const el=e.target.closest('[data-g]');if(!el)return;
+  elegirBusqueda(Number(el.dataset.g));
+});
+$('#gq-results')?.addEventListener('mousemove',e=>{
+  const el=e.target.closest('[data-g]');if(!el)return;
+  const i=Number(el.dataset.g);
+  if(i!==gIdx){gIdx=i;document.querySelectorAll('#gq-results .gres').forEach((x,k)=>x.classList.toggle('on',k===i))}
+});
+document.addEventListener('click',e=>{
+  if($('#gsearch')&&!$('#gsearch').contains(e.target))cerrarBusqueda();
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='/'&&!e.ctrlKey&&!e.metaKey&&document.activeElement?.tagName!=='INPUT'&&document.activeElement?.tagName!=='TEXTAREA'){
+    e.preventDefault();$('#gq')?.focus();
+  }
+});

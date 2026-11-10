@@ -410,3 +410,20 @@ dialog::backdrop{background:rgba(3,4,8,.66);backdrop-filter:blur(8px)}
 .pe-item b{font-weight:600}
 .pe-item button{min-height:34px;font-size:.78rem;padding:.2rem .55rem}
 .pe-empty{border:1px dashed var(--line);border-radius:10px;padding:.6rem;color:var(--mute);font-size:.82rem}
+
+/* Buscador global (funciones, perfumes y clientes) */
+.gsearch{position:relative;display:flex;align-items:center;gap:.45rem;background:var(--s2);border:1px solid var(--line);border-radius:999px;padding:0 .75rem;height:38px;min-width:230px;max-width:340px;flex:1}
+.gsearch svg{width:17px;height:17px;flex:0 0 auto;fill:none;stroke:var(--mute);stroke-width:1.7;stroke-linecap:round}
+.gsearch input{border:0;background:transparent;color:var(--ink);font:inherit;font-size:.86rem;outline:none;width:100%;min-width:0}
+.gsearch input::placeholder{color:var(--mute2)}
+.gsearch:focus-within{border-color:var(--gold-line);box-shadow:0 0 0 3px var(--gold-soft)}
+.gsearch-res{position:absolute;top:calc(100% + 8px);right:0;width:min(430px,88vw);max-height:min(360px,60vh);overflow:auto;background:var(--s1);border:1px solid var(--line);border-radius:12px;box-shadow:0 24px 60px -24px #000;padding:.35rem;z-index:80}
+.gres{display:flex;align-items:center;justify-content:space-between;gap:.7rem;padding:.5rem .6rem;border-radius:8px;cursor:pointer}
+.gres:hover,.gres.on{background:var(--s2)}
+.gres .g-info{display:flex;flex-direction:column;gap:.05rem;min-width:0}
+.gres b{font-size:.86rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gres small{color:var(--mute);font-size:.74rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gres .g-tipo{font-size:.66rem;color:var(--mute2);border:1px solid var(--line);border-radius:99px;padding:.1rem .45rem;flex:0 0 auto}
+.gsearch-vacio{padding:.7rem .6rem;color:var(--mute);font-size:.82rem}
+@media(max-width:900px){.gsearch{min-width:0;max-width:none}.gsearch input{font-size:.8rem}}
+@media(max-width:760px){.gsearch{height:36px;max-width:170px}.gres small{display:none}}

@@ -47,6 +47,13 @@
 ### Envío masivo
 - Motor de anuncios verificado en simulación: texto con `{nombre}` + PDF + video, estado `enviado` 1/1 y 0 errores.
 
+### Campañas programadas
+- SQL 11 verificado por el dueño (ya se aceptan `programada/enviando/cancelada`) y el bot arranca con `problemas: 0`.
+- Nuevo `sql/12_campanas_fecha_hora.sql`: convierte `fecha_programada` a `timestamptz` porque era DATE y perdía la hora elegida.
+
+### Buscador global
+- Sustituido el avatar “JP” por un buscador de funciones, perfumes y clientes (atajo: tecla `/`).
+
 ### Pedidos con varios perfumes
 - El formulario de pedido permite agregar **varios perfumes**, cada uno con su tamaño, cantidad y precio; lista con quitar, total y saldo en vivo.
 

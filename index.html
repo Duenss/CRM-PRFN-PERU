@@ -51,7 +51,11 @@
       <div class="top-actions">
         <button class="chipstatus" id="wa-chip" type="button" title="Estado del bot"><span class="dot"></span><span id="wa-chip-t">Comprobando…</span></button>
         <button class="iconbtn" id="soundToggle" type="button" aria-label="Activar sonido de interfaz" aria-pressed="false" title="Sonido de interfaz"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path class="wave" d="M15.5 8.5a5 5 0 0 1 0 7"/><path class="wave" d="M18.2 6a8.5 8.5 0 0 1 0 12"/></svg></button>
-        <div class="avatar" title="Dueño">JP</div>
+        <div class="gsearch" id="gsearch">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          <input id="gq" type="search" placeholder="Buscar función o perfume…" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="gq-results" aria-autocomplete="list" aria-label="Buscar función o perfume">
+          <div id="gq-results" class="gsearch-res" role="listbox" aria-label="Resultados de búsqueda" hidden></div>
+        </div>
       </div>
     </header>
 

@@ -98,4 +98,5 @@ En **Ajustes → Límites y tiempos**:
 | No aparece el QR | Actualiza el panel; si sigue, revisa el log del bot. |
 | “Sin permisos en Supabase” | Ejecuta `sql/10_permisos_panel.sql`. |
 | Campañas programadas fallan | Ejecuta `sql/11_arreglar_estado_campanas.sql`. |
+| La campaña sale a otra hora | Ejecuta `sql/12_campanas_fecha_hora.sql` (guarda la hora, no solo la fecha). |
 | No se guarda un cliente | Revisa que el teléfono no esté repetido (avisa “Ya existe”). |
