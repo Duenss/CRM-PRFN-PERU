@@ -12,8 +12,8 @@ test('lista blanca: acepta rutas del panel', () => {
   assert.equal(rutaPermitida('PATCH', '/api/pedidos/P-0001'), true);
   assert.equal(rutaPermitida('POST', '/api/conversaciones/51999888777/enviar'), true);
   assert.equal(rutaPermitida('DELETE', '/api/anuncios/A-001'), true);
-  assert.equal(rutaPermitida('GET', '/media/comprobantes/abc.png'), true);
-  assert.equal(rutaPermitida('GET', '/media/../etc/passwd'), false);
+  assert.equal(rutaPermitida('GET', '/api/media/comprobantes/abc.png'), true);
+  assert.equal(rutaPermitida('GET', '/api/media/../etc/passwd'), false);
 });
 
 test('lista blanca: rechaza métodos y rutas no permitidas', () => {

@@ -1044,7 +1044,7 @@ async function cargarQrImagen(sesionId,img){
 }
 async function abrirComprobante(archivo){
   try{
-    const blob=await botBlob('/media/comprobantes/'+encodeURIComponent(archivo),{timeoutMs:15000});
+    const blob=await botBlob('/api/media/comprobantes/'+encodeURIComponent(archivo),{timeoutMs:15000});
     const url=URL.createObjectURL(blob);
     window.open(url,'_blank','noopener,noreferrer');
     setTimeout(()=>URL.revokeObjectURL(url),60000);

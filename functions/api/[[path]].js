@@ -25,7 +25,7 @@
 const RUTAS = {
   GET: [
     '/api/health', '/api/estado', '/api/qr', '/api/logs', '/api/eventos', '/api/stream',
-    '/media/comprobantes', '/media/productos',
+    '/api/media/comprobantes', '/api/media/productos',
     '/api/ia', '/api/ajustes', '/api/campanas', '/api/pedidos', '/api/analiticas',
     '/api/estadisticas', '/api/seguimiento', '/api/conversaciones', '/api/clientes', '/api/anuncios'
   ],
@@ -41,8 +41,8 @@ const RUTAS = {
 export function rutaPermitida(metodo, ruta) {
   const lista = RUTAS[metodo];
   if (!lista) return false;
-  // Archivos servidos por el bot (comprobantes y fotos de productos).
-  if (metodo === 'GET' && /^\/media\/(comprobantes|productos)\/[A-Za-z0-9._\-]+$/.test(ruta)) return true;
+  // Archivos servidos por el bot (comprobantes y fotos de productos) vía /api/media.
+  if (metodo === 'GET' && /^\/api\/media\/(comprobantes|productos)\/[A-Za-z0-9._\-]+$/.test(ruta)) return true;
   if (!/^\/api\/[A-Za-z0-9/_\-]*$/.test(ruta)) return false;
   return lista.some(prefijo => ruta === prefijo || ruta.startsWith(prefijo + '/') || ruta.startsWith(prefijo + '?'));
 }
@@ -125,7 +125,9 @@ export async function onRequest(context) {
   if (!esDueno(usuario, env)) return json({ error: 'Sin permisos para esta cuenta.' }, 403);
 
   // --- Reenvío al bot ---
-  const destino = base + ruta + url.search;
+  // /api/media/... se reenvía al /media/... del bot.
+  const rutaBot = ruta.startsWith('/api/media/') ? ruta.slice(4) : ruta;
+  const destino = base + rutaBot + url.search;
   const headers = new Headers(request.headers);
   headers.delete('host');
   headers.delete('cf-connecting-ip');
