@@ -451,11 +451,11 @@ async function enviarCatalogo({ tel, nombre, clienteId, sesionId }) {
   }
   // Video explicativo (configurable desde Ajustes).
   if (cfg.enviarVideo) {
-    const video = archivoPersonalizado('video') || path.join(raizProyecto, 'docs', 'entrega', 'perfumeria-fina-crm.mp4');
+    const video = archivoPersonalizado('video') || path.join(raizProyecto, 'docs', 'entrega', 'experiencia-perfumeria.mp4');
     if (fs.existsSync(video)) {
       try {
-        const envV = await enviarArchivo(tel, video, 'video/mp4', 'Perfumeria-Fina-CRM.mp4', '🎬 Así funciona *Perfumería Fina CRM*', sesionId);
-        registrar({ telefono: tel, texto: '🎬 Video del CRM', direccion: 'saliente', nombre, clienteId, origen: 'ia', waId: envV?.waId || '' });
+        const envV = await enviarArchivo(tel, video, 'video/mp4', 'Perfumeria-Fina-Peru.mp4', '🎬 Así es *Perfumería Fina Perú*', sesionId);
+        registrar({ telefono: tel, texto: '🎬 Video de Perfumería Fina', direccion: 'saliente', nombre, clienteId, origen: 'ia', waId: envV?.waId || '' });
         log(`Video enviado a +${tel}.`);
       } catch (e) {
         log('No se pudo enviar el video: ' + e.message);
@@ -917,7 +917,7 @@ function adjuntosAnuncio() {
       caption: '📕 Catálogo *Navidad 2026* · Perfumería Fina Perú'
     },
     video: {
-      ruta: archivoPersonalizado('video') || path.join(raizProyecto, 'docs', 'entrega', 'perfumeria-fina-crm.mp4'),
+      ruta: archivoPersonalizado('video') || path.join(raizProyecto, 'docs', 'entrega', 'experiencia-perfumeria.mp4'),
       mimetype: 'video/mp4',
       nombre: 'Perfumeria-Fina-CRM.mp4',
       caption: '🎬 Así funciona *Perfumería Fina CRM*'
@@ -1591,10 +1591,7 @@ async function manejarMensaje(msg, sesionId = null) {
   if (!cliente && !config.responderDesconocidos) return;
   if (!esPrueba && ia.maxPorConversacion > 0 && respuestasIA(tel) >= ia.maxPorConversacion) {
     log(`Límite de ${ia.maxPorConversacion} respuestas automáticas alcanzado con +${tel}; se avisa al cliente y al dueño.`);
-    const aviso = 'Gracias por tu paciencia 🙌 Te paso con un administrador para continuar con tu pedido.';
-    try {
-      await enviarRegistrado({ tel, texto: aviso, nombre, clienteId: cliente?.id, sesionId });
-    } catch (e) { log('No se pudo avisar del pase al administrador: ' + e.message); }
+    // Sin mensaje al cliente: la conversación sigue abierta y el admin toma el control.
     try {
       pausarIA(tel, true, 'Límite de respuestas automáticas', nombre);
       await notificarDueno(
@@ -1676,13 +1673,8 @@ ${String(texto).slice(0, 300)}
         motivo: ai.motivo,
         mensaje: String(texto).slice(0, 300)
       });
-      const aviso = ai.aviso || (/reclamo/i.test(ai.motivo)
-        ? 'Lamento lo ocurrido. Te paso con un administrador para que revise tu caso personalmente 🙌'
-        : 'Te paso con un administrador para que te atienda personalmente 🙌');
-      const env2 = await enviar(tel, aviso, sesionId);
-      await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'saliente', texto: aviso, origen: 'bot', estado: 'derivado' });
-      registrar({ telefono: tel, texto: aviso, direccion: 'saliente', nombre: nombreChat, clienteId: cliente?.id, origen: 'sistema', estado: 'derivado', waId: env2?.waId || '' });
-      log(`Conversación derivada al dueño y pausada: +${tel} (${ai.motivo}).`);
+      // Sin aviso al cliente: se notifica solo al administrador y la IA queda pausada.
+      log(`Conversación derivada al dueño y pausada (sin aviso al cliente): +${tel} (${ai.motivo}).`);
       return;
     }
     log(`Enviando respuesta a +${tel}...`);
