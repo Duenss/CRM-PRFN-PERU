@@ -6,6 +6,7 @@ function msgErrorSb(error){
   const m=String(error&&error.message?error.message:(error||''));
   if(/row-level security|permission denied|new row violates|violates row-level/i.test(m))return 'Sin permisos en Supabase (RLS). Ejecuta el SQL sql/10_permisos_panel.sql en Supabase → SQL Editor, o avísale al administrador.';
   if(/JWT|invalid.*token|401/i.test(m))return 'Tu sesión de Supabase venció. Cierra sesión y vuelve a entrar.';
+  if(/campanas_estado_check|violates check constraint/i.test(m))return 'La tabla de campañas tiene un estado no permitido. Ejecuta sql/11_arreglar_estado_campanas.sql en Supabase → SQL Editor y vuelve a intentar.';
   if(/does not exist|relation/i.test(m))return 'Falta una tabla en Supabase ('+m+'). Revisa que el esquema esté creado.';
   return m||'Error de Supabase';
 }

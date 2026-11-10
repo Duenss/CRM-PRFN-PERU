@@ -34,6 +34,9 @@
 - Bienvenida, PDF y video configurables desde Ajustes.
 - Supervisor con auto-reinicio del proceso del bot.
 
+### Campañas
+- Detectado el bloqueo real de "programar campaña": la tabla `campanas` conservaba una restricción vieja que no permite `programada`. Nuevo `sql/11_arreglar_estado_campanas.sql` y mensaje claro en el panel.
+
 ### Panel sin el bot
 - El panel ya no se queda esperando al bot: carga catálogo (202 productos) y plantillas en ~4 s con el bot apagado; el respaldo de clientes se pide sin bloquear y el proxy corta a los 8 s.
 - Verificado deteniendo el bot: 0 errores JS y datos de Supabase visibles.

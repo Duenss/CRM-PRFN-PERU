@@ -16,8 +16,8 @@ Panel de ventas + bot de WhatsApp con IA para Perfumería Fina Perú.
 ## Instalación en 5 pasos
 
 1. **Base de datos**: ejecuta en Supabase → SQL Editor los archivos de `sql/` en orden:
-   `00_instalar_todo.sql` (o `01`…`02`), `03_seguridad_rls.sql`, `07_envios_claim.sql` y
-   `10_permisos_panel.sql`. Crea el usuario del dueño en **Authentication → Users**.
+   `00_instalar_todo.sql` (o `01`…`02`), `03_seguridad_rls.sql`, `07_envios_claim.sql`,
+   `10_permisos_panel.sql` y `11_arreglar_estado_campanas.sql`. Crea el usuario del dueño en **Authentication → Users**.
 2. **Bot local**:
    ```bash
    cd bot
