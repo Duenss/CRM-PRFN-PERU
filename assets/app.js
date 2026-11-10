@@ -950,6 +950,34 @@ function aplicarEventoSSE(d){
   manejarEvento(d); // derivacion / comprobante / seguimiento
 }
 /* ---------- límites y tiempos (anti-baneo) ---------- */
+function fmtBytes(b){b=Number(b)||0;return b>=1048576?(b/1048576).toFixed(1)+' MB':Math.round(b/1024)+' KB'}
+async function cargarArchivosInfo(){
+  try{
+    const r=await botFetch('/api/archivos');
+    const a=r.archivos||{};
+    if($('#aj-pdf-info'))$('#aj-pdf-info').textContent=a.pdf?.personalizado?('Actual: '+a.pdf.nombre+' · '+fmtBytes(a.pdf.bytes)):'Usando el PDF de fábrica.';
+    if($('#aj-video-info'))$('#aj-video-info').textContent=a.video?.personalizado?('Actual: '+a.video.nombre+' · '+fmtBytes(a.video.bytes)):'Usando el video de fábrica.';
+  }catch(e){/* si el bot está apagado se deja — */}
+}
+function leerArchivoBase64(file){
+  return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result||'').split(',')[1]||'');r.onerror=()=>rej(new Error('No se pudo leer el archivo'));r.readAsDataURL(file)});
+}
+async function subirArchivoConfig(tipo,file){
+  const infoEl=tipo==='pdf'?$('#aj-pdf-info'):$('#aj-video-info');
+  if(infoEl)infoEl.textContent='Subiendo '+file.name+' ('+fmtBytes(file.size)+')…';
+  try{
+    const base64=await leerArchivoBase64(file);
+    const r=await botFetch('/api/archivos/'+tipo,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre:file.name,base64}),timeoutMs:180000});
+    if(infoEl)infoEl.textContent='Actualizado: '+r.nombre+' · '+fmtBytes(r.bytes);
+    toast(tipo==='pdf'?'PDF del catálogo actualizado':'Video actualizado');
+  }catch(e){
+    if(infoEl)infoEl.textContent='Error: '+e.message;
+    toast('No se pudo subir: '+e.message,'error');
+  }
+}
+$('#aj-pdf-file')?.addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];if(f)subirArchivoConfig('pdf',f)});
+$('#aj-video-file')?.addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];if(f)subirArchivoConfig('video',f)});
+
 async function cargarAjustes(){
   try{
     const j=await botFetch('/api/ajustes');
@@ -961,6 +989,7 @@ async function cargarAjustes(){
     set('aj-hora-ini',a.horaInicio);set('aj-hora-fin',a.horaFin);
     if($('#aj-bienvenida'))$('#aj-bienvenida').value=a.bienvenidaTexto||'';
     if($('#aj-pdf'))$('#aj-pdf').checked=a.enviarCatalogo!==false;
+    cargarArchivosInfo();
     if($('#aj-video'))$('#aj-video').checked=!!a.enviarVideo;
     const es=$('#aj-status');if(es)es.textContent=`Actualizado: ${fmtFechaHora(a.actualizado)}`;
   }catch(e){const es=$('#aj-status');if(es)es.textContent='No se pudieron cargar los ajustes (revisa la conexión).';}

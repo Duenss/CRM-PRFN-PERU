@@ -403,6 +403,10 @@
           <textarea id="aj-bienvenida" rows="3" maxlength="600" placeholder="{saludo}, {nombre}. Nos alegra que hayas elegido a *Perfumería Fina Perú*…"></textarea>
           <label style="display:flex;gap:.5rem;align-items:center;margin-top:.5rem"><input type="checkbox" id="aj-pdf" style="width:auto"> <span>Al pedir catálogo, enviar el <b>PDF</b></span></label>
           <label style="display:flex;gap:.5rem;align-items:center;margin-top:.2rem"><input type="checkbox" id="aj-video" style="width:auto"> <span>Al pedir catálogo, enviar también el <b>video</b></span></label>
+          <div class="grid2" style="margin-top:.9rem">
+            <div><label for="aj-pdf-file">Cambiar el PDF del catálogo (máx. 20 MB)</label><input type="file" id="aj-pdf-file" accept="application/pdf"><p class="muted" id="aj-pdf-info" style="margin:.3rem 0 0">—</p></div>
+            <div><label for="aj-video-file">Cambiar el video (máx. 60 MB)</label><input type="file" id="aj-video-file" accept="video/mp4,video/webm"><p class="muted" id="aj-video-info" style="margin:.3rem 0 0">—</p></div>
+          </div>
         </div>
       </div>
       <div class="box">

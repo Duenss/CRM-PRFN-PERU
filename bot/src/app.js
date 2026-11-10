@@ -28,7 +28,7 @@ import { esEfectivo, decidirEstadoPedidoIA, debeDerivarPago, textoAvisoPagoDigit
 
 const panelPath = fileURLToPath(new URL('./panel.html', import.meta.url));
 const app = express();
-app.use(express.json({ limit: '12mb' }));
+app.use(express.json({ limit: '40mb' }));
 // Evita que el navegador cachee respuestas de la API (el QR rota cada pocos segundos).
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/')) res.set('Cache-Control', 'no-store');
@@ -127,6 +127,7 @@ const puede = c => c && c.activo !== false && !!c.consentimiento && !c.baja;
 /* ---------------- pedidos, pagos y seguimiento ---------------- */
 const botDataDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data');
 const comprobantesDir = path.join(botDataDir, 'comprobantes');
+const archivosDir = path.join(botDataDir, 'archivos');
 const raizProyecto = path.join(botDataDir, '..', '..');
 
 /** Guarda la imagen de un comprobante y devuelve su nombre de archivo. */
@@ -380,6 +381,20 @@ function pideCatalogo(texto) {
 }
 
 /** Datos del catálogo PDF (generados por scripts/catalogo/build.mjs). */
+/**
+ * Devuelve la ruta del PDF/video que el dueño subió desde Ajustes, o '' si no
+ * hay ninguno (entonces se usa el archivo de fábrica).
+ */
+function archivoPersonalizado(tipo) {
+  try {
+    const cfg = estadoAjustes();
+    const nombre = tipo === 'pdf' ? cfg.catalogoArchivo : cfg.videoArchivo;
+    if (!nombre) return '';
+    const ruta = path.join(archivosDir, nombre);
+    return fs.existsSync(ruta) ? ruta : '';
+  } catch { return ''; }
+}
+
 function infoCatalogo() {
   const ruta = path.join(raizProyecto, 'docs', 'catalogo', 'catalogo-info.json');
   const pdf = path.join(raizProyecto, 'docs', 'catalogo', 'catalogo-navidad-2026.pdf');
@@ -390,7 +405,9 @@ function infoCatalogo() {
 
 /** Envía el catálogo PDF con la explicación de páginas por categoría. */
 async function enviarCatalogo({ tel, nombre, clienteId, sesionId }) {
-  const { info, pdf, existe } = infoCatalogo();
+  const { info, pdf } = infoCatalogo();
+  const pdfRuta = archivoPersonalizado('pdf') || pdf;
+  const existe = fs.existsSync(pdfRuta);
   const secciones = Array.isArray(info?.secciones) ? info.secciones : [];
   const lineas = secciones.map(s => {
     const d = s.productosDesde || s.desde;
@@ -405,7 +422,7 @@ async function enviarCatalogo({ tel, nombre, clienteId, sesionId }) {
   const cfg = estadoAjustes();
   if (existe && cfg.enviarCatalogo !== false) {
     try {
-      const env = await enviarArchivo(tel, pdf, 'application/pdf', 'Catalogo-Perfumeria-Fina-Navidad-2026.pdf', '📕 Catálogo *Navidad 2026* · Perfumería Fina Perú', sesionId);
+      const env = await enviarArchivo(tel, pdfRuta, 'application/pdf', 'Catalogo-Perfumeria-Fina.pdf', '📕 Catálogo *Perfumería Fina* · Perfumería Fina Perú', sesionId);
       await logMensaje({ clienteId, telefono: tel, direccion: 'saliente', texto: '📕 [catálogo PDF enviado]', origen: 'ia' });
       registrar({ telefono: tel, texto: '📕 Catálogo Navidad 2026 (PDF)', direccion: 'saliente', nombre, clienteId, origen: 'ia', waId: env?.waId || '' });
       log(`Catálogo PDF enviado a +${tel}.`);
@@ -425,7 +442,7 @@ async function enviarCatalogo({ tel, nombre, clienteId, sesionId }) {
   }
   // Video explicativo (configurable desde Ajustes).
   if (cfg.enviarVideo) {
-    const video = path.join(raizProyecto, 'docs', 'entrega', 'perfumeria-fina-crm.mp4');
+    const video = archivoPersonalizado('video') || path.join(raizProyecto, 'docs', 'entrega', 'perfumeria-fina-crm.mp4');
     if (fs.existsSync(video)) {
       try {
         const envV = await enviarArchivo(tel, video, 'video/mp4', 'Perfumeria-Fina-CRM.mp4', '🎬 Así funciona *Perfumería Fina CRM*', sesionId);
@@ -872,13 +889,13 @@ function destinatariosAnuncio(clientes, chats, anuncio) {
 function adjuntosAnuncio() {
   return {
     catalogo: {
-      ruta: path.join(raizProyecto, 'docs', 'catalogo', 'catalogo-navidad-2026.pdf'),
+      ruta: archivoPersonalizado('pdf') || path.join(raizProyecto, 'docs', 'catalogo', 'catalogo-navidad-2026.pdf'),
       mimetype: 'application/pdf',
       nombre: 'Catalogo-Perfumeria-Fina-Navidad-2026.pdf',
       caption: '📕 Catálogo *Navidad 2026* · Perfumería Fina Perú'
     },
     video: {
-      ruta: path.join(raizProyecto, 'docs', 'entrega', 'perfumeria-fina-crm.mp4'),
+      ruta: archivoPersonalizado('video') || path.join(raizProyecto, 'docs', 'entrega', 'perfumeria-fina-crm.mp4'),
       mimetype: 'video/mp4',
       nombre: 'Perfumeria-Fina-CRM.mp4',
       caption: '🎬 Así funciona *Perfumería Fina CRM*'
@@ -2142,6 +2159,52 @@ app.delete('/api/conversaciones', auth, async (req, res) => {
     log(`Bandeja vaciada desde el panel${borroMensajes ? ' · mensajes de Supabase borrados' : ''}.`);
     emitir('sync', { motivo: 'bandeja_vaciada' });
     res.json({ ok: true, mensajesBorrados: borroMensajes });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ---------- Archivos configurables (PDF del catálogo y video) ----------
+const TIPOS_ARCHIVO = { pdf: { ext: 'pdf', limite: 20 * 1024 * 1024 }, video: { ext: 'mp4', limite: 60 * 1024 * 1024 } };
+
+app.get('/api/archivos', auth, (_req, res) => {
+  try {
+    const cfg = estadoAjustes();
+    const info = {};
+    for (const tipo of Object.keys(TIPOS_ARCHIVO)) {
+      const nombre = tipo === 'pdf' ? cfg.catalogoArchivo : cfg.videoArchivo;
+      const ruta = nombre ? path.join(archivosDir, nombre) : '';
+      const existe = !!ruta && fs.existsSync(ruta);
+      info[tipo] = {
+        personalizado: existe,
+        nombre: existe ? nombre : '',
+        bytes: existe ? fs.statSync(ruta).size : 0
+      };
+    }
+    res.json({ ok: true, archivos: info });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/archivos/:tipo', auth, (req, res) => {
+  const tipo = String(req.params.tipo || '');
+  const def = TIPOS_ARCHIVO[tipo];
+  if (!def) return res.status(400).json({ error: 'Tipo no válido (pdf o video).' });
+  try {
+    const base64 = String(req.body?.base64 || '').replace(/^data:[^;]+;base64,/, '');
+    if (!base64) return res.status(400).json({ error: 'Falta el archivo.' });
+    const buffer = Buffer.from(base64, 'base64');
+    if (!buffer.length) return res.status(400).json({ error: 'Archivo vacío.' });
+    if (buffer.length > def.limite) {
+      return res.status(413).json({ error: `El archivo supera ${Math.round(def.limite / 1024 / 1024)} MB.` });
+    }
+    fs.mkdirSync(archivosDir, { recursive: true });
+    const nombre = tipo === 'pdf' ? `catalogo.${def.ext}` : `video.${def.ext}`;
+    fs.writeFileSync(path.join(archivosDir, nombre), buffer);
+    actualizarAjustes(tipo === 'pdf' ? { catalogoArchivo: nombre } : { videoArchivo: nombre });
+    log(`Archivo ${tipo} actualizado desde el panel (${nombre}, ${Math.round(buffer.length / 1024)} KB).`);
+    res.json({ ok: true, nombre, bytes: buffer.length });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

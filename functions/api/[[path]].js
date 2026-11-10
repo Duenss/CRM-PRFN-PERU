@@ -27,12 +27,13 @@ const RUTAS = {
     '/api/health', '/api/estado', '/api/qr', '/api/logs', '/api/eventos', '/api/stream',
     '/api/media/comprobantes', '/api/media/productos',
     '/api/ia', '/api/ajustes', '/api/campanas', '/api/pedidos', '/api/analiticas',
-    '/api/estadisticas', '/api/seguimiento', '/api/conversaciones', '/api/clientes', '/api/anuncios'
+    '/api/estadisticas', '/api/seguimiento', '/api/conversaciones', '/api/clientes', '/api/anuncios',
+    '/api/archivos'
   ],
   POST: [
     '/api/anuncios', '/api/pedidos', '/api/ajustes', '/api/ia', '/api/sincronizar',
     '/api/revisar', '/api/enviar', '/api/sesion', '/api/logout', '/api/prueba',
-    '/api/borradores', '/api/seguimiento', '/api/conversaciones'
+    '/api/borradores', '/api/seguimiento', '/api/conversaciones', '/api/archivos'
   ],
   PATCH: ['/api/pedidos', '/api/anuncios'],
   DELETE: ['/api/anuncios', '/api/conversaciones']

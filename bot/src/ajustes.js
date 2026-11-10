@@ -39,6 +39,8 @@ const base = () => ({
   // Al pedir el catálogo: ¿adjuntamos el PDF? ¿y el video?
   enviarCatalogo: true,
   enviarVideo: false,
+  catalogoArchivo: '',
+  videoArchivo: '',
   actualizado: new Date().toISOString()
 });
 
@@ -66,6 +68,8 @@ function normalizar(a = {}) {
     bienvenidaTexto: String(a.bienvenidaTexto || '').slice(0, 600),
     enviarCatalogo: a.enviarCatalogo !== false,
     enviarVideo: a.enviarVideo === true,
+    catalogoArchivo: nombreSeguro(a.catalogoArchivo),
+    videoArchivo: nombreSeguro(a.videoArchivo),
     actualizado: new Date().toISOString()
   };
 }
@@ -79,6 +83,11 @@ function guardar() {
   } catch (e) {
     console.warn('[ajustes] no se pudo guardar:', e.message);
   }
+}
+
+/** Solo permite nombres de archivo simples (sin rutas). */
+function nombreSeguro(v) {
+  return String(v || '').replace(/[^A-Za-z0-9._-]/g, '').slice(0, 80);
 }
 
 export function estadoAjustes() {
