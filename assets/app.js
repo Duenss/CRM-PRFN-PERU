@@ -331,6 +331,7 @@ function irTab(name){
   const c=CRUMBS[name]||['',''];
   if($('#crumb'))$('#crumb').textContent=c[0];
   if($('#crumb-sub'))$('#crumb-sub').textContent=c[1];
+  if(name==='ajustes'){ if(typeof cargarAjustes==='function')cargarAjustes(); if(typeof cargarArchivosInfo==='function')cargarArchivosInfo(); }
   arrancarTareasBase();
   if(name==='bandeja'){cargarBandeja();alertasNuevas=0;actualizarAlertBadge();}
   else if(name==='pedidos')cargarPedidos();
