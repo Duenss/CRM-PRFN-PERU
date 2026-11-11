@@ -1755,7 +1755,26 @@ function renderPedidos(j){
   }).join('')||'<p class="empty">Aún no hay pedidos. Crea uno con "Nuevo pedido" o espera a que la IA detecte una compra.</p>';
 }
 let peItems=[];
-function productoPeActual(){return productos.find(x=>x.id===$('#pe-prod').value)||null}
+let peProdSel=null;
+function productoPeActual(){return peProdSel;}
+function pintarSugerenciasPe(texto){
+  const cont=$('#pe-prod-list');if(!cont)return;
+  const q=String(texto||'').toLowerCase().trim();
+  const lista=(q?productos.filter(p=>[p.nombre,p.casa_inspirada].join(' ').toLowerCase().includes(q)):productos).slice(0,40);
+  cont.innerHTML=lista.map(p=>`<div class="opt" role="option" data-pe-opt="${esc(p.id)}"><b>${esc(p.nombre)}</b><small>${esc(p.casa_inspirada||'')}</small></div>`).join('')||`<div class="combo-empty">Sin coincidencias. Puedes escribir el nombre y agregarlo igual.</div>`;
+  cont.hidden=false;
+  $('#pe-prod')?.setAttribute('aria-expanded','true');
+}
+function cerrarSugerenciasPe(){
+  const cont=$('#pe-prod-list');if(cont)cont.hidden=true;
+  $('#pe-prod')?.setAttribute('aria-expanded','false');
+}
+function elegirProductoPe(p){
+  peProdSel=p;
+  if(p){$('#pe-prod').value=p.nombre+' ('+(p.casa_inspirada||'')+')';$('#pe-precio').value=precioPedidoActual();}
+  cerrarSugerenciasPe();
+  refrescarActualPe();
+}
 function totalPeItems(){return peItems.reduce((s,it)=>s+(Number(it.precio)||0)*(Number(it.cantidad)||1),0)}
 function renderPeItems(){
   const cont=$('#pe-items');if(!cont)return;
@@ -1779,23 +1798,27 @@ function refrescarActualPe(){
 }
 function agregarPeItem(){
   const p=productoPeActual();
-  if(!p){toast('Elige un perfume del catálogo.','error');return false}
+  const textoLibre=String($('#pe-prod')?.value||'').trim();
+  const nombre=p?p.nombre:textoLibre;
+  if(!nombre){toast('Escribe o elige un perfume.','error');return false}
   const ml=$('#pe-ml').value==='100'?100:50;
   const cantidad=Math.max(1,Number($('#pe-cant').value)||1);
   const precio=Number($('#pe-precio').value)||0;
   if(precio<=0){toast('Escribe el precio unitario.','error');return false}
-  peItems.push({productoId:p.id,nombre:p.nombre,ml,cantidad,precio});
+  peItems.push({productoId:p?.id||null,nombre,ml,cantidad,precio});
   $('#pe-cant').value=1;
   $('#pe-precio').value=precioPedidoActual();
   renderPeItems();refrescarActualPe();
   return true;
 }
 function llenarProductosPedido(){
-  const sel=$('#pe-prod');if(!sel)return;
-  sel.innerHTML=productos.map(p=>`<option value="${esc(p.id)}">${esc(p.nombre)} (${esc(p.casa_inspirada||'')})</option>`).join('')||'<option value="">Sin catálogo</option>';
+  peProdSel=null;
+  if($('#pe-prod'))$('#pe-prod').value='';
+  if($('#pe-precio'))$('#pe-precio').value=0;
+  cerrarSugerenciasPe();
 }
 function precioPedidoActual(){
-  const p=productos.find(x=>x.id===$('#pe-prod').value);
+  const p=productoPeActual();
   return Number($('#pe-ml').value==='100'?p?.precio_100ml:p?.precio_50ml)||0;
 }
 function refrescarTotalPedido(){
@@ -1835,7 +1858,16 @@ $('#pe-items')?.addEventListener('click',e=>{
   const b=e.target.closest('[data-pe-del]');if(!b)return;
   peItems.splice(Number(b.dataset.peDel),1);renderPeItems();
 });
-$('#pe-prod')?.addEventListener('change',()=>{$('#pe-precio').value=precioPedidoActual();refrescarActualPe()});
+$('#pe-prod')?.addEventListener('focus',()=>{pintarSugerenciasPe($('#pe-prod').value)});
+$('#pe-prod')?.addEventListener('input',()=>{peProdSel=null;pintarSugerenciasPe($('#pe-prod').value)});
+$('#pe-prod')?.addEventListener('keydown',e=>{if(e.key==='Escape')cerrarSugerenciasPe()});
+$('#pe-prod')?.addEventListener('blur',()=>setTimeout(cerrarSugerenciasPe,180));
+$('#pe-prod-list')?.addEventListener('mousedown',e=>{
+  const o=e.target.closest('[data-pe-opt]');if(!o)return;
+  e.preventDefault();
+  const p=productos.find(x=>String(x.id)===String(o.dataset.peOpt));
+  if(p)elegirProductoPe(p);
+});
 $('#pe-ml')?.addEventListener('change',()=>{$('#pe-precio').value=precioPedidoActual();refrescarActualPe()});
 $('#pe-cant')?.addEventListener('input',refrescarActualPe);
 $('#pe-precio')?.addEventListener('input',refrescarActualPe);
@@ -1852,7 +1884,7 @@ async function guardarPedido(){
   if(!/^\d{8,15}$/.test(tel))return toast('Escribe un WhatsApp válido.', 'error');
   if(!peItems.length && !agregarPeItem()) return;
   if(!peItems.length)return toast('Agrega al menos un perfume.','error');
-  const prod=productos.find(x=>x.id===$('#pe-prod').value);
+  const prod=productoPeActual();
   const items=peItems.map(it=>({productoId:it.productoId,nombre:it.nombre,ml:it.ml,cantidad:it.cantidad,precio:it.precio}));
   const b=$('#pe-save');b.disabled=true;
   try{
@@ -2112,7 +2144,7 @@ $('#pe-new')?.addEventListener('click',()=>abrirFormPedido());
 $('#pe-close')?.addEventListener('click',()=>{$('#pe-form').hidden=true});
 $('#pe-cancel')?.addEventListener('click',()=>{$('#pe-form').hidden=true});
 $('#pe-save')?.addEventListener('click',guardarPedido);
-$('#pe-prod')?.addEventListener('change',()=>{$('#pe-precio').value=precioPedidoActual();refrescarTotalPedido()});
+
 $('#pe-ml')?.addEventListener('change',()=>{$('#pe-precio').value=precioPedidoActual();refrescarTotalPedido()});
 ['#pe-cant','#pe-precio','#pe-adelanto','#pe-metodo'].forEach(s=>$(s)?.addEventListener('input',refrescarTotalPedido));
 $('#pe-list')?.addEventListener('click',e=>{

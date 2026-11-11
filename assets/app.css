@@ -650,3 +650,14 @@ button:not(.ghost):not(.iconbtn):not(.toplogo):not(.chipstatus):not(.ai){}
 
 .more-chats{width:100%;margin:.4rem 0 .2rem;padding:.6rem;border-radius:12px;border:1px dashed rgba(221,183,95,.35);background:rgba(255,255,255,.02);color:var(--gold);font:inherit;font-size:.8rem;cursor:pointer;transition:background .2s, border-color .2s}
 .more-chats:hover{background:rgba(221,183,95,.08);border-color:rgba(221,183,95,.6)}
+
+/* Combo oscuro con búsqueda (Pedidos → Perfume) */
+.combo{position:relative}
+.combo-list{position:absolute;z-index:70;left:0;right:0;top:calc(100% + 5px);max-height:280px;overflow:auto;
+  background:#0f141c;border:1px solid rgba(221,183,95,.35);border-radius:12px;
+  box-shadow:0 22px 60px -24px #000,0 0 24px -18px rgba(221,183,95,.5);padding:.3rem}
+.combo-list .opt{padding:.48rem .65rem;border-radius:8px;cursor:pointer;font-size:.85rem;color:var(--ink)}
+.combo-list .opt:hover,.combo-list .opt.on{background:rgba(221,183,95,.14)}
+.combo-list .opt small{display:block;color:var(--mute2);font-size:.7rem;margin-top:.1rem}
+.combo-list .combo-empty{padding:.55rem .65rem;color:var(--mute2);font-size:.8rem}
+.pe-prod-wrap .combo input{width:100%}

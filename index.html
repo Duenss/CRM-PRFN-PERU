@@ -176,7 +176,13 @@
             <div><label for="pe-nombre">Nombre</label><input id="pe-nombre" maxlength="120"></div>
           </div>
           <div class="grid2">
-            <div><label for="pe-prod">Perfume</label><select id="pe-prod"></select></div>
+            <div class="pe-prod-wrap"><label for="pe-prod">Perfume</label>
+              <div class="combo">
+                <input id="pe-prod" type="text" placeholder="Busca o escribe el perfume…" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="pe-prod-list" aria-autocomplete="list">
+                <div id="pe-prod-list" class="combo-list" role="listbox" hidden></div>
+              </div>
+              <small class="muted" style="font-size:.72rem">Puedes escribir cualquier perfume; no depende del catálogo.</small>
+            </div>
             <div><label for="pe-ml">Tamaño</label><select id="pe-ml"><option value="50">50 ml</option><option value="100">100 ml</option></select></div>
           </div>
           <div class="grid2">
