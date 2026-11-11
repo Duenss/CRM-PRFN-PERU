@@ -403,6 +403,13 @@ export function vaciar() {
   return true;
 }
 
+function esNombreAgregado(nombre) {
+  const t = String(nombre || '').trim();
+  if (!t) return false;
+  if (t.startsWith('@')) return false;                 // LID / solo pushname con @ = no agregado
+  return !/^\+?[\d\s\-()]+$/.test(t);             // un nombre real, no un número
+}
+
 export function listar(limite = 40) {
   return Object.values(chats)
     .sort((a, b) => (Number(!!b.pin) - Number(!!a.pin)) || (tiempo(b) - tiempo(a)))
@@ -458,8 +465,8 @@ export function buscar({ limite = 80, offset = 0, q = '', filtro = 'todos' } = {
     if (filtro === 'personas' && (c.grupo || c.tipo !== 'persona')) return false;
     if (filtro === 'empresas' && c.tipo !== 'empresa') return false;
     // "Agregado" = el número está guardado en la agenda del WhatsApp.
-    if (filtro === 'agregados' && c.agregado !== true) return false;
-    if (filtro === 'noAgregados' && c.agregado === true) return false;
+    if (filtro === 'agregados' && !esNombreAgregado(c.nombre)) return false;
+    if (filtro === 'noAgregados' && esNombreAgregado(c.nombre)) return false;
     if (texto) {
       const blob = [c.nombre, c.nombreWa, c.nombreGuardado, c.telefono, c.ultimoTexto].join(' ').toLowerCase();
       if (!blob.includes(texto)) return false;
