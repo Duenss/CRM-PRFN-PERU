@@ -606,3 +606,32 @@ button:not(.ghost):not(.iconbtn):not(.toplogo):not(.chipstatus):not(.ai){}
 .card-h{position:relative}
 .card-h::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;
   background:linear-gradient(90deg, transparent, rgba(221,183,95,.28), transparent)}
+
+/* ===== Bandeja: marcos con glow blanco (minimalista) ===== */
+.inbox{background:transparent;border:0;border-radius:0;overflow:visible;gap:1rem;grid-template-columns:minmax(290px,350px) minmax(0,1fr)}
+.in-list{border:0;background:transparent;border-radius:0;padding:.2rem .4rem .2rem .1rem;display:flex;flex-direction:column;gap:.62rem;overflow:auto}
+.in-item{border:1px solid rgba(255,255,255,.17);border-bottom:1px solid rgba(255,255,255,.17);border-radius:16px;
+  background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.015));
+  box-shadow:0 0 0 1px rgba(255,255,255,.05), 0 0 22px -10px rgba(255,255,255,.5), 0 16px 40px -32px #000;
+  padding:.72rem .8rem;transition:border-color .22s var(--ease), box-shadow .22s var(--ease), transform .22s var(--ease), background .22s var(--ease)}
+.in-item:hover{background:linear-gradient(180deg, rgba(255,255,255,.085), rgba(255,255,255,.02));border-color:rgba(255,255,255,.34);
+  box-shadow:0 0 0 1px rgba(255,255,255,.14), 0 0 30px -8px rgba(255,255,255,.6), 0 18px 44px -30px #000;transform:translateY(-1px)}
+.in-item.on{background:linear-gradient(180deg, rgba(255,255,255,.11), rgba(255,255,255,.03));border-color:rgba(221,183,95,.55);
+  box-shadow:0 0 0 1px rgba(221,183,95,.4), 0 0 34px -6px rgba(221,183,95,.55), 0 18px 44px -30px #000}
+.in-item.on::before{border-radius:16px 0 0 16px;width:3px}
+.in-chat{background:#0a0e14;border:1px solid rgba(255,255,255,.15);border-radius:20px;
+  box-shadow:0 0 0 1px rgba(255,255,255,.05), 0 0 42px -24px rgba(255,255,255,.4), 0 26px 60px -40px #000;overflow:hidden}
+.in-head,.in-tagsbar{background:linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.01));border-bottom:1px solid rgba(255,255,255,.12)}
+.in-msgs{background:radial-gradient(900px 520px at 30% 0%, rgba(255,255,255,.04), transparent 60%), #0a0e14}
+.quick{background:linear-gradient(0deg, rgba(255,255,255,.025), transparent);border-top:1px solid rgba(255,255,255,.10)}
+.in-form{border-top:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.02)}
+@media(max-width:760px){.inbox{gap:.8rem}.in-list{padding:.15rem .05rem}.in-item{border-radius:14px}}
+
+/* Bandeja compacta: filas como tarjetas con glow blanco y ✕ flotante */
+.in-item{position:relative;padding:.62rem .8rem;min-height:0}
+.in-item .delchat{position:absolute;top:.5rem;right:.55rem;width:20px;height:20px;opacity:.35}
+.in-item:hover .delchat{opacity:1}
+.in-item .imeta{padding-right:.15rem;gap:.25rem}
+.in-item .ib small{max-width:100%}
+.in-item{border-color:rgba(255,255,255,.22);box-shadow:0 0 0 1px rgba(255,255,255,.07), 0 0 24px -8px rgba(255,255,255,.6), 0 16px 40px -32px #000}
+.in-item:hover{border-color:rgba(255,255,255,.4);box-shadow:0 0 0 1px rgba(255,255,255,.18), 0 0 32px -6px rgba(255,255,255,.7), 0 18px 44px -30px #000}
