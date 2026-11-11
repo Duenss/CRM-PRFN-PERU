@@ -217,7 +217,10 @@ async function crearSesion(id, { onMensaje, onMensajePropio, onAck, log }) {
   const s = sesiones.get(id);
   const opciones = {
     authStrategy: new LocalAuth({ clientId: `sesion-${id}`, dataPath: config.sessionPath }),
-    webVersionCache: { type: 'none' },
+    webVersionCache: {
+      type: 'remote',
+      remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.1053990023-alpha.html'
+    },
     puppeteer: {
       headless: config.headless,
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
