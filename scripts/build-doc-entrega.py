@@ -164,7 +164,7 @@ doc.add_paragraph(
 )
 table(['Indicador', 'Resultado'],
       [['Estado del proyecto', 'Completado y en producción'],
-       ['Panel web', 'https://crm-prfn-peru.pages.dev'],
+       ['Panel web', 'https://crm.perfumeriafinaperu.com'],
        ['WhatsApp del bot', 'Conectado y funcionando'],
        ['Pruebas realizadas', '86 pruebas automáticas · 11 pruebas del panel · smoke test 7/7'],
        ['Seguridad', 'Acceso privado con usuario y contraseña, datos protegidos y copias de seguridad']],
@@ -282,7 +282,7 @@ doc.add_paragraph(
 
 # ---------- 11. CÓMO EMPEZAR ----------
 h1('11. Cómo empezar a usarlo')
-bullet(' https://crm-prfn-peru.pages.dev — ingresa con el correo y la contraseña que se te entregó por separado.', 'Abrir el panel:')
+bullet(' https://crm.perfumeriafinaperu.com — ingresa con el correo y la contraseña que se te entregó por separado.', 'Abrir el panel:')
 bullet(' Solo se hace una vez: Ajustes → Conectar WhatsApp → escanear el QR con el celular de la tienda.', 'Conectar WhatsApp:')
 bullet(' Ajustes → Horario: si quieres que el bot trabaje 24/7, deja inicio 0 y fin 24 (o pulsa “Poner 24/7”).', 'Horario 24/7:')
 bullet(' Agrega tus clientes (o impórtalos desde CSV), revisa el catálogo y envía tu primer anuncio.', 'Primeros pasos:')

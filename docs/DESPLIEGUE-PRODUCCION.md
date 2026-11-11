@@ -177,7 +177,7 @@ servidor de Cloudflare.
 4. En **Settings → Environment variables** agrega:
    - BOT_URL = http://157.173.192.178:25577
    - BOT_TOKEN = el token del bot (el mismo de /bot/.env)
-5. Deploy. La URL queda tipo https://crm-prfn-peru.pages.dev.
+5. Deploy. La URL queda tipo https://crm.perfumeriafinaperu.com.
 6. Abre el panel, inicia sesión con Supabase y en **Ajustes → Conexión** deja la
    **URL del bot vacía** y el **token vacío** (el proxy los pone).
 7. Escanea el QR en http://157.173.192.178:25577/panel (o usando el proxy:

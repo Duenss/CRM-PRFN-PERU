@@ -6,7 +6,7 @@ Resumen del estado del sistema al 10/11/2026.
 
 | Cosa | Dónde |
 |---|---|
-| Panel | https://crm-prfn-peru.pages.dev |
+| Panel | https://crm.perfumeriafinaperu.com |
 | Repo (privado) | https://github.com/Duenss/CRM-PRFN-PERU |
 | Bot (API) | http://node.sakurasmp.xyz:25577 |
 | Servidor | Pterodactyl · Sakura Host · ID 52 |
@@ -98,7 +98,7 @@ Mientras esas dos acciones no se hagan, el sistema queda operativo para el resto
 
 ## Estado final de entrega (10/11/2026)
 
-- **Panel:** https://crm-prfn-peru.pages.dev (login con el correo del dueño y contraseña entregada aparte).
+- **Panel:** https://crm.perfumeriafinaperu.com (login con el correo del dueño y contraseña entregada aparte).
 - **Diseño:** glass minimalista con destellos dorados, login con imágenes de la marca, Bandeja con tarjetas y marcos de glow blanco, Inicio con KPIs (promos, conversaciones, campañas programadas, mensajes enviados hoy).
 - **Video:** versión compatible con WhatsApp (H.264 Main + AAC, 652 KB) y reintento automático de entrega.
 - **Datos limpios:** 0 clientes, 0 mensajes, 0 campañas, 0 envíos, 0 pedidos, 0 chats. Se conservan 202 productos, 11 plantillas, configuración, bienvenida (510 caracteres), PDF y video.

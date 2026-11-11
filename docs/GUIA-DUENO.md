@@ -1,7 +1,7 @@
 # Guía del dueño · CRM Perfumería Fina Perú
 
 Guía corta para usar el CRM en el día a día. El panel vive en
-**https://crm-prfn-peru.pages.dev** y se entra con el correo y contraseña de Supabase
+**https://crm.perfumeriafinaperu.com** y se entra con el correo y contraseña de Supabase
 (`perfumeriafinaperu@gmail.com`).
 
 ---

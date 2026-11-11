@@ -1,6 +1,6 @@
 # Verificación del panel (pruebas reales con navegador)
 
-Fecha: 10/11/2026 · Panel: https://crm-prfn-peru.pages.dev · Bot: Pterodactyl (servidor 52)
+Fecha: 10/11/2026 · Panel: https://crm.perfumeriafinaperu.com · Bot: Pterodactyl (servidor 52)
 
 Todas las pruebas se hicieron con el **usuario real del dueño** y se limpiaron los datos
 temporales al terminar (la base queda en 0 clientes / 0 campañas / 0 envíos / 0 mensajes

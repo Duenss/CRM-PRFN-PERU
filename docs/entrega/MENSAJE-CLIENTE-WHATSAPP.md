@@ -27,4 +27,6 @@ Hola [Nombre] 👋 Ya está listo el sistema completo que estuvimos preparando. 
 
 📎 A continuación te envío un *PDF detallado* con el funcionamiento de cada módulo, cómo usar cada uno y lo que se va a ahorrar con la secretaria automática.
 
+🌐 *Panel del CRM:* https://crm.perfumeriafinaperu.com
+
 Quedo atento a cualquier consulta 🙌
