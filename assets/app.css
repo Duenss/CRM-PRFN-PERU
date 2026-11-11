@@ -647,3 +647,6 @@ button:not(.ghost):not(.iconbtn):not(.toplogo):not(.chipstatus):not(.ai){}
 .in-item .ib .tipo{display:none}
 .in-item .ib b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .in-item .ib small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.more-chats{width:100%;margin:.4rem 0 .2rem;padding:.6rem;border-radius:12px;border:1px dashed rgba(221,183,95,.35);background:rgba(255,255,255,.02);color:var(--gold);font:inherit;font-size:.8rem;cursor:pointer;transition:background .2s, border-color .2s}
+.more-chats:hover{background:rgba(221,183,95,.08);border-color:rgba(221,183,95,.6)}

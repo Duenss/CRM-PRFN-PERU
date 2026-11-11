@@ -12,7 +12,7 @@ const archivoBak = archivo + '.bak';
 const INTERVALO_BAK = 5 * 60 * 1000;
 let ultimoBak = 0;
 
-const MAX_CHATS = 400;
+const MAX_CHATS = 60000;
 const MAX_MENSAJES = 500;
 
 /** Lee un JSON de conversaciones; devuelve null si no existe o está corrupto. */
@@ -427,6 +427,47 @@ export function listar(limite = 40) {
       waId: c.waId || '',
       wa: !!c.wa
     }));
+}
+
+/** Búsqueda y paginación para la Bandeja (soporta miles de chats). */
+export function buscar({ limite = 80, offset = 0, q = '', filtro = 'todos' } = {}) {
+  const texto = String(q || '').toLowerCase().trim();
+  const serializar = c => ({
+    telefono: c.telefono,
+    nombre: c.nombre,
+    nombreWa: c.nombreWa || '',
+    nombreGuardado: c.nombreGuardado || '',
+    esEmpresa: c.esEmpresa === true,
+    tipo: c.tipo || '',
+    clienteId: c.clienteId,
+    noLeidos: c.noLeidos || 0,
+    ultimoTexto: c.ultimoTexto,
+    ultimoEn: c.ultimoEn,
+    total: c.mensajes.length,
+    pin: !!c.pin,
+    fijado: !!(c.fijado || c.pin),
+    grupo: c.grupo === true,
+    archivado: c.archivado === true,
+    propio: c.propio === true,
+    waId: c.waId || '',
+    wa: !!c.wa
+  });
+  let arr = Object.values(chats).filter(c => {
+    if (filtro === 'noLeidos' && !((c.noLeidos || 0) > 0)) return false;
+    if (filtro === 'fijados' && !(c.fijado || c.pin)) return false;
+    if (filtro === 'personas' && (c.grupo || c.tipo !== 'persona')) return false;
+    if (filtro === 'empresas' && c.tipo !== 'empresa') return false;
+    if (texto) {
+      const blob = [c.nombre, c.nombreWa, c.nombreGuardado, c.telefono, c.ultimoTexto].join(' ').toLowerCase();
+      if (!blob.includes(texto)) return false;
+    }
+    return true;
+  });
+  arr.sort((a, b) => (Number(!!b.pin) - Number(!!a.pin)) || (tiempo(b) - tiempo(a)));
+  const total = arr.length;
+  const desde = Math.max(0, Number(offset) || 0);
+  const items = arr.slice(desde, desde + limite).map(serializar);
+  return { items, total, hasMore: desde + items.length < total };
 }
 
 export function obtener(telefono) {

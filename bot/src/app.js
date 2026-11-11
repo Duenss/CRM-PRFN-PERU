@@ -10,7 +10,7 @@ import { Cola, dormir, esperaEntreEnvios } from './queue.js';
 import { estadoIA, actualizarIA, pausarIA, estaPausado, promptIA, resumenIA } from './ia.js';
 import { estadoAjustes, actualizarAjustes, esperaMasivaMs, esperaChatMs } from './ajustes.js';
 import { oculto, ocultar, limpiar as limpiarOcultos } from './ocultos.js';
-import { registrar, listar, obtener, marcarLeido, respuestasIA, porDia, resumen as resumenChats, registrarCabecera, importarMensajes, yaExisteWa, actualizarAck, mensajesEntrantes, eliminar as eliminarConversacion, fijar as fijarChat, archivar as archivarChat, vaciar as vaciarConversaciones, flush as flushConversaciones } from './conversaciones.js';
+import { registrar, listar, buscar, obtener, marcarLeido, respuestasIA, porDia, resumen as resumenChats, registrarCabecera, importarMensajes, yaExisteWa, actualizarAck, mensajesEntrantes, eliminar as eliminarConversacion, fijar as fijarChat, archivar as archivarChat, vaciar as vaciarConversaciones, flush as flushConversaciones } from './conversaciones.js';
 import * as pedidos from './pedidos.js';
 import * as anuncios from './anuncios.js';
 // (Las plantillas de pago se eliminaron: las billeteras digitales las verifica el admin.)
@@ -2151,7 +2151,7 @@ async function sincronizarChatsDesdeWhatsApp(sesionId = null) {
   if (estadoAjustes().importarChats === false) {
     return { lista: [], chats: 0, grupos: 0, sinNumero: 0, omitido: true };
   }
-  const lista = await conTimeout(listarChatsWa(sesionId), 90000, 'listar chats de WhatsApp');
+  const lista = await conTimeout(listarChatsWa(sesionId), 240000, 'listar chats de WhatsApp');
   const propios = estadoWa().map(s => String(s.numero || '')).filter(Boolean);
   let chats = 0, grupos = 0, sinNumero = 0, archivados = 0, sinConversacion = 0;
   for (const c of lista) {
@@ -2190,12 +2190,18 @@ async function sincronizarChatsDesdeWhatsApp(sesionId = null) {
   return { lista, chats, grupos, sinNumero, archivados, sinConversacion };
 }
 
+let sincronizacionEnCurso = false;
 app.post('/api/sincronizar', auth, async (req, res) => {
   if (!config.modoPrueba && !sesionDisponible(req.body?.sesion || null)) {
     return res.status(503).json({ error: 'Ningún WhatsApp está conectado.' });
   }
+  if (sincronizacionEnCurso) return res.json({ ok: true, enCurso: true });
   const hacerChats = req.body?.chats !== false;
   const hacerContactos = req.body?.contactos !== false;
+  // Cuentas grandes (miles de chats/contactos) pueden tardar más que el proxy:
+  // se responde de inmediato y el trabajo sigue en segundo plano.
+  sincronizacionEnCurso = true;
+  res.json({ ok: true, enCurso: true, chats: 0, contactosNuevos: 0, contactosExistentes: 0 });
   const salida = { ok: true, chats: 0, chatsTotal: 0, contactos: 0, contactosNuevos: 0, contactosExistentes: 0 };
   try {
     if (hacerChats) {
@@ -2228,12 +2234,12 @@ app.post('/api/sincronizar', auth, async (req, res) => {
     }
     if (hacerContactos) {
       if (!sb) return res.status(503).json({ error: 'Falta SUPABASE_SERVICE_ROLE_KEY en el bot.' });
-      const contactos = await conTimeout(listarContactosWa(req.body?.sesion || null), 50000, 'listar contactos de WhatsApp');
+      const contactos = await conTimeout(listarContactosWa(req.body?.sesion || null), 300000, 'listar contactos de WhatsApp');
       salida.contactos = contactos.length;
       const actuales = await getClientes();
       const existentes = new Set(actuales.map(c => c.telefono));
       const nuevos = contactos
-        .filter(c => esNumeroPeru(c.telefono) && !existentes.has(c.telefono))
+        .filter(c => /^\d{8,15}$/.test(String(c.telefono || '')) && !existentes.has(c.telefono))
         .map(c => ({
           nombre: c.nombre || `+${c.telefono}`,
           telefono: c.telefono,
@@ -2241,16 +2247,16 @@ app.post('/api/sincronizar', auth, async (req, res) => {
           consentimiento: false,
           etiquetas: []
         }));
-      salida.contactosExistentes = contactos.filter(c => esNumeroPeru(c.telefono)).length - nuevos.length;
+      salida.contactosExistentes = contactos.filter(c => /^\d{8,15}$/.test(String(c.telefono || ''))).length - nuevos.length;
       const r = await importarClientes(nuevos);
       salida.contactosNuevos = r.insertados;
     }
     log(`Sincronización: ${salida.chats} chats · ${salida.contactosNuevos} contactos nuevos (de ${salida.contactos}).`);
     emitir('sync', { motivo: 'manual', chats: salida.chats, total: salida.chatsTotal || salida.chats });
-    res.json(salida);
   } catch (e) {
     log('Error al sincronizar: ' + (e?.stack || e?.message || e));
-    res.status(500).json({ error: e.message });
+  } finally {
+    sincronizacionEnCurso = false;
   }
 });
 
@@ -2272,7 +2278,7 @@ app.post('/api/conversaciones/:telefono/importar', auth, async (req, res) => {
 
 /* ---------------- Bandeja (router) ---------------- */
 registrarConversaciones(app, {
-  auth, normalizar, listar, obtener, marcarLeido, estadoIA, seguimiento, pedidos,
+  auth, normalizar, listar, buscar, obtener, marcarLeido, estadoIA, seguimiento, pedidos,
   resumenChats, getClientes, getCliente, config, sesionDisponible, enviar,
   logMensaje, registrar, log
 });

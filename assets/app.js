@@ -1152,6 +1152,16 @@ async function sincronizar(opts = {}) {
       body: JSON.stringify({ chats, contactos }),
       timeoutMs: 120000
     });
+    if (j.enCurso) {
+      toast('Sincronización iniciada en segundo plano. Con miles de chats puede tardar varios minutos.');
+      if (estado) estado.textContent = 'Sincronizando en segundo plano… puedes seguir usando el panel.';
+      setTimeout(async () => {
+        if (origen === 'bandeja') cargarBandeja({ reset: true });
+        if (contactos && typeof load === 'function') await load();
+      }, 20000);
+      setTimeout(() => { if (origen === 'bandeja') cargarBandeja({ reset: true }); }, 60000);
+      return;
+    }
     const partes = [];
     if (chats) partes.push(`${j.chats} chats en la Bandeja`);
     if (contactos) partes.push(`${j.contactosNuevos} contactos nuevos (${j.contactosExistentes} ya existían)`);
@@ -1255,23 +1265,33 @@ async function refrescarChip(){
 $('#wa-chip')?.addEventListener('click',()=>irTab('bot'));
 
 /* ---------- bandeja de entrada ---------- */
-let inChats=[],inTel=null,inPausados=new Set(),inIAactiva=true,bandejaCargada=false,inFiltro='todos';
+let inChats=[],inTel=null,inPausados=new Set(),inIAactiva=true,bandejaCargada=false,inFiltro='todos',inTotal=0,inHasMore=false,inBuscando=false;
 function actualizarBadge(n){
   const b=$('#unread-badge');if(!b)return;
   b.hidden=!n;b.textContent=n>99?'99+':n;
   document.title=(n?('('+(n>99?'99+':n)+') '):'')+'Panel · Perfumería Fina Perú';
 }
-async function cargarBandeja(){
+async function cargarBandeja({reset=false,append=false}={}){
   const l=$('#in-list');if(!l)return;
+  if(inBuscando)return;
+  inBuscando=true;
   const prev = bandejaCargada ? new Map(inChats.map(c=>[String(c.telefono),{no:c.noLeidos||0}])) : null;
+  if(reset){inChats=[];inTotal=0;inHasMore=false;}
   try{
-    const j=await botFetch('/api/conversaciones?limite=80');
-    inChats=j.conversaciones||[];inPausados=new Set((j.ia?.pausados||[]).map(p=>p.telefono));
+    const q=($('#in-q')?.value||'').trim();
+    const offset=append?inChats.length:0;
+    const url='/api/conversaciones?limite=80&offset='+offset+'&filtro='+encodeURIComponent(inFiltro)+'&q='+encodeURIComponent(q);
+    const j=await botFetch(url);
+    const lista=j.conversaciones||[];
+    inChats=append?[...inChats,...lista.filter(c=>!inChats.some(x=>x.telefono===c.telefono))]:lista;
+    inTotal=Number.isFinite(j.total)?j.total:(j.resumen?.chats||inChats.length);
+    inHasMore=!!j.hasMore;
+    inPausados=new Set((j.ia?.pausados||[]).map(p=>p.telefono));
     inIAactiva=j.ia?.activa!==false;
     guardarUltimo('bandeja',j);
     // Respaldo si el SSE estuviera caído: detecta no leídos nuevos por polling.
-    if(prev&&!SSE_ABIERTO){
-      const hayNuevo=(j.conversaciones||[]).some(c=>{
+    if(prev&&!SSE_ABIERTO&&!append){
+      const hayNuevo=lista.some(c=>{
         const p=prev.get(String(c.telefono));
         return p ? (c.noLeidos||0)>p.no : (c.noLeidos||0)>0;
       });
@@ -1294,7 +1314,7 @@ async function cargarBandeja(){
     }else if(!inChats.length){
       l.innerHTML='<p class="empty" style="padding:1rem">No se pudo cargar. Revisa que el bot esté encendido.</p>';
     }
-  }
+  }finally{inBuscando=false;}
 }
 function innerFilaChat(c){
   const nomBase=c.nombreWa||c.nombre||('+'+c.telefono);
@@ -1333,6 +1353,7 @@ function pintarLista(){
   }
   html+=[...fijados,...normales].map(filaChatHTML).join('');
   if(!html)html='<p class="empty" style="padding:1rem">Sin chats con este filtro.</p>';
+  if(inHasMore)html+=`<button class="more-chats" type="button" data-more="1">Cargar más · ${inChats.length} de ${inTotal}</button>`;
   if(cont.dataset.sig===html)return;
   cont.dataset.sig=html;
   cont.innerHTML=html;
@@ -1582,7 +1603,7 @@ $('#in-filtros')?.addEventListener('click',e=>{
   const b=e.target.closest('[data-inf]');if(!b)return;
   inFiltro=b.dataset.inf;
   $('#in-filtros').querySelectorAll('[data-inf]').forEach(x=>x.classList.toggle('on',x===b));
-  pintarLista();
+  cargarBandeja({reset:true});
 });
 $('#in-list')?.addEventListener('click',async e=>{
   const pin=e.target.closest('[data-pin]');
@@ -1613,9 +1634,15 @@ $('#in-list')?.addEventListener('click',async e=>{
     }catch(err){toast('No se pudo quitar: '+err.message,'error')}
     return;
   }
+  if(e.target.closest('[data-more]')){cargarBandeja({append:true});return;}
   const it=e.target.closest('[data-tel]');if(it)abrirChat(it.dataset.tel);
 });
-$('#in-q')?.addEventListener('input',pintarLista);
+let inQTimer=null;
+$('#in-q')?.addEventListener('input',()=>{
+  pintarLista();
+  clearTimeout(inQTimer);
+  inQTimer=setTimeout(()=>cargarBandeja({reset:true}),450);
+});
 $('#in-refresh')?.addEventListener('click',cargarBandeja);
 $('#in-pause')?.addEventListener('click',togglePausa);
 $('#in-form')?.addEventListener('submit',async e=>{

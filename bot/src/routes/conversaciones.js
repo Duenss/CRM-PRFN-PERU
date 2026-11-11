@@ -1,7 +1,7 @@
 // Router de la bandeja de entrada: clientes, conversaciones y envío manual.
 export function registrarConversaciones(app, ctx) {
   const {
-    auth, normalizar, listar, obtener, marcarLeido, estadoIA,
+    auth, normalizar, listar, buscar, obtener, marcarLeido, estadoIA,
     seguimiento, pedidos, resumenChats, getClientes, getCliente,
     config, sesionDisponible, enviar, logMensaje, registrar, log
   } = ctx;
@@ -15,16 +15,23 @@ export function registrarConversaciones(app, ctx) {
   });
 
   app.get('/api/conversaciones', auth, (req, res) => {
-    const limite = Math.min(100, Math.max(1, Number(req.query.limite) || 40));
+    const limite = Math.min(200, Math.max(1, Number(req.query.limite) || 80));
+    const offset = Math.max(0, Number(req.query.offset) || 0);
+    const q = String(req.query.q || '').trim();
+    const filtro = ['todos', 'noLeidos', 'fijados', 'personas', 'empresas'].includes(req.query.filtro)
+      ? req.query.filtro : 'todos';
     const ia = estadoIA();
     const pausados = new Set(ia.pausados.map(p => p.telefono));
+    const pagina = buscar({ limite, offset, q, filtro });
     res.json({
-      conversaciones: listar(limite).map(c => ({
+      conversaciones: pagina.items.map(c => ({
         ...c,
         pausado: pausados.has(c.telefono),
         seguimiento: seguimiento.estaActivo(c.telefono),
         etiquetas: pedidos.etiquetasChat(c.telefono)
       })),
+      total: pagina.total,
+      hasMore: pagina.hasMore,
       resumen: resumenChats(),
       ia: { activa: ia.activa, autoRespuesta: ia.autoRespuesta, pausadas: ia.pausados }
     });
