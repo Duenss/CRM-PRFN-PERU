@@ -1111,6 +1111,36 @@ async function cargarQrImagen(sesionId,img){
   qrBloque=bloque;
   img.src=qrBlobUrl;
 }
+function abrirInvoice(id){
+  const p=[...leerPedidosLocales().map(x=>({...x,local:true})),...pedidosCache].find(x=>String(x.id)===String(id));
+  if(!p)return toast('Pedido no encontrado.','error');
+  const items=(p.items||[]).map(it=>`<tr><td>${esc(it.nombre)}</td><td>${it.ml} ml</td><td style="text-align:center">${it.cantidad}</td><td style="text-align:right">S/ ${Number(it.precio).toFixed(2)}</td><td style="text-align:right">S/ ${(Number(it.precio)*Number(it.cantidad)).toFixed(2)}</td></tr>`).join('');
+  const fecha=p.creado?new Date(p.creado).toLocaleString('es-PE'):fmtFechaHora(p.actualizado);
+  const body=$('#inv-body');if(!body)return;
+  body.innerHTML=`
+    <div class="inv-head">
+      <div><h2>Perfumería Fina Perú</h2><small>Aromas que fascinan · RUC/DNI: ________</small></div>
+      <div class="inv-num"><b>RECIBO ${esc(p.id)}</b><small>${esc(fecha)}</small></div>
+    </div>
+    <div class="inv-grid">
+      <div><small>Cliente</small><b>${esc(p.nombre||('+'+p.telefono))}</b><small>+${esc(p.telefono)}</small></div>
+      <div><small>Entrega</small><b>${p.entrega==='estacion'?('Recojo: '+esc(p.estacion||'estación')):p.entrega==='delivery'?'Delivery':'Por definir'}</b><small>${p.fechaEntrega?esc(p.fechaEntrega)+' '+esc(horaTxt(p.horaEntrega)):'—'}</small></div>
+      <div><small>Método de pago</small><b>${metodoTxt(p.metodo)}</b><small>Estado: ${esc(ESTADO_TXT[p.estado]||p.estado)}</small></div>
+    </div>
+    <table class="inv-table"><thead><tr><th>Producto</th><th>Tamaño</th><th>Cant.</th><th>Precio</th><th>Subtotal</th></tr></thead><tbody>${items||'<tr><td colspan="5">Sin productos</td></tr>'}</tbody></table>
+    <div class="inv-tot">
+      <div><span>Total</span><b>S/ ${Number(p.total||0).toFixed(2)}</b></div>
+      ${p.adelanto?`<div><span>Adelanto</span><b>S/ ${Number(p.adelanto).toFixed(2)}</b></div>`:''}
+      <div class="inv-saldo"><span>Saldo</span><b>S/ ${Number(p.saldo||0).toFixed(2)}</b></div>
+    </div>
+    ${p.notas?`<p class="inv-nota">Notas: ${esc(p.notas)}</p>`:''}
+    <p class="inv-foot">¡Gracias por tu compra! 🌸 Perfumería Fina Perú · WhatsApp +51 910 418 951</p>`;
+  const dlg=$('#dlgInvoice');if(dlg&&!dlg.open)dlg.showModal();
+}
+$('#inv-x')?.addEventListener('click',()=>$('#dlgInvoice')?.close());
+$('#inv-print')?.addEventListener('click',()=>window.print());
+$('#pe-list')?.addEventListener('click',e=>{const inv=e.target.closest('[data-inv]');if(inv){abrirInvoice(inv.dataset.inv);}});
+
 async function abrirComprobante(archivo){
   try{
     const blob=await botBlob('/api/media/comprobantes/'+encodeURIComponent(archivo),{timeoutMs:15000});
@@ -1765,6 +1795,7 @@ function renderPedidos(j){
       </div>
       <div class="acts" style="justify-content:flex-end;flex-wrap:wrap">
         <button class="ghost" data-ver-chat="${esc(p.telefono)}" type="button">Chat</button>
+        <button class="ghost" data-inv="${esc(p.id)}" type="button">🧾 Invoice</button>
         ${comp?`<button class="ghost" data-comp="${esc(p.id)}" type="button">Comprobante</button>`:''}
         ${p.estado==='comprobante_recibido'?`<button data-verificar="${esc(p.id)}" type="button">Verificar pago</button><button class="ghost" data-rechazar="${esc(p.id)}" type="button">Rechazar</button>`:''}
         ${p.estado==='por_entregar'?`<button data-entregar="${esc(p.id)}" type="button">Marcar entregado</button>`:''}

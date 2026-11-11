@@ -988,9 +988,9 @@ export async function historialWa(telefono, limite = 50, sesionId = null) {
     if (!chat) return null;
     let lista = (chat.msgs && chat.msgs.getModelsArray && chat.msgs.getModelsArray()) || [];
     lista = lista.filter(filtro);
-    const tope = Math.min(100, Math.max(1, limite));
+    const tope = Math.min(160, Math.max(1, limite));
     let vueltas = 0;
-    while (lista.length < tope && vueltas < 8) {
+    while (lista.length < tope && vueltas < 14) {
       vueltas++;
       try {
         const cargados = await W.require('WAWebChatLoadMessages').loadEarlierMsgs({ chat });

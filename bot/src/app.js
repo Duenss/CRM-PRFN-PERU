@@ -1413,25 +1413,37 @@ async function manejarAck(msg, ack, sesionId = null) {
   }
 }
 
-/** Resume el estilo de escritura del cliente en este chat para imitarlo. */
+/** Analiza a fondo el estilo de escritura de este chat (cliente y negocio). */
 const estiloCache = new Map();
 function estiloDelChat(tel) {
   try {
     const chat = obtener(tel);
     if (!chat) return '';
-    const msgs = (chat.mensajes || []).filter(m => m.direccion === 'entrante' && String(m.texto || '').trim());
-    if (msgs.length < 3) return '';
-    const muestra = msgs.slice(-40);
-    const txt = muestra.map(m => m.texto).join('\n');
-    const emojis = txt.match(/\p{Extended_Pictographic}/gu) || [];
-    const unicos = [...new Set(emojis)].slice(0, 6).join(' ');
-    const conVineta = (txt.match(/^[•\-\*]\s/mg) || []).length;
-    const promedio = Math.round(txt.length / muestra.length);
-    let estilo = '';
-    if (emojis.length) estilo += `Usa emojis (${unicos}). `;
-    if (conVineta) estilo += 'Escribe con viñetas. ';
-    estilo += `Mensajes de ~${promedio} caracteres. `;
-    return estilo ? `Estilo aprendido de esta conversación: ${estilo}Responde imitando ese estilo (emojis y viñetas cuando encajen), sin exagerar.` : '';
+    const todos = chat.mensajes || [];
+    const entrantes = todos.filter(m => m.direccion === 'entrante' && String(m.texto || '').trim()).slice(-80);
+    const humanos = todos.filter(m => m.direccion === 'saliente' && ['panel', 'cliente'].includes(String(m.origen || '')) && String(m.texto || '').trim()).slice(-40);
+    if (entrantes.length < 2 && humanos.length < 2) return '';
+    const analizar = (msgs) => {
+      const txt = msgs.map(m => String(m.texto)).join('\n');
+      const emojis = [...new Set(txt.match(/\p{Extended_Pictographic}/gu) || [])].slice(0, 8);
+      const bullets = (txt.match(/^[•\-\*]\s/mg) || []).length;
+      const promedio = Math.round(msgs.reduce((n, m) => n + String(m.texto).length, 0) / Math.max(1, msgs.length));
+      const exclamaciones = (txt.match(/!/g) || []).length;
+      return { emojis, bullets, promedio, exclamaciones };
+    };
+    const cli = analizar(entrantes);
+    const neg = humanos.length ? analizar(humanos) : null;
+    let s = '';
+    if (cli.emojis.length) s += `El cliente escribe con emojis (${cli.emojis.join(' ')}). `;
+    if (cli.bullets) s += 'El cliente suele usar viñetas. ';
+    s += `Mensajes del cliente de ~${cli.promedio} caracteres. `;
+    if (cli.exclamaciones >= 2) s += 'Usa exclamaciones. ';
+    if (neg) {
+      if (neg.emojis.length) s += `El negocio responde con emojis (${neg.emojis.slice(0, 6).join(' ')}). `;
+      s += `Mensajes del negocio de ~${neg.promedio} caracteres${neg.bullets ? ', con viñetas' : ''}. `;
+    }
+    s += 'Imita ese estilo (emojis y viñetas cuando encajen), cálido y breve, sin exagerar.';
+    return `Estilo aprendido de esta conversación (analizados ${entrantes.length + humanos.length} mensajes): ${s}`;
   } catch { return ''; }
 }
 
@@ -1525,7 +1537,7 @@ async function manejarMensaje(msg, sesionId = null) {
   }
 
   const cliente = await getCliente(tel);
-  const hist = await historial(tel, 8);
+  const hist = await historial(tel, 12);
   const nombreChat = msg._data?.notifyName || cliente?.nombre || `+${tel}`;
   await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'entrante', texto, origen: 'cliente' });
   registrar({ telefono: tel, texto, direccion: 'entrante', nombre: nombreChat, clienteId: cliente?.id, origen: 'cliente', waId });
@@ -2703,7 +2715,7 @@ let historialesEnCurso = false;
 let bandejaVaciadaEn = 0;
 let historialesHechos = false;
 
-async function actualizarHistorialesConocidos({ limite = 100, maxChats = 150, forzar = false } = {}) {
+async function actualizarHistorialesConocidos({ limite = 160, maxChats = 250, forzar = false } = {}) {
   if (config.modoPrueba || historialesEnCurso || !hayConexion()) return;
   if (!forzar && Date.now() - bandejaVaciadaEn < 120000) return; // Bandeja recién vaciada
   historialesEnCurso = true;
@@ -2714,7 +2726,7 @@ async function actualizarHistorialesConocidos({ limite = 100, maxChats = 150, fo
       try {
         // Si el chat se borró mientras corría esta puesta al día, no se recrea.
         if (!obtener(c.telefono)) continue;
-        const msgs = await conTimeout(historialWa(c.telefono, limite), 30000, 'historial +' + c.telefono);
+        const msgs = await conTimeout(historialWa(c.telefono, limite), 45000, 'historial +' + c.telefono);
         if (msgs && msgs.length && obtener(c.telefono)) {
           const nuevos = importarMensajes(c.telefono, msgs);
           if (nuevos) actualizados++;

@@ -674,3 +674,23 @@ button:not(.ghost):not(.iconbtn):not(.toplogo):not(.chipstatus):not(.ai){}
 .in-filtros-row{display:flex;align-items:center;gap:.7rem;margin:.1rem 0 .55rem;flex-wrap:wrap}
 .in-filtros-row .seg{flex:0 0 auto}
 .in-filtros-row #in-filtro-info{font-size:.78rem}
+.inv-dlg{border:0;padding:0;background:transparent;max-width:min(820px,96vw);width:100%}
+.inv-dlg::backdrop{background:rgba(0,0,0,.65);backdrop-filter:blur(3px)}
+.inv-card{background:#0f141c;color:var(--ink);border:1px solid rgba(221,183,95,.28);border-radius:16px;padding:1.3rem 1.4rem;box-shadow:0 30px 80px -30px #000}
+.inv-head{display:flex;justify-content:space-between;gap:1rem;border-bottom:1px solid rgba(221,183,95,.25);padding-bottom:.8rem;margin-bottom:.9rem}
+.inv-head h2{margin:0;font-size:1.2rem}
+.inv-head small{display:block;color:var(--mute2);font-size:.72rem;margin-top:.2rem}
+.inv-num{text-align:right}
+.inv-num b{display:block;color:var(--gold);font-size:1rem}
+.inv-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.7rem;margin-bottom:.9rem}
+.inv-grid small{display:block;color:var(--mute2);font-size:.66rem;text-transform:uppercase;letter-spacing:.06em}
+.inv-grid b{display:block;font-size:.86rem;margin:.1rem 0}
+.inv-table{width:100%;border-collapse:collapse;font-size:.82rem}
+.inv-table th{color:var(--mute2);font-size:.66rem;text-transform:uppercase;text-align:left;padding:.35rem .4rem;border-bottom:1px solid rgba(255,255,255,.12)}
+.inv-table td{padding:.4rem;border-bottom:1px solid rgba(255,255,255,.06)}
+.inv-tot{display:flex;flex-direction:column;align-items:flex-end;gap:.2rem;margin-top:.8rem;font-size:.86rem}
+.inv-tot div{display:flex;gap:1rem;min-width:220px;justify-content:space-between}
+.inv-tot .inv-saldo{border-top:1px solid rgba(221,183,95,.3);margin-top:.25rem;padding-top:.3rem;color:var(--gold);font-size:1rem}
+.inv-nota{color:var(--mute2);font-size:.74rem;margin:.7rem 0 0}
+.inv-foot{color:var(--gold);font-size:.75rem;text-align:center;margin:1rem 0 0}
+@media print{body>*{display:none!important}#dlgInvoice{display:block!important;position:static;max-width:none;width:100%;margin:0;background:#fff}#dlgInvoice .inv-card{background:#fff;color:#111;border:0;box-shadow:none;padding:0}#dlgInvoice .acts{display:none!important}#dlgInvoice .inv-head small,#dlgInvoice .inv-grid small,#dlgInvoice .inv-table th{color:#555}#dlgInvoice .inv-num b,#dlgInvoice .inv-foot{color:#8a6d1f}#dlgInvoice .inv-table td{border-color:#ddd}}
