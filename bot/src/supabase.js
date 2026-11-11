@@ -21,8 +21,15 @@ export async function getCliente(telefono) {
 
 export async function getClientes() {
   if (!sb) return [];
-  const { data } = await sb.from('clientes').select('*');
-  return data || [];
+  const salida = [];
+  const paso = 1000;
+  for (let i = 0; i < 30; i++) {
+    const { data, error } = await sb.from('clientes').select('*').range(i * paso, (i + 1) * paso - 1);
+    if (error) { console.warn('[supabase] getClientes:', error.message); break; }
+    salida.push(...(data || []));
+    if (!data || data.length < paso) break;
+  }
+  return salida;
 }
 
 export async function getProductos() {

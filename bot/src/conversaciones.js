@@ -514,6 +514,28 @@ export function aplicarContactos(contactos = []) {
   guardar();
 }
 
+/** Completa nombres de chats numéricos usando la base de clientes del CRM. */
+export function aplicarNombresClientes(clientes = []) {
+  const mapa = new Map();
+  for (const cl of Array.isArray(clientes) ? clientes : []) {
+    const tel = limpiarTel(cl.telefono);
+    const nom = String(cl.nombre || '').trim();
+    if (!tel || !nom) continue;
+    if (/^\+?[\d\s\-()]+$/.test(nom)) continue;
+    mapa.set(tel, nom);
+  }
+  for (const tel of Object.keys(chats)) {
+    const nom = mapa.get(tel);
+    if (!nom) continue;
+    const ch = chats[tel];
+    if (!ch.nombre || /^\+?[\d\s\-()]+$/.test(String(ch.nombre))) {
+      ch.nombre = nom;
+      ch.nombreWa = nom;
+    }
+  }
+  guardar();
+}
+
 export function obtener(telefono) {
   const c = chats[limpiarTel(telefono)];
   if (!c) return null;
