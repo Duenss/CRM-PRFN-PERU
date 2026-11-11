@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config, validarConfig, esNumeroPeru, normalizar } from './config.js';
 import { sb, getCliente, getClientes, getProductos, logMensaje, historial, marcarBaja, importarClientes } from './supabase.js';
-import { iniciarWhatsApp, enviar, enviarImagen, enviarVideo, enviarArchivo, estadoWa, cerrarSesion, reiniciarSesion, hayConexion, sesionDisponible, listarChatsWa, listarContactosWa, historialWa, resolverTelefonoWa, idMensaje, descargarMediaWa, conTimeout } from './whatsapp.js';
+import { iniciarWhatsApp, enviar, enviarImagen, enviarVideo, enviarArchivo, estadoWa, cerrarSesion, reiniciarSesion, hayConexion, sesionDisponible, listarChatsWa, listarContactosWa, historialWa, resolverTelefonoWa, recordarDestinoWa, idMensaje, descargarMediaWa, conTimeout } from './whatsapp.js';
 import { redactarRespuesta, transcribirAudio, redactarBorradores, redactarBienvenida, redactarAnuncio, productoPorId, productoMencionado } from './ai.js';
 import { Cola, dormir, esperaEntreEnvios } from './queue.js';
 import { estadoIA, actualizarIA, pausarIA, estaPausado, promptIA, resumenIA } from './ia.js';
@@ -1471,8 +1471,11 @@ async function manejarMensaje(msg, sesionId = null) {
   if (chat.endsWith('@g.us') || chat === 'status@broadcast') return;
   let tel = normalizar(chat.split('@')[0]);
   if (!chat.endsWith('@c.us')) {
-    const real = await resolverTelefonoWa(chat, sesionId);
-    if (real) tel = real;
+    if (chat.endsWith('@lid')) recordarDestinoWa(tel, chat);
+    if (chat.endsWith('@lid') && !tel) {
+      const real = await resolverTelefonoWa(chat, sesionId);
+      if (real) tel = real;
+    }
   }
   if (!/^\d{8,15}$/.test(tel)) return;
 

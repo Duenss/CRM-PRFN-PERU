@@ -66,7 +66,9 @@ export function registrarConversaciones(app, ctx) {
     }
     try {
       const cliente = await getCliente(tel);
-      const env = await enviar(tel, texto, req.body?.sesion || null);
+      const chatLocal = obtener(tel);
+      const waId = (chatLocal && /@lid$/.test(String(chatLocal.waId || ''))) ? chatLocal.waId : '';
+      const env = await enviar(tel, texto, req.body?.sesion || null, waId ? { waId } : {});
       await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'saliente', texto, origen: 'panel' });
       registrar({
         telefono: tel,
