@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { config, validarConfig, esNumeroPeru, normalizar } from './config.js';
 import { sb, getCliente, getClientes, getProductos, logMensaje, historial, marcarBaja, importarClientes } from './supabase.js';
 import { iniciarWhatsApp, enviar, enviarImagen, enviarVideo, enviarArchivo, estadoWa, cerrarSesion, reiniciarSesion, hayConexion, sesionDisponible, listarChatsWa, listarContactosWa, historialWa, resolverTelefonoWa, idMensaje, descargarMediaWa, conTimeout } from './whatsapp.js';
-import { redactarRespuesta, transcribirAudio, redactarBorradores, redactarAnuncio, productoPorId, productoMencionado } from './ai.js';
+import { redactarRespuesta, transcribirAudio, redactarBorradores, redactarBienvenida, redactarAnuncio, productoPorId, productoMencionado } from './ai.js';
 import { Cola, dormir, esperaEntreEnvios } from './queue.js';
 import { estadoIA, actualizarIA, pausarIA, estaPausado, promptIA, resumenIA } from './ia.js';
 import { estadoAjustes, actualizarAjustes, esperaMasivaMs, esperaChatMs } from './ajustes.js';
@@ -1195,6 +1195,10 @@ async function enviarCampana(id) {
 
     const clientes = await getClientes();
     const mapa = new Map(clientes.map(c => [String(c.id), c]));
+    // Campaña marcada como "a todos": incluye clientes sin consentimiento
+    // (siempre respetando bajas e inactivos).
+    const paraTodos = Array.isArray(campana.segmento) && campana.segmento.includes('__TODOS__');
+    const elegibleCampana = c => c && c.activo !== false && !c.baja && (paraTodos || !!c.consentimiento);
     log(`Iniciando campaña "${campana.titulo}" con ${total} envíos pendientes.`);
     emitirProgresoCampana(campana, { enviados: 0, total, errores: 0 });
 
@@ -1207,7 +1211,7 @@ async function enviarCampana(id) {
       }
 
       const c = mapa.get(String(e.cliente_id));
-      if (!puede(c)) {
+      if (!elegibleCampana(c)) {
         await actualizarEnvio(e.id, { estado: 'omitido', fecha_envio: new Date().toISOString() }, 'marcar envío omitido');
         log(`Omitido: ${c?.nombre || e.cliente_id} (sin consentimiento, baja o inactivo).`);
         continue;
@@ -1989,6 +1993,16 @@ app.get('/api/campanas', auth, async (_req, res) => {
 app.get('/api/logs', auth, (_req, res) => res.json({ logs: logs.slice(-120) }));
 
 /* ---------------- Borradores de campaña con IA ---------------- */
+app.post('/api/ia/bienvenida', auth, async (req, res) => {
+  try {
+    const texto = await redactarBienvenida({ actual: req.body?.actual });
+    log('Mensaje de bienvenida generado con IA.');
+    res.json({ texto });
+  } catch (e) {
+    res.status(502).json({ error: 'No se pudo generar: ' + e.message });
+  }
+});
+
 app.post('/api/borradores', auth, async (req, res) => {
   try {
     const borradores = await redactarBorradores({

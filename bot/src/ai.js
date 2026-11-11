@@ -802,6 +802,60 @@ Reglas:
   return texto.slice(0, 1200);
 }
 
+/** Redacta un mensaje de bienvenida bonito (con emojis) usando la IA. */
+export async function redactarBienvenida({ actual = '' } = {}) {
+  const [cfg] = await Promise.all([getConfiguracion()]);
+  const tienda = cfg && typeof cfg === 'object' ? cfg : {};
+  const respaldo = () => {
+    const txt = `{saludo}, {nombre}. ✨ ¡Bienvenido(a) a *Perfumería Fina Perú*, aromas que fascinan! 🌸
+
+Nuestras fragancias son *equivalentes de alta calidad* con *50 % de esencia*, inspiradas en las casas perfumeras más reconocidas: buena fijación y en envase propio. 💎
+
+💳 En Lima aceptamos todos los medios de pago según tu preferencia: efectivo al recibir, Yape, Plin o transferencia.
+🚚 Envíos a Lima y provincia.
+
+📕 Te envío nuestro catálogo y video para que conozcas las fragancias. 🎬
+🌐 Web: https://www.perfumeriafinaperu.com`;
+    return txt.slice(0, 600);
+  };
+  if (!config.geminiKey && !config.groqKey) return respaldo();
+  const datosTienda = [
+    tienda.nombre && `Nombre: ${tienda.nombre}`,
+    tienda.tono_de_voz && `Tono: ${tienda.tono_de_voz}`,
+    tienda.medios_de_pago && `Pagos: ${tienda.medios_de_pago}`,
+    tienda.envios && `Envíos: ${tienda.envios}`,
+    tienda.enlace_web && `Web: ${tienda.enlace_web}`,
+    tienda.horario && `Horario: ${tienda.horario}`
+  ].filter(Boolean).join('\n') || 'Perfumería Fina Perú, perfumes equivalentes con 50 % de esencia.';
+
+  const prompt = `Redacta UN mensaje de bienvenida para WhatsApp del negocio "Perfumería Fina Perú".
+Datos:
+${datosTienda}
+
+Reglas obligatorias:
+- Empieza exactamente con {saludo}, {nombre}. (con coma y punto)
+- Máximo 560 caracteres en total.
+- Usa *negritas* de WhatsApp para frases clave.
+- Usa bastantes emojis (✨🌸💎🫧🎁🚚💳📕🌐) de forma elegante.
+- Menciona que las fragancias son equivalentes de alta calidad con *50 % de esencia*.
+- Menciona medios de pago (efectivo al recibir, Yape, Plin o transferencia) y envíos a Lima y provincia.
+- Di que le enviarás el catálogo y el video.
+- Termina con la web https://www.perfumeriafinaperu.com
+- Tono cálido, profesional y breve.
+- Devuelve SOLO el texto del mensaje (sin comillas ni explicaciones).
+
+Texto actual que puedes mejorar:
+${String(actual || '').slice(0, 700)}`;
+  try {
+    const raw = await gemini(prompt, { json: false, temperature: 0.9, maxOutputTokens: 700 });
+    const limpio = String(raw || '').replace(/^["'`\s]+|["'`\s]+$/g, '').trim();
+    return (limpio || respaldo()).slice(0, 600);
+  } catch (e) {
+    console.warn('[ia] bienvenida: se usa texto de respaldo:', e.message);
+    return respaldo();
+  }
+}
+
 export async function redactarBorradores({ objetivo = 'promo', condiciones = '', segmento = [], productos = [] } = {}) {
   const [cfg, todos] = await Promise.all([getConfiguracion(), getProductos()]);
   const ids = new Set((Array.isArray(productos) ? productos : []).map(x => String(x || '').trim()).filter(Boolean));

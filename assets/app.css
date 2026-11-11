@@ -661,3 +661,16 @@ button:not(.ghost):not(.iconbtn):not(.toplogo):not(.chipstatus):not(.ai){}
 .combo-list .opt small{display:block;color:var(--mute2);font-size:.7rem;margin-top:.1rem}
 .combo-list .combo-empty{padding:.55rem .65rem;color:var(--mute2);font-size:.8rem}
 .pe-prod-wrap .combo input{width:100%}
+
+/* Etiquetas de colores (más visibles) */
+.etag{font-size:.66rem;padding:.1rem .48rem;margin-left:.28rem;border-radius:99px;font-weight:600;
+  color:var(--gold);background:rgba(221,183,95,.14);border:1px solid rgba(221,183,95,.4)}
+.in-tags .etag{font-size:.72rem;padding:.14rem .55rem}
+.etag:nth-child(3n+2){color:#8db9ff;background:rgba(90,160,255,.14);border-color:rgba(90,160,255,.42)}
+.etag:nth-child(3n){color:var(--success);background:rgba(61,214,140,.13);border-color:rgba(61,214,140,.4)}
+.etag.dark,.etag.mute{color:var(--mute2);background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.14)}
+.tag{font-size:.72rem;padding:.1rem .5rem;font-weight:600;border-radius:99px;margin-left:.3rem;white-space:nowrap;
+  color:var(--gold);background:rgba(221,183,95,.13);border:1px solid rgba(221,183,95,.35)}
+.in-filtros-row{display:flex;align-items:center;gap:.7rem;margin:.1rem 0 .55rem;flex-wrap:wrap}
+.in-filtros-row .seg{flex:0 0 auto}
+.in-filtros-row #in-filtro-info{font-size:.78rem}

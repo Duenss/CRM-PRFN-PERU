@@ -129,7 +129,7 @@ refrescarSonido();
 
 /* UI de preferencias de sonido (Ajustes) */
 function pintarPreferenciasSonido(){
-  if($('#snd-vol'))$('#snd-vol').value=Math.round(volumen()*100);
+
   if($('#snd-entrante'))$('#snd-entrante').checked=suenaEvento('entrante');
   if($('#snd-derivacion'))$('#snd-derivacion').checked=suenaEvento('derivacion');
   if($('#snd-envio'))$('#snd-envio').checked=suenaEvento('envio');
@@ -137,7 +137,7 @@ function pintarPreferenciasSonido(){
 }
 function guardarPreferenciasSonido(){
   soundCfg={
-    vol:Math.min(1,Math.max(0,(Number($('#snd-vol')?.value)||0)/100)),
+    vol:1,
     ev:{
       ...(soundCfg.ev||{}),
       entrante:!!$('#snd-entrante')?.checked,
@@ -490,8 +490,9 @@ $('#k-add').onclick=()=>{
   const m=$('#k-msg');m.value+=(m.value&&!m.value.endsWith('\n')?'\n':'')+`• ${p.nombre} (inspirado en ${p.casa_inspirada||'—'}): equivalente, 50 ml S/ ${p.precio_50ml??'—'} · 100 ml S/ ${p.precio_100ml??'—'}`;
   prev();
 };
-const destinos=()=>{const s=tagsOf($('#k-seg').value);return clientes.filter(c=>puede(c)&&(!s.length||s.some(t=>(Array.isArray(c.etiquetas)?c.etiquetas:[]).map(x=>String(x).toLowerCase()).includes(t))))};
-function infoDest(){$('#k-info').textContent=`Se enviará a ${destinos().length} clientes que aceptaron promociones y no pidieron la baja.`}
+const destinos=()=>{const s=tagsOf($('#k-seg').value);const todos=!!$('#k-sin-consent')?.checked;return clientes.filter(c=>(todos?(c.activo!==false&&!c.baja):puede(c))&&(!s.length||s.some(t=>(Array.isArray(c.etiquetas)?c.etiquetas:[]).map(x=>String(x).toLowerCase()).includes(t))))};
+function infoDest(){const todos=!!$('#k-sin-consent')?.checked;$('#k-info').textContent=todos?`Se enviará a ${destinos().length} clientes (incluye sin consentimiento; no incluye bajas ni inactivos).`:`Se enviará a ${destinos().length} clientes que aceptaron promociones y no pidieron la baja.`}
+$('#k-sin-consent')?.addEventListener('change',infoDest);
 $('#k-seg').oninput=infoDest;
 
 $('#k-ai').onclick=async()=>{
@@ -529,7 +530,8 @@ async function crearCampana(estado){
   }
   sending=true;
   try{
-    const{data:k,error}=await sb.from('campanas').insert({titulo:tit,mensaje_final:msg+($('#k-baja').checked?BAJA:''),segmento:tagsOf($('#k-seg').value),fecha_programada:fecha,estado,numero_emisor:$('#k-num').value}).select().single();
+    const segmento=[...tagsOf($('#k-seg').value)];if($('#k-sin-consent')?.checked)segmento.push('__TODOS__');
+    const{data:k,error}=await sb.from('campanas').insert({titulo:tit,mensaje_final:msg+($('#k-baja').checked?BAJA:''),segmento,fecha_programada:fecha,estado,numero_emisor:$('#k-num').value}).select().single();
     if(error)throw error;
     const{error:e2}=await sb.from('envios').insert(dest.map(c=>({campana_id:k.id,cliente_id:c.id})));
     if(e2){
@@ -766,8 +768,8 @@ $('#cal-today').onclick=()=>{calCursor=new Date();calSel=hoyISO();renderCalendar
 /* ---------- bot ---------- */
 let botURL=localStorage.getItem('bot_url')??'';
 let botToken=localStorage.getItem('bot_token')||'';
-$('#b-url').value=botURL;$('#b-token').value=botToken;
-function guardarBot(){botURL=$('#b-url').value.trim().replace(/\/$/,'');botToken=$('#b-token').value.trim();localStorage.setItem('bot_url',botURL);localStorage.setItem('bot_token',botToken);conectarSSE()}
+
+function guardarBot(){conectarSSE()}
 /* Preferencia del envío manual: WhatsApp Web en este navegador o app de escritorio. */
 if($('#b-wa')){
   $('#b-wa').value=localStorage.getItem('wa_modo')==='app'?'app':'web';
@@ -956,8 +958,12 @@ async function cargarArchivosInfo(){
   try{
     const r=await botFetch('/api/archivos');
     const a=r.archivos||{};
-    if($('#aj-pdf-info'))$('#aj-pdf-info').textContent=a.pdf?.personalizado?('Actual: '+a.pdf.nombre+' · '+fmtBytes(a.pdf.bytes)):'Usando el PDF de fábrica.';
-    if($('#aj-video-info'))$('#aj-video-info').textContent=a.video?.personalizado?('Actual: '+a.video.nombre+' · '+fmtBytes(a.video.bytes)):'Usando el video de fábrica.';
+    const txtPdf=a.pdf?.personalizado?('Actual: '+a.pdf.nombre+' · '+fmtBytes(a.pdf.bytes)):'Usando el PDF de fábrica.';
+    const txtVid=a.video?.personalizado?('Actual: '+a.video.nombre+' · '+fmtBytes(a.video.bytes)):'Usando el video de fábrica.';
+    if($('#aj-pdf-info'))$('#aj-pdf-info').textContent=txtPdf;
+    if($('#aj-video-info'))$('#aj-video-info').textContent=txtVid;
+    if($('#bw-pdf-info'))$('#bw-pdf-info').textContent=txtPdf;
+    if($('#bw-video-info'))$('#bw-video-info').textContent=txtVid;
   }catch(e){/* si el bot está apagado se deja — */}
 }
 function leerArchivoBase64(file){
@@ -965,11 +971,13 @@ function leerArchivoBase64(file){
 }
 async function subirArchivoConfig(tipo,file){
   const infoEl=tipo==='pdf'?$('#aj-pdf-info'):$('#aj-video-info');
+  const infoBw=tipo==='pdf'?$('#bw-pdf-info'):$('#bw-video-info');
   if(infoEl)infoEl.textContent='Subiendo '+file.name+' ('+fmtBytes(file.size)+')…';
   try{
     const base64=await leerArchivoBase64(file);
     const r=await botFetch('/api/archivos/'+tipo,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre:file.name,base64}),timeoutMs:180000});
     if(infoEl)infoEl.textContent='Actualizado: '+r.nombre+' · '+fmtBytes(r.bytes);
+    if(infoBw)infoBw.textContent='Actualizado: '+r.nombre+' · '+fmtBytes(r.bytes);
     toast(tipo==='pdf'?'PDF del catálogo actualizado':'Video actualizado');
   }catch(e){
     if(infoEl)infoEl.textContent='Error: '+e.message;
@@ -978,6 +986,8 @@ async function subirArchivoConfig(tipo,file){
 }
 $('#aj-pdf-file')?.addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];if(f)subirArchivoConfig('pdf',f)});
 $('#aj-video-file')?.addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];if(f)subirArchivoConfig('video',f)});
+$('#bw-pdf-file')?.addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];if(f)subirArchivoConfig('pdf',f)});
+$('#bw-video-file')?.addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];if(f)subirArchivoConfig('video',f)});
 
 async function cargarAjustes(){
   try{
@@ -1038,7 +1048,7 @@ $('#b-clear-inbox')?.addEventListener('click',async()=>{
   }catch(e){toast('No se pudo vaciar: '+e.message,'error')}
   b.disabled=false;
 });
-$('#b-test').onclick=async()=>{
+if($('#b-test'))$('#b-test').onclick=async()=>{
   guardarBot();
   const s=$('#b-status');s.textContent='Comprobando…';
   try{
@@ -1049,7 +1059,7 @@ $('#b-test').onclick=async()=>{
       `<div class="muted" style="margin-top:.5rem">Cola: ${Number(j.cola)||0} · Programadas: ${Number(j.programadas)||0} · Auto-respuesta: ${j.autoRespuesta?'activa':'apagada'}${j.modoPrueba?' · MODO PRUEBA':''} · Hoy: ${j.enviadosHoy??0}${j.maxPorDia?'/'+j.maxPorDia:''}</div>`;
   }catch(e){s.innerHTML='<span class="status"><span class="dot off"></span>Sin conexión con el bot</span> <span class="muted">Enciéndelo y revisa la dirección.</span>'}
 };
-$('#b-open').onclick=()=>{guardarBot();toast('Conexión guardada')};
+if($('#b-open'))$('#b-open').onclick=()=>{guardarBot();toast('Conexión guardada')};
 
 /* ---------- registro del bot ---------- */
 async function cargarLogs(){
@@ -2018,6 +2028,7 @@ async function cargarBienvenida(){
     if($('#bw-video'))$('#bw-video').checked=a.enviarVideo===true;
     actualizarContadorBienvenida();renderPreviewBienvenida();
     if($('#bw-status'))$('#bw-status').textContent='Última actualización: '+(a.actualizado?fmtFechaHora(a.actualizado):'—');
+    cargarArchivosInfo();
   }catch(e){if($('#bw-status'))$('#bw-status').textContent='No se pudo cargar (revisa la conexión).'}
 }
 $('#bw-texto')?.addEventListener('input',()=>{actualizarContadorBienvenida();renderPreviewBienvenida()});
@@ -2033,6 +2044,18 @@ document.querySelectorAll('[data-bw-token]').forEach(b=>b.addEventListener('clic
 }));
 $('#bw-reset')?.addEventListener('click',()=>{const t=$('#bw-texto');if(t){t.value=BW_SUGERIDA;actualizarContadorBienvenida();renderPreviewBienvenida();toast('Texto sugerido restaurado (sin guardar)')}});
 $('#bw-refresh')?.addEventListener('click',cargarBienvenida);
+$('#bw-ia')?.addEventListener('click',async()=>{
+  const b=$('#bw-ia');if(!b)return;b.disabled=true;const antes=b.textContent;b.textContent='Generando…';
+  try{
+    const r=await botFetch('/api/ia/bienvenida',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({actual:$('#bw-texto')?.value||''})});
+    if(!r.texto)throw new Error('La IA no devolvió texto.');
+    if($('#bw-texto'))$('#bw-texto').value=r.texto;
+    actualizarContadorBienvenida();renderPreviewBienvenida();
+    if($('#bw-status'))$('#bw-status').textContent='Borrador generado con IA · revísalo y guarda.';
+    toast('Mensaje de bienvenida generado');
+  }catch(e){toast('No se pudo generar: '+e.message,'error')}
+  b.disabled=false;b.textContent=antes||'✨ Generar con IA';
+});
 $('#bw-save')?.addEventListener('click',async()=>{
   const b=$('#bw-save');b.disabled=true;
   try{

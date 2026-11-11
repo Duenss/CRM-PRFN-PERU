@@ -122,8 +122,9 @@
     <section class="tab" id="t-bandeja" hidden>
       <div class="pagehead">
         <div><h1>Bandeja de entrada</h1><p class="muted" id="in-sub">Conversaciones de WhatsApp en vivo.</p></div>
-        <div class="bar" style="margin:0"><div class="seg" id="in-filtros" role="group" aria-label="Filtrar chats"><button type="button" data-inf="todos" class="on">Todos</button><button type="button" data-inf="noLeidos">No leídos</button><button type="button" data-inf="fijados">Fijados</button><button type="button" data-inf="personas">Personas</button><button type="button" data-inf="empresas">Empresas</button></div><input id="in-q" type="search" placeholder="Buscar por nombre o número"><button class="ghost" id="in-notify" type="button" title="Activar sonido y notificaciones de derivaciones">Activar avisos</button><button class="ghost" id="in-sync" type="button">Sincronizar WhatsApp</button><button class="ghost" id="in-refresh" type="button">Actualizar</button><button class="ghost" id="in-pause" type="button" title="Pausar la IA en todos los chats">Pausar IA</button></div>
+        <div class="bar" style="margin:0"><input id="in-q" type="search" placeholder="Buscar por nombre o número"><button class="ghost" id="in-notify" type="button" title="Activar sonido y notificaciones de derivaciones">Activar avisos</button><button class="ghost" id="in-sync" type="button">Sincronizar WhatsApp</button><button class="ghost" id="in-refresh" type="button">Actualizar</button><button class="ghost" id="in-pause" type="button" title="Pausar la IA en todos los chats">Pausar IA</button></div>
       </div>
+      <div class="in-filtros-row"><div class="seg" id="in-filtros" role="group" aria-label="Filtrar chats"><button type="button" data-inf="todos" class="on">Todos</button><button type="button" data-inf="agregados">Agregados</button><button type="button" data-inf="noAgregados">No agregados</button></div><span class="muted" id="in-filtro-info"></span></div>
       <div class="inbox">
         <div class="in-list" id="in-list"><p class="empty" style="padding:1rem">Cargando…</p></div>
         <div class="in-chat">
@@ -317,6 +318,7 @@
             </div>
             <label class="ck"><input type="checkbox" id="k-baja" checked> Agregar aviso para darse de baja al final</label>
             <label for="k-seg">Enviar solo a clientes con etiqueta (separadas por coma; vacío = todos)</label><input id="k-seg" maxlength="200" placeholder="vip, mujer">
+            <label class="ck" style="margin-top:.45rem"><input type="checkbox" id="k-sin-consent"> <b>Enviar a TODOS</b> (incluye clientes sin consentimiento; respeta bajas e inactivos)</label>
             <p class="muted" id="k-info"></p>
             <div class="acts">
               <button class="ghost" id="k-manual" type="button">Preparar envío manual</button>
@@ -430,6 +432,11 @@
           </div>
           <label class="ck" style="display:flex;gap:.5rem;align-items:center;margin:.5rem 0 0"><input type="checkbox" id="bw-pdf" style="width:auto"> <span>Enviar el <b>PDF</b> con la bienvenida y el catálogo</span></label>
           <label class="ck" style="display:flex;gap:.5rem;align-items:center;margin:.2rem 0 .6rem"><input type="checkbox" id="bw-video" style="width:auto"> <span>Enviar el <b>video</b> con la bienvenida y el catálogo</span></label>
+          <div class="acts" style="margin-top:.2rem"><button class="ghost" id="bw-ia" type="button">✨ Generar con IA</button></div>
+          <div class="grid2" style="margin-top:.7rem">
+            <div><label for="bw-pdf-file">PDF del catálogo (máx. 20 MB)</label><input type="file" id="bw-pdf-file" accept="application/pdf"><p class="muted" id="bw-pdf-info" style="margin:.3rem 0 0">—</p></div>
+            <div><label for="bw-video-file">Video (máx. 60 MB)</label><input type="file" id="bw-video-file" accept="video/mp4,video/webm"><p class="muted" id="bw-video-info" style="margin:.3rem 0 0">—</p></div>
+          </div>
           <div class="acts"><button class="ghost" id="bw-reset" type="button">Restaurar texto sugerido</button><button id="bw-save" type="button">Guardar bienvenida</button></div>
           <p class="muted" id="bw-status" style="margin-top:.6rem">—</p>
         </div>
@@ -443,10 +450,8 @@
       <div class="pagehead"><div><h1>Ajustes de conexión</h1><p class="muted">Dirección del bot, estado del número y reglas de envío.</p></div></div>
       <div class="box">
         <h2>Conexión</h2>
-        <label for="b-url">Dirección del bot (API)</label><input id="b-url" placeholder="Vacío = proxy de Cloudflare Pages · local: http://localhost:3000">
-        <p class="muted" style="font-size:.78rem;margin:.2rem 0 .6rem">En Cloudflare Pages deja este campo <b>vacío</b> (usa el proxy <code>/api</code>). En local pon <code>http://localhost:3000</code>.</p>
-        <label for="b-token">Token del bot (opcional, si configuraste BOT_TOKEN)</label><input id="b-token" type="password" autocomplete="off">
-        <div class="acts"><button class="ghost" id="b-test" type="button">Probar conexión</button><button id="b-open" type="button">Guardar conexión</button></div>
+        <p class="muted" style="font-size:.82rem;margin-top:0">La dirección y el token del bot se configuran en <b>Cloudflare Pages</b>. Desde aquí solo puedes comprobar que el panel lo alcanza.</p>
+        <div class="acts" style="justify-content:flex-start"><button class="ghost" id="b-test" type="button">Probar conexión</button></div>
         <p id="b-status" class="muted" style="margin-top:1rem">Sin comprobar.</p>
       </div>
       <div class="box">
@@ -466,7 +471,7 @@
         <div class="acts" style="justify-content:flex-start"><button class="ghost" id="aj-247" type="button">Poner 24/7</button></div>
         <div class="acts"><button id="aj-save" type="button">Guardar límites y tiempos</button></div>
         <p class="muted" id="aj-status" style="margin-top:.6rem">—</p>
-        <div style="margin-top:1rem;border-top:1px solid var(--line);padding-top:.9rem">
+        <div hidden style="margin-top:1rem;border-top:1px solid var(--line);padding-top:.9rem">
           <h2 style="margin-top:0">Mensajes automáticos</h2>
           <label for="aj-bienvenida">Mensaje de bienvenida (usa <b>{saludo}</b> y <b>{nombre}</b>)</label>
           <textarea id="aj-bienvenida" rows="3" maxlength="600" placeholder="{saludo}, {nombre}. Nos alegra que hayas elegido a *Perfumería Fina Perú*…"></textarea>
@@ -481,9 +486,7 @@
       </div>
       <div class="box">
         <h2>Sonidos y avisos</h2>
-        <p class="muted" style="font-size:.8rem;margin-top:0">Volumen y eventos. Los sonidos se activan con el botón de bocina de la barra superior.</p>
-        <label for="snd-vol">Volumen</label>
-        <input id="snd-vol" type="range" min="0" max="100" step="5" style="width:100%">
+        <p class="muted" style="font-size:.8rem;margin-top:0">Eventos de sonido. Se activan con el botón de bocina de la barra superior (volumen máximo).</p>
         <div class="grid2" style="margin-top:.6rem">
           <label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" id="snd-entrante" style="width:auto"> <span>Mensaje entrante</span></label>
           <label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" id="snd-derivacion" style="width:auto"> <span>Derivación al dueño</span></label>
@@ -492,7 +495,7 @@
         </div>
         <div class="acts"><button class="ghost" id="snd-test" type="button">Probar sonido</button></div>
       </div>
-      <div class="box">
+      <div class="box" hidden>
         <h2>Mantenimiento de la Bandeja</h2>
         <p class="muted" style="font-size:.82rem;margin-top:0">Vacía los chats y el historial de mensajes para empezar de cero cuando cambies de número de WhatsApp. <b>No borra clientes, pedidos ni el catálogo.</b></p>
         <div class="acts"><button class="ghost" id="b-clear-inbox" type="button">Limpiar Bandeja</button></div>
@@ -505,7 +508,7 @@
         </select>
         <p class="muted" id="b-clear-status" style="margin-top:.5rem"></p>
       </div>
-      <div class="box">
+      <div class="box" hidden>
         <h2>Envío manual (botón WhatsApp)</h2>
         <p class="muted">Cuando uses <b>Enviar por WhatsApp</b> en Campañas, elige dónde abrirlo. En <b>Web</b> se abre en una pestaña de este mismo navegador: si ya iniciaste sesión de WhatsApp Web no te pedirá QR (solo la primera vez). En <b>App</b> se abre la aplicación de escritorio si la tienes instalada.</p>
         <label for="b-wa">Abrir en</label>

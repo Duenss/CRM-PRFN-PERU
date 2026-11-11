@@ -457,6 +457,9 @@ export function buscar({ limite = 80, offset = 0, q = '', filtro = 'todos' } = {
     if (filtro === 'fijados' && !(c.fijado || c.pin)) return false;
     if (filtro === 'personas' && (c.grupo || c.tipo !== 'persona')) return false;
     if (filtro === 'empresas' && c.tipo !== 'empresa') return false;
+    // "Agregado" = el número está guardado en la agenda del WhatsApp.
+    if (filtro === 'agregados' && !c.nombreGuardado) return false;
+    if (filtro === 'noAgregados' && c.nombreGuardado) return false;
     if (texto) {
       const blob = [c.nombre, c.nombreWa, c.nombreGuardado, c.telefono, c.ultimoTexto].join(' ').toLowerCase();
       if (!blob.includes(texto)) return false;
