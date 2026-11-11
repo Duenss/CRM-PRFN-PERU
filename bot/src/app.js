@@ -10,7 +10,7 @@ import { Cola, dormir, esperaEntreEnvios } from './queue.js';
 import { estadoIA, actualizarIA, pausarIA, estaPausado, promptIA, resumenIA } from './ia.js';
 import { estadoAjustes, actualizarAjustes, esperaMasivaMs, esperaChatMs } from './ajustes.js';
 import { oculto, ocultar, limpiar as limpiarOcultos } from './ocultos.js';
-import { registrar, listar, buscar, obtener, marcarLeido, respuestasIA, porDia, resumen as resumenChats, registrarCabecera, importarMensajes, yaExisteWa, actualizarAck, mensajesEntrantes, eliminar as eliminarConversacion, fijar as fijarChat, archivar as archivarChat, vaciar as vaciarConversaciones, flush as flushConversaciones } from './conversaciones.js';
+import { registrar, listar, buscar, marcarAgregados, obtener, marcarLeido, respuestasIA, porDia, resumen as resumenChats, registrarCabecera, importarMensajes, yaExisteWa, actualizarAck, mensajesEntrantes, eliminar as eliminarConversacion, fijar as fijarChat, archivar as archivarChat, vaciar as vaciarConversaciones, flush as flushConversaciones } from './conversaciones.js';
 import * as pedidos from './pedidos.js';
 import * as anuncios from './anuncios.js';
 // (Las plantillas de pago se eliminaron: las billeteras digitales las verifica el admin.)
@@ -2271,6 +2271,7 @@ app.post('/api/sincronizar', auth, async (req, res) => {
           etiquetas: []
         }));
       salida.contactosExistentes = aptos.length - nuevos.length;
+      try { marcarAgregados(contactos.map(c => c.telefono)); } catch (e) { log('No se pudieron marcar agregados: ' + e.message); }
       const r = await importarClientes(nuevos);
       salida.contactosNuevos = r.insertados;
       log(`Contactos de WhatsApp: ${contactos.length} totales · ${aptos.length} con formato Perú · ${r.insertados} nuevos importados.`);

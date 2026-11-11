@@ -458,8 +458,8 @@ export function buscar({ limite = 80, offset = 0, q = '', filtro = 'todos' } = {
     if (filtro === 'personas' && (c.grupo || c.tipo !== 'persona')) return false;
     if (filtro === 'empresas' && c.tipo !== 'empresa') return false;
     // "Agregado" = el número está guardado en la agenda del WhatsApp.
-    if (filtro === 'agregados' && !c.nombreGuardado) return false;
-    if (filtro === 'noAgregados' && c.nombreGuardado) return false;
+    if (filtro === 'agregados' && c.agregado !== true) return false;
+    if (filtro === 'noAgregados' && c.agregado === true) return false;
     if (texto) {
       const blob = [c.nombre, c.nombreWa, c.nombreGuardado, c.telefono, c.ultimoTexto].join(' ').toLowerCase();
       if (!blob.includes(texto)) return false;
@@ -471,6 +471,13 @@ export function buscar({ limite = 80, offset = 0, q = '', filtro = 'todos' } = {
   const desde = Math.max(0, Number(offset) || 0);
   const items = arr.slice(desde, desde + limite).map(serializar);
   return { items, total, hasMore: desde + items.length < total };
+}
+
+/** Marca qué chats tienen su número guardado en la agenda (contactos). */
+export function marcarAgregados(telefonos = []) {
+  const set = new Set((Array.isArray(telefonos) ? telefonos : []).map(t => limpiarTel(t)));
+  for (const tel of Object.keys(chats)) chats[tel].agregado = set.has(tel);
+  guardar();
 }
 
 export function obtener(telefono) {
