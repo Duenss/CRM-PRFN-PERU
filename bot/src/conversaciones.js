@@ -498,19 +498,18 @@ export function aplicarContactos(contactos = []) {
     const c = mapa.get(tel);
     if (!c) continue;
     const ch = chats[tel];
-    if (c.guardado === true) {
-      ch.agregado = true;
-      const nom = String(c.nombreGuardado || c.nombre || '').trim();
-      if (nom) {
-        if (!ch.nombreGuardado) ch.nombreGuardado = nom;
-        if (!ch.nombre || /^\+?[\d\s]+$/.test(String(ch.nombre))) {
-          ch.nombre = nom;
-          ch.nombreWa = nom;
-        }
+    const nom = String(c.nombreGuardado || c.nombre || '').trim();
+    // El nombre se aplica aunque el contacto no esté "guardado": sirve para
+    // que los chats viejos dejen de mostrarse como +51XXXXXXXXX.
+    if (nom && !/^\+?[\d\s\-()]+$/.test(nom)) {
+      if (!ch.nombre || /^\+?[\d\s\-()]+$/.test(String(ch.nombre))) {
+        ch.nombre = nom;
+        ch.nombreWa = nom;
       }
-    } else if (ch.agregado !== true) {
-      ch.agregado = false;
+      if (!ch.nombreGuardado) ch.nombreGuardado = nom;
     }
+    if (c.guardado === true) ch.agregado = true;
+    else if (ch.agregado !== true) ch.agregado = false;
   }
   guardar();
 }
