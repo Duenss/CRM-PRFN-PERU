@@ -1255,7 +1255,7 @@ async function refrescarChip(){
 $('#wa-chip')?.addEventListener('click',()=>irTab('bot'));
 
 /* ---------- bandeja de entrada ---------- */
-let inChats=[],inTel=null,inPausados=new Set(),inIAactiva=true,bandejaCargada=false;
+let inChats=[],inTel=null,inPausados=new Set(),inIAactiva=true,bandejaCargada=false,inFiltro='todos';
 function actualizarBadge(n){
   const b=$('#unread-badge');if(!b)return;
   b.hidden=!n;b.textContent=n>99?'99+':n;
@@ -1316,7 +1316,13 @@ let verArchivados=false;
 function pintarLista(){
   const cont=$('#in-list');if(!cont)return;
   const q=($('#in-q')?.value||'').toLowerCase().trim();
-  const l=inChats.filter(c=>!q||[c.nombreWa,c.nombre,c.telefono,c.ultimoTexto].join(' ').toLowerCase().includes(q));
+  const pasaFiltro=c=>
+    inFiltro==='noLeidos'?(c.noLeidos||0)>0:
+    inFiltro==='fijados'?!!c.fijado:
+    inFiltro==='personas'?(c.tipo==='persona'&&!c.grupo):
+    inFiltro==='empresas'?(c.tipo==='empresa'):
+    true;
+  const l=inChats.filter(c=>pasaFiltro(c)&&(!q||[c.nombreWa,c.nombre,c.telefono,c.ultimoTexto].join(' ').toLowerCase().includes(q)));
   const fijados=l.filter(c=>c.fijado&&!c.archivado);
   const archivados=l.filter(c=>c.archivado);
   const normales=l.filter(c=>!c.fijado&&!c.archivado);
@@ -1326,7 +1332,7 @@ function pintarLista(){
     if(verArchivados)html+=archivados.map(filaChatHTML).join('');
   }
   html+=[...fijados,...normales].map(filaChatHTML).join('');
-  if(!html)html='<p class="empty" style="padding:1rem">Sin conversaciones todavía.</p>';
+  if(!html)html='<p class="empty" style="padding:1rem">Sin chats con este filtro.</p>';
   if(cont.dataset.sig===html)return;
   cont.dataset.sig=html;
   cont.innerHTML=html;
@@ -1572,6 +1578,12 @@ async function togglePausa(){
   }catch(e){toast('No se pudo cambiar: '+e.message)}
   b.disabled=false;
 }
+$('#in-filtros')?.addEventListener('click',e=>{
+  const b=e.target.closest('[data-inf]');if(!b)return;
+  inFiltro=b.dataset.inf;
+  $('#in-filtros').querySelectorAll('[data-inf]').forEach(x=>x.classList.toggle('on',x===b));
+  pintarLista();
+});
 $('#in-list')?.addEventListener('click',async e=>{
   const pin=e.target.closest('[data-pin]');
   if(pin){

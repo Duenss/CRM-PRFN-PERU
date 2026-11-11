@@ -635,3 +635,10 @@ button:not(.ghost):not(.iconbtn):not(.toplogo):not(.chipstatus):not(.ai){}
 .in-item .ib small{max-width:100%}
 .in-item{border-color:rgba(255,255,255,.22);box-shadow:0 0 0 1px rgba(255,255,255,.07), 0 0 24px -8px rgba(255,255,255,.6), 0 16px 40px -32px #000}
 .in-item:hover{border-color:rgba(255,255,255,.4);box-shadow:0 0 0 1px rgba(255,255,255,.18), 0 0 32px -6px rgba(255,255,255,.7), 0 18px 44px -30px #000}
+
+/* Bandeja: evitar encogimiento de tarjetas en listas largas */
+.in-list .in-item{flex:0 0 auto;min-height:74px}
+.in-item .ib{overflow:hidden}
+.in-item .ib small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#in-filtros{flex-wrap:nowrap;flex:0 0 auto}
+#in-filtros button{min-height:34px;padding:.2rem .6rem;font-size:.78rem}
