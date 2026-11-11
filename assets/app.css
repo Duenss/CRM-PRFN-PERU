@@ -642,3 +642,8 @@ button:not(.ghost):not(.iconbtn):not(.toplogo):not(.chipstatus):not(.ai){}
 .in-item .ib small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #in-filtros{flex-wrap:nowrap;flex:0 0 auto}
 #in-filtros button{min-height:34px;padding:.2rem .6rem;font-size:.78rem}
+
+/* Bandeja: sin etiquetas de tipo en la lista (más limpio, estilo WhatsApp) */
+.in-item .ib .tipo{display:none}
+.in-item .ib b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.in-item .ib small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
