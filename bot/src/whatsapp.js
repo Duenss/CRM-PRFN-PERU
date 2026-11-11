@@ -661,7 +661,7 @@ export async function listarChatsWa(sesionId = null) {
   let crudos;
   try {
     // Vía normal: el wrapper de whatsapp-web.js.
-    const chats = await conTimeout(s.client.getChats(), 45000, 'getChats');
+    const chats = await conTimeout(s.client.getChats(), 90000, 'getChats');
     crudos = chats.map(c => {
       const esEmpresa = !!(c.contact?.isBusiness || c.contact?.isEnterprise || c.contact?.businessProfile);
       const nombreGuardado = c.contact?.name || '';
@@ -831,7 +831,7 @@ export async function listarChatsWa(sesionId = null) {
         }
       } catch (e) {}
       return out;
-    }, undefined, 45000, 'getChats (respaldo)');
+    }, undefined, 90000, 'getChats (respaldo)');
   }
 
   // WhatsApp Web no trae el último mensaje de todos los chats hasta abrirlos.
@@ -949,7 +949,7 @@ export async function listarChatsWa(sesionId = null) {
 export async function listarContactosWa(sesionId = null) {
   const s = sesionParaEnviar(sesionId);
   if (!s) throw new Error('Ningún WhatsApp está conectado');
-  const contactos = await conTimeout(s.client.getContacts(), 45000, 'getContacts');
+  const contactos = await conTimeout(s.client.getContacts(), 120000, 'getContacts');
   const propio = normalizar(s.numero);
   const porTel = new Map();
   for (const c of contactos) {
@@ -1021,7 +1021,7 @@ export async function historialWa(telefono, limite = 50, sesionId = null) {
         };
       })
       .filter(Boolean);
-  }, { chatId, limite }, 45000, 'historialWa');
+  }, { chatId, limite }, 90000, 'historialWa');
   return msgs || [];
 }
 
