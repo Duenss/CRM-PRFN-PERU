@@ -615,7 +615,7 @@ let diasRango=7;
 async function renderInicio(){
   const ahora=new Date(),hh=ahora.getHours();
   const saludo=hh<12?'Buenos días':hh<19?'Buenas tardes':'Buenas noches';
-  if($('#i-hola'))$('#i-hola').textContent=`${saludo}, Juan`;
+  if($('#i-hola'))$('#i-hola').textContent=`${saludo}, Estimado Jordy`;
   if($('#i-fecha'))$('#i-fecha').textContent=ahora.toLocaleDateString('es-PE',{weekday:'long',day:'numeric',month:'long'});
   const mes=hoyISO().slice(0,7);
   const cum=clientes.filter(c=>c.fecha_cumpleanos).map(c=>{
