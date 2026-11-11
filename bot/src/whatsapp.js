@@ -394,6 +394,27 @@ function destinoConocido(limpio) {
   return w ? { _serialized: w } : null;
 }
 
+/**
+ * Resuelve el destino de un envío:
+ *  1) waId explícito (@lid o @c.us)
+ *  2) LID recordado al recibir un mensaje
+ *  3) getNumberId normal
+ *  4) si el número no resuelve y parece LID, se envía directo a <numero>@lid
+ */
+async function idDestino(s, limpio, opciones = {}) {
+  if (opciones && opciones.waId && /@(lid|c\.us)$/.test(String(opciones.waId))) {
+    return { _serialized: String(opciones.waId) };
+  }
+  const conocido = destinoConocido(limpio);
+  if (conocido) return conocido;
+  try {
+    const id = await conTimeout(s.client.getNumberId(limpio), 20000, 'getNumberId');
+    if (id) return id;
+  } catch (e) { /* se intenta por LID */ }
+  if (/^\d{12,16}$/.test(String(limpio))) return { _serialized: `${limpio}@lid` };
+  return null;
+}
+
 export async function enviar(telefono, texto, sesionId = null, opciones = {}) {
   const limpio = String(telefono || '').replace(/\D/g, '');
   if (config.modoPrueba) {
@@ -404,9 +425,7 @@ export async function enviar(telefono, texto, sesionId = null, opciones = {}) {
   const s = sesionParaEnviar(sesionId);
   if (!s) throw new Error(sesionId ? `La sesión ${sesionId} no está conectada` : 'Ningún WhatsApp está conectado');
 
-  const id = (opciones && opciones.waId && /@(lid|c\.us)$/.test(String(opciones.waId)))
-    ? { _serialized: String(opciones.waId) }
-    : (destinoConocido(limpio) || await conTimeout(s.client.getNumberId(limpio), 20000, 'getNumberId'));
+  const id = await idDestino(s, limpio, opciones);
   if (!id) throw new Error(`El número +${limpio} no tiene WhatsApp`);
   recordarEnvio(texto);
   const opcionesWa = {};
@@ -439,7 +458,7 @@ export async function enviarImagen(telefono, media = {}, caption = '', sesionId 
   // Asegura la compatibilidad con el WhatsApp Web actual antes de enviar media.
   await conTimeout(parcharMsgKey(s.client, s), 25000, 'compatibilidad multimedia');
 
-  const id = destinoConocido(limpio) || await conTimeout(s.client.getNumberId(limpio), 20000, 'getNumberId');
+  const id = await idDestino(s, limpio);
   if (!id) throw new Error(`El número +${limpio} no tiene WhatsApp`);
 
   let mm;
@@ -478,7 +497,7 @@ export async function enviarVideo(telefono, archivo, caption = '', sesionId = nu
   const s = sesionParaEnviar(sesionId);
   if (!s) throw new Error(sesionId ? `La sesión ${sesionId} no está conectada` : 'Ningún WhatsApp está conectado');
   await conTimeout(parcharMsgKey(s.client, s), 25000, 'compatibilidad multimedia');
-  const id = destinoConocido(limpio) || await conTimeout(s.client.getNumberId(limpio), 20000, 'getNumberId');
+  const id = await idDestino(s, limpio);
   if (!id) throw new Error(`El número +${limpio} no tiene WhatsApp`);
   const mm = MessageMedia.fromFilePath(archivo);
   recordarEnvio(caption);
@@ -506,7 +525,7 @@ export async function enviarArchivo(telefono, archivo, mimetype = 'video/mp4', n
   const s = sesionParaEnviar(sesionId);
   if (!s) throw new Error(sesionId ? `La sesión ${sesionId} no está conectada` : 'Ningún WhatsApp está conectado');
   await conTimeout(parcharMsgKey(s.client, s), 25000, 'compatibilidad multimedia');
-  const id = destinoConocido(limpio) || await conTimeout(s.client.getNumberId(limpio), 20000, 'getNumberId');
+  const id = await idDestino(s, limpio);
   if (!id) throw new Error(`El número +${limpio} no tiene WhatsApp`);
   const mm = MessageMedia.fromFilePath(archivo);
   recordarEnvio(caption);
