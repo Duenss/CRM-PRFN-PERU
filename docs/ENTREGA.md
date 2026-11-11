@@ -113,3 +113,13 @@ Ajustes → Horario: **inicio 0** y **fin 24** (o botón “Poner 24/7”) → G
 
 - Mensaje para WhatsApp: `docs/entrega/MENSAJE-CLIENTE-WHATSAPP.txt`
 - Documento detallado: `docs/entrega/Sistema-Secretaria-Automatica-Perfumeria-Fina-Peru.pdf`
+
+## Estado final (Contabo + Coolify) — noviembre 2026
+
+- **Bot WhatsApp:** desplegado en Contabo Cloud VPS 4 (4 vCPU / 8 GB) con **Coolify Cloud**.
+- **Dominio del bot:** https://bot.perfumeriafinaperu.com (SSL Let's Encrypt, DNS only).
+- **Panel:** https://crm.perfumeriafinaperu.com (Cloudflare Pages) con `BOT_URL` apuntando al bot nuevo.
+- **Despliegue:** repo privado vía GitHub App, auto-deploy en cada push a `master`; ver `docs/DESPLIEGUE-COOLIFY-CONTABO.md`.
+- **Healthcheck:** `GET /api/health` → 200; estado del bot visible en el panel.
+- **Backups:** no configurados (decisión del dueño).
+- **Servidor anterior:** Sakura/Pterodactyl fuera de uso.
