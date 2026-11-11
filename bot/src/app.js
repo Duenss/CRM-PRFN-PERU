@@ -331,8 +331,8 @@ async function procesarPedidoIA({ tel, nombre, clienteId, pedidoIA }) {
 /* ---------------- resumen de compra, pago y agenda (determinístico) ---------------- */
 
 /** Envía un texto y lo deja registrado en Bandeja + Supabase. */
-async function enviarRegistrado({ tel, texto, nombre = '', clienteId = null, sesionId = null, origen = 'bot' }) {
-  const env = await enviar(tel, texto, sesionId);
+async function enviarRegistrado({ tel, texto, nombre = '', clienteId = null, sesionId = null, origen = 'bot', opciones = {} }) {
+  const env = await enviar(tel, texto, sesionId, opciones);
   await logMensaje({ clienteId, telefono: tel, direccion: 'saliente', texto, origen });
   registrar({ telefono: tel, texto, direccion: 'saliente', nombre, clienteId, origen, waId: env?.waId || '' });
   return env;
@@ -369,7 +369,7 @@ async function enviarBienvenida({ tel, nombre, clienteId, sesionId }) {
   const texto = plantilla
     .replaceAll('{saludo}', saludoHora())
     .replaceAll('{nombre}', nom || 'estimado');
-  await enviarRegistrado({ tel, texto, nombre, clienteId, sesionId, origen: 'ia' });
+  await enviarRegistrado({ tel, texto, nombre, clienteId, sesionId, origen: 'ia', opciones: { linkPreview: true } });
   marcarSaludado(tel);
   log(`Bienvenida enviada a +${tel}.`);
   return true;
@@ -414,20 +414,10 @@ function infoCatalogo() {
 
 /** Envía el catálogo PDF con la explicación de páginas por categoría. */
 async function enviarCatalogo({ tel, nombre, clienteId, sesionId }) {
-  const { info, pdf } = infoCatalogo();
+  const { pdf } = infoCatalogo();
   const pdfRuta = archivoPersonalizado('pdf') || pdf;
   const existe = fs.existsSync(pdfRuta);
-  const secciones = Array.isArray(info?.secciones) ? info.secciones : [];
-  const lineas = secciones.map(s => {
-    const d = s.productosDesde || s.desde;
-    const h = s.productosHasta || s.hasta;
-    return `• Páginas *${d} a ${h}*: perfumes de ${s.nombre}`;
-  });
-  const detalle = lineas.length
-    ? `\n\n${lineas.join('\n')}`
-    : '\n\n• Perfumes de *diseñador*, *árabes* y de *nicho*';
-  const texto = `Claro, estimado. A continuación le envío un PDF con nuestras fragancias 📄${detalle}\n\nQuedo atento a tu respuesta; si deseas alguna recomendación, también nos tienes aquí 😊`;
-  await enviarRegistrado({ tel, texto, nombre, clienteId, sesionId, origen: 'ia' });
+  // El catálogo se envía directo (PDF + video), sin texto explicativo.
   const cfg = estadoAjustes();
   if (existe && cfg.enviarCatalogo !== false) {
     try {
@@ -447,7 +437,7 @@ async function enviarCatalogo({ tel, nombre, clienteId, sesionId }) {
       });
     }
   } else {
-    log('No existe el PDF del catálogo; se envió solo la explicación.');
+    log('No existe el PDF del catálogo; se omite.');
   }
   // Video explicativo (configurable desde Ajustes).
   if (cfg.enviarVideo) {
@@ -1518,6 +1508,15 @@ async function manejarMensaje(msg, sesionId = null) {
   // dispara el catálogo (con el video si está activado).
   const primerSaludoInfo = esSaludoOInfo(texto);
   if (esTextoReal && (pideCatalogo(texto) || primerSaludoInfo)) {
+    // Si el cliente solo saluda y no es la primera vez, se le saluda igual.
+    if (primerSaludoInfo && yaHuboSaliente) {
+      const s = saludoONada(tel, nombreChat);
+      if (s) {
+        try {
+          await enviarRegistrado({ tel, texto: `${s}. ¿En qué te puedo ayudar? Te comparto el catálogo 😊`, nombre: nombreChat, clienteId: cliente?.id, sesionId });
+        } catch (e) { log('No se pudo responder el saludo: ' + e.message); }
+      }
+    }
     try {
       await enviarCatalogo({ tel, nombre: nombreChat, clienteId: cliente?.id, sesionId });
     } catch (e) { log('No se pudo enviar el catálogo: ' + e.message); }

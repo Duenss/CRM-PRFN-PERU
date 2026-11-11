@@ -378,7 +378,7 @@ function sesionParaEnviar(sesionId) {
   return [...sesiones.values()].find(s => s.estado === 'conectado') || null;
 }
 
-export async function enviar(telefono, texto, sesionId = null) {
+export async function enviar(telefono, texto, sesionId = null, opciones = {}) {
   const limpio = String(telefono || '').replace(/\D/g, '');
   if (config.modoPrueba) {
     logFn(`[PRUEBA${sesionId ? ' ' + sesionId : ''}] Mensaje para +${limpio}: ${String(texto).slice(0, 160)}${String(texto).length > 160 ? '…' : ''}`);
@@ -391,7 +391,9 @@ export async function enviar(telefono, texto, sesionId = null) {
   const id = await conTimeout(s.client.getNumberId(limpio), 20000, 'getNumberId');
   if (!id) throw new Error(`El número +${limpio} no tiene WhatsApp`);
   recordarEnvio(texto);
-  const enviado = await conTimeout(s.client.sendMessage(id._serialized, texto), 60000, 'sendMessage');
+  const opcionesWa = {};
+  if (opciones && opciones.linkPreview && /https?:\/\//i.test(String(texto || ''))) opcionesWa.linkPreview = true;
+  const enviado = await conTimeout(s.client.sendMessage(id._serialized, texto, opcionesWa), 60000, 'sendMessage');
   const waId = idMensaje(enviado);
   if (waId) {
     enviadosPorBot.add(waId);
