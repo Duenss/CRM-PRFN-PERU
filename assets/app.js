@@ -1496,8 +1496,10 @@ function etiquetasDelChat(tel){
 }
 function pintarEtiquetasChat(){
   const cont=$('#in-tags');if(!cont)return;
+  const item=inChats.find(c=>String(c.telefono)===String(inTel));
+  const noWa=item?.sinWhatsApp===true;
   const ets=inTel?etiquetasDelChat(inTel):[];
-  cont.innerHTML=ets.map(t=>'<i class="etag">'+esc(t)+'</i>').join('');
+  cont.innerHTML=(noWa?'<i class="etag warn" title="WhatsApp no reconoce este número">sin WhatsApp</i>':'')+ets.map(t=>'<i class="etag">'+esc(t)+'</i>').join('');
   if($('#in-tag-add'))$('#in-tag-add').hidden=!inTel;
 }
 function abrirEtiquetasChat(){
