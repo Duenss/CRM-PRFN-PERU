@@ -95,3 +95,21 @@ entrega faltan dos acciones del dueño, que **no puede hacer la IA**:
 
 Mientras esas dos acciones no se hagan, el sistema queda operativo para el resto
 (clientes, catálogo, pedidos, anuncios con IA, calendario, ajustes, seguridad y respaldos).
+
+## Estado final de entrega (10/11/2026)
+
+- **Panel:** https://crm-prfn-peru.pages.dev (login con el correo del dueño y contraseña entregada aparte).
+- **Diseño:** glass minimalista con destellos dorados, login con imágenes de la marca, Bandeja con tarjetas y marcos de glow blanco, Inicio con KPIs (promos, conversaciones, campañas programadas, mensajes enviados hoy).
+- **Video:** versión compatible con WhatsApp (H.264 Main + AAC, 652 KB) y reintento automático de entrega.
+- **Datos limpios:** 0 clientes, 0 mensajes, 0 campañas, 0 envíos, 0 pedidos, 0 chats. Se conservan 202 productos, 11 plantillas, configuración, bienvenida (510 caracteres), PDF y video.
+- **Sesión de WhatsApp:** cerrada. El bot queda en **QR**: el cliente debe escanearlo una vez (Ajustes → Conectar WhatsApp).
+- **Bot:** esperando QR; respuestas automáticas y límites anti-bloqueo configurados.
+
+### Cómo dejar el bot 24/7
+
+Ajustes → Horario: **inicio 0** y **fin 24** (o botón “Poner 24/7”) → Guardar. La IA responderá todos los días a toda hora.
+
+### Mensaje y documento de entrega
+
+- Mensaje para WhatsApp: `docs/entrega/MENSAJE-CLIENTE-WHATSAPP.txt`
+- Documento detallado: `docs/entrega/Sistema-Secretaria-Automatica-Perfumeria-Fina-Peru.pdf`
