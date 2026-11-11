@@ -24,6 +24,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libxrandr2 \
       xdg-utils \
       tini \
+      xvfb \
+      x11-utils \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -44,4 +46,4 @@ HEALTHCHECK --interval=60s --timeout=10s --start-period=90s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||25577)+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD ["sh", "-c", "rm -f /app/.wwebjs_auth/*/Singleton* /app/.wwebjs_cache/*/Singleton* 2>/dev/null; exec node src/server.js"]
+CMD ["sh", "-c", "rm -f /app/.wwebjs_auth/*/Singleton* /app/.wwebjs_cache/*/Singleton* 2>/dev/null; Xvfb :99 -screen 0 1280x800x24 >/tmp/xvfb.log 2>&1 & export DISPLAY=:99; sleep 1; exec node src/server.js"]

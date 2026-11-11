@@ -18,7 +18,8 @@ services:
       PORT: "25577"
       TZ: America/Lima
       # Chromium: Puppeteer descarga Chrome for Testing al construir la imagen
-      HEADLESS: "true"
+      HEADLESS: "false"
+      DISPLAY: ":99"
       SESSION_PATH: /app/.wwebjs_auth
       # --- Supabase ---
       SUPABASE_URL: ${SUPABASE_URL}
