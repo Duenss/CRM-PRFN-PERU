@@ -430,12 +430,15 @@ async function enviarCatalogo({ tel, nombre, clienteId, sesionId }) {
   const existe = fs.existsSync(pdfRuta);
   // El catálogo se envía directo (PDF + video), sin texto explicativo.
   const cfg = estadoAjustes();
+  let catalogoEnviado = false;
+  let videoEnviado = false;
   if (existe && cfg.enviarCatalogo !== false) {
     try {
       const env = await enviarArchivo(tel, pdfRuta, 'application/pdf', 'Catalogo-Perfumeria-Fina.pdf', '📕 Catálogo *Perfumería Fina* · Perfumería Fina Perú', sesionId);
       await logMensaje({ clienteId, telefono: tel, direccion: 'saliente', texto: '📕 [catálogo PDF enviado]', origen: 'ia' });
       registrar({ telefono: tel, texto: '📕 Catálogo Perfumería Fina (PDF)', direccion: 'saliente', nombre, clienteId, origen: 'ia', waId: env?.waId || '' });
       log(`Catálogo PDF enviado a +${tel}.`);
+      catalogoEnviado = true;
       await dormir(3500); // dejar terminar la subida del PDF antes del video
     } catch (e) {
       log('No se pudo enviar el catálogo PDF: ' + e.message);
@@ -460,12 +463,31 @@ async function enviarCatalogo({ tel, nombre, clienteId, sesionId }) {
         const envV = await enviarVideo(tel, video, captionVideo, sesionId);
         registrar({ telefono: tel, texto: '🎬 Video de Perfumería Fina', direccion: 'saliente', nombre, clienteId, origen: 'ia', waId: envV?.waId || '' });
         log(`Video enviado a +${tel}.`);
+        videoEnviado = true;
         programarChequeoVideo({ tel, video, caption: captionVideo, sesionId, waId: envV?.waId, nombre, clienteId });
       } catch (e) {
         log('No se pudo enviar el video: ' + e.message);
       }
     } else {
       log('Video de Perfumería Fina no encontrado en el servidor; se omite.');
+    }
+  }
+  // Después del catálogo/video se invita a elegir: una sola pregunta, con el
+  // estilo de la tienda, para que el cliente responda y la IA lo asesore.
+  if (catalogoEnviado || videoEnviado) {
+    try {
+      const pregunta = [
+        '✨ *¿Te ayudo a elegir tu perfume ideal?* ✨',
+        '',
+        'Cuéntame para qué ocasión lo buscas —día, noche, playa, trabajo o regalo— y te recomiendo las fragancias que mejor encajan contigo 🌸',
+        'Y si ya viste alguna que te llamó la atención, dime cuál y te cuento sus notas 😉',
+        '',
+        'Quedo atento a tu respuesta 💬'
+      ].join('\n');
+      await enviarRegistrado({ tel, texto: pregunta, nombre, clienteId, sesionId, origen: 'bot' });
+      log(`Pregunta de asesoría enviada a +${tel} después del catálogo.`);
+    } catch (e) {
+      log('No se pudo enviar la pregunta de asesoría: ' + e.message);
     }
   }
   return true;
