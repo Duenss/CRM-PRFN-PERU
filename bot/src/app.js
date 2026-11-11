@@ -2236,10 +2236,19 @@ app.post('/api/sincronizar', auth, async (req, res) => {
       if (!sb) return res.status(503).json({ error: 'Falta SUPABASE_SERVICE_ROLE_KEY en el bot.' });
       const contactos = await conTimeout(listarContactosWa(req.body?.sesion || null), 300000, 'listar contactos de WhatsApp');
       salida.contactos = contactos.length;
+      // Caché local con TODOS los contactos (nombres para la Bandeja y búsquedas),
+      // sin importar país. La tabla clientes exige formato peruano, así que solo
+      // los números válidos de Perú se insertan en Supabase.
+      try {
+        const dir = path.join(process.cwd(), 'data');
+        fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(path.join(dir, 'contactos.json'), JSON.stringify(contactos), 'utf8');
+      } catch (e) { log('No se pudo guardar la caché de contactos: ' + e.message); }
       const actuales = await getClientes();
       const existentes = new Set(actuales.map(c => c.telefono));
-      const nuevos = contactos
-        .filter(c => /^\d{8,15}$/.test(String(c.telefono || '')) && !existentes.has(c.telefono))
+      const aptos = contactos.filter(c => /^51[0-9]{9}$/.test(String(c.telefono || '')));
+      const nuevos = aptos
+        .filter(c => !existentes.has(c.telefono))
         .map(c => ({
           nombre: c.nombre || `+${c.telefono}`,
           telefono: c.telefono,
@@ -2247,9 +2256,10 @@ app.post('/api/sincronizar', auth, async (req, res) => {
           consentimiento: false,
           etiquetas: []
         }));
-      salida.contactosExistentes = contactos.filter(c => /^\d{8,15}$/.test(String(c.telefono || ''))).length - nuevos.length;
+      salida.contactosExistentes = aptos.length - nuevos.length;
       const r = await importarClientes(nuevos);
       salida.contactosNuevos = r.insertados;
+      log(`Contactos de WhatsApp: ${contactos.length} totales · ${aptos.length} con formato Perú · ${r.insertados} nuevos importados.`);
     }
     log(`Sincronización: ${salida.chats} chats · ${salida.contactosNuevos} contactos nuevos (de ${salida.contactos}).`);
     emitir('sync', { motivo: 'manual', chats: salida.chats, total: salida.chatsTotal || salida.chats });
