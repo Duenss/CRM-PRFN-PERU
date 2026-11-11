@@ -10,7 +10,7 @@ import { Cola, dormir, esperaEntreEnvios } from './queue.js';
 import { estadoIA, actualizarIA, pausarIA, estaPausado, promptIA, resumenIA } from './ia.js';
 import { estadoAjustes, actualizarAjustes, esperaMasivaMs, esperaChatMs } from './ajustes.js';
 import { oculto, ocultar, limpiar as limpiarOcultos } from './ocultos.js';
-import { registrar, listar, buscar, marcarAgregados, aplicarContactos, aplicarNombresClientes, obtener, marcarLeido, respuestasIA, porDia, resumen as resumenChats, registrarCabecera, importarMensajes, yaExisteWa, actualizarAck, mensajesEntrantes, eliminar as eliminarConversacion, fijar as fijarChat, archivar as archivarChat, vaciar as vaciarConversaciones, flush as flushConversaciones } from './conversaciones.js';
+import { registrar, listar, buscar, marcarAgregados, aplicarContactos, aplicarNombresClientes, marcarSinWhatsApp, obtener, marcarLeido, respuestasIA, porDia, resumen as resumenChats, registrarCabecera, importarMensajes, yaExisteWa, actualizarAck, mensajesEntrantes, eliminar as eliminarConversacion, fijar as fijarChat, archivar as archivarChat, vaciar as vaciarConversaciones, flush as flushConversaciones } from './conversaciones.js';
 import * as pedidos from './pedidos.js';
 import * as anuncios from './anuncios.js';
 // (Las plantillas de pago se eliminaron: las billeteras digitales las verifica el admin.)
@@ -2357,10 +2357,16 @@ app.post('/api/conversaciones/:telefono/importar', auth, async (req, res) => {
   try {
     const msgs = await historialWa(tel, Number(req.body?.limite) || 50, req.body?.sesion || null);
     const nuevos = importarMensajes(tel, msgs);
+    marcarSinWhatsApp(tel, false);
     res.json({ ok: true, leidos: msgs.length, nuevos });
   } catch (e) {
-    log('Error al importar historial de +' + tel + ': ' + (e?.stack || e?.message || e));
-    res.status(500).json({ error: e.message });
+    const mensaje = String(e?.message || e);
+    const noWa = /no tiene WhatsApp|no está registrado|not registered/i.test(mensaje);
+    if (noWa) marcarSinWhatsApp(tel, true);
+    log('Error al importar historial de +' + tel + ': ' + mensaje);
+    // Nunca se devuelve error duro al panel: el chat sigue visible y se puede
+    // revisar; solo se avisa que ese número no tiene historial accesible.
+    res.json({ ok: true, leidos: 0, nuevos: 0, aviso: noWa ? 'Este número no tiene WhatsApp (no se puede importar su historial).' : 'No se pudo leer el historial en este momento.' });
   }
 });
 

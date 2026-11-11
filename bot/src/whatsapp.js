@@ -1009,9 +1009,13 @@ export async function historialWa(telefono, limite = 50, sesionId = null) {
   if (!s) throw new Error('Ningún WhatsApp está conectado');
   const limpio = String(telefono || '').replace(/\D/g, '');
   await esperarPagina(s);
-  const numId = await conTimeout(s.client.getNumberId(limpio), 20000, 'getNumberId');
-  if (!numId) throw new Error(`El número +${limpio} no tiene WhatsApp`);
-  const chatId = numId._serialized;
+  let numId = null;
+  try {
+    numId = await conTimeout(s.client.getNumberId(limpio), 20000, 'getNumberId');
+  } catch (e) { numId = null; }
+  // Los chats @lid no resuelven a número: se lee directo con su identificador.
+  const chatId = numId?._serialized || (/^\d{12,16}$/.test(limpio) ? `${limpio}@lid` : '');
+  if (!chatId) throw new Error(`El número +${limpio} no tiene WhatsApp`);
   // Se lee directo de la página y sin serializar: `getChatById`/`fetchMessages`
   // de whatsapp-web.js fallan ("r") al serializar chats en la versión actual.
   const msgs = await evalPagina(s, async ({ chatId, limite }) => {

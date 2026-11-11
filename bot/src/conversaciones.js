@@ -431,6 +431,7 @@ export function listar(limite = 40) {
       grupo: c.grupo === true,
       archivado: c.archivado === true,
       propio: c.propio === true,
+      sinWhatsApp: c.sinWhatsApp === true,
       waId: c.waId || '',
       wa: !!c.wa
     }));
@@ -456,6 +457,7 @@ export function buscar({ limite = 80, offset = 0, q = '', filtro = 'todos' } = {
     grupo: c.grupo === true,
     archivado: c.archivado === true,
     propio: c.propio === true,
+    sinWhatsApp: c.sinWhatsApp === true,
     waId: c.waId || '',
     wa: !!c.wa
   });
@@ -536,6 +538,15 @@ export function aplicarNombresClientes(clientes = []) {
   guardar();
 }
 
+/** Marca si el número del chat existe o no en WhatsApp (validación). */
+export function marcarSinWhatsApp(telefono, valor = true) {
+  const tel = limpiarTel(telefono);
+  const ch = chats[tel];
+  if (!ch) return;
+  ch.sinWhatsApp = valor === true;
+  guardar();
+}
+
 export function obtener(telefono) {
   const c = chats[limpiarTel(telefono)];
   if (!c) return null;
@@ -555,6 +566,7 @@ export function obtener(telefono) {
     grupo: c.grupo === true,
     archivado: c.archivado === true,
     propio: c.propio === true,
+    sinWhatsApp: c.sinWhatsApp === true,
     waId: c.waId || '',
     wa: !!c.wa,
     mensajes: c.mensajes.filter(m => String(m.texto || '').trim()).slice(-MAX_MENSAJES)

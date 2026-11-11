@@ -1569,9 +1569,10 @@ $('#in-resync')?.addEventListener('click',async()=>{
   const b=$('#in-resync');b.disabled=true;
   try{
     const r=await botFetch('/api/conversaciones/'+inTel+'/importar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({limite:200}),timeoutMs:180000});
-    toast('Historial actualizado ('+(r.leidos||0)+' mensajes leídos, '+(r.nuevos||0)+' nuevos)');
+    if(r.aviso)toast(r.aviso);
+    else toast('Historial actualizado ('+(r.leidos||0)+' mensajes leídos, '+(r.nuevos||0)+' nuevos)');
     await abrirChat(inTel);
-  }catch(e){toast('No se pudo actualizar: '+e.message,'error')}
+  }catch(e){toast('No se pudo leer el historial en este momento. El chat sigue disponible.')}
   b.disabled=false;
 });
 document.addEventListener('keydown',e=>{
@@ -1701,7 +1702,12 @@ $('#in-form')?.addEventListener('submit',async e=>{
   try{
     await botFetch('/api/conversaciones/'+inTel+'/enviar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({texto}),timeoutMs:60000});
     t.value='';await refrescarHiloAbierto();toast('Mensaje enviado');
-  }catch(err){toast('No se envió: '+err.message)}
+  }catch(err){
+    const msg=String(err?.message||'');
+    toast(/no tiene WhatsApp|no está registrado/i.test(msg)
+      ? 'Este número no está en WhatsApp: no se puede enviar. Puedes responder desde el celular.'
+      : 'No se pudo enviar el mensaje. Revisa la conexión del bot.');
+  }
   b.disabled=false;
 });
 $('#in-text')?.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('#in-form').requestSubmit()}});
