@@ -1811,6 +1811,12 @@ ${String(texto).slice(0, 300)}
 /* ---------------- API ---------------- */
 // Falla cerrado: sin BOT_TOKEN configurado en modo real, el bot no atiende
 // peticiones (solo /api/health). Con token, comparación en tiempo constante.
+// Healthcheck público (para Docker/Coolify y monitoreo).
+app.get('/api/health', (_req, res) => {
+  const s = (estadoWa().find(x => String(x.id) === '1')) || {};
+  res.json({ ok: true, uptime: Math.round(process.uptime()), estado: s.estado || 'iniciando' });
+});
+
 const auth = crearAuth({
   token: config.botToken,
   produccion: !config.modoPrueba,

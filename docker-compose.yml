@@ -1,33 +1,65 @@
-# Perfumería Fina · despliegue con Docker (recomendado para VPS)
+# Stack del bot de WhatsApp CRM — Perfumería Fina Perú
+# Desplegable en Coolify (Cloud o self-hosted), Docker Compose o VPS directa.
 #
-#   cp bot/.env.production.example bot/.env     # completa los valores reales
-#   docker compose up -d --build
-#   docker compose logs -f bot
-#
-# El QR se escanea desde el panel del bot: http://IP:3000/panel
-# (o desde el CRM → Ajustes → Conectar WhatsApp, apuntando a esa URL).
-
+# Datos persistentes en volúmenes:
+#   bot-data   -> /app/data        (conversaciones, pedidos, ajustes, archivos)
+#   bot-auth   -> /app/.wwebjs_auth (sesión de WhatsApp: evita re-escanear QR)
+#   bot-cache  -> /app/.wwebjs_cache
 services:
   bot:
-    build: .
+    build:
+      context: ./bot
+      dockerfile: Dockerfile
     container_name: pf-bot
     restart: unless-stopped
-    env_file:
-      - bot/.env
-    ports:
-      - "3000:3000"
+    init: true
+    environment:
+      NODE_ENV: production
+      PORT: "25577"
+      TZ: America/Lima
+      # Chromium del sistema instalado en la imagen
+      CHROME_PATH: /usr/bin/chromium
+      HEADLESS: "true"
+      SESSION_PATH: /app/.wwebjs_auth
+      # --- Supabase ---
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      # --- Bot ---
+      BOT_TOKEN: ${BOT_TOKEN}
+      SESIONES: ${SESIONES:-1}
+      OWNER_NUMBER: ${OWNER_NUMBER}
+      OWNER_EMAIL: ${OWNER_EMAIL:-}
+      NUMEROS_PRUEBA: ${NUMEROS_PRUEBA:-}
+      MODO_PRUEBA: ${MODO_PRUEBA:-false}
+      SIMULAR_ENTRANTES: ${SIMULAR_ENTRANTES:-false}
+      AUTO_RESPUESTA: ${AUTO_RESPUESTA:-true}
+      RESPONDER_DESCONOCIDOS: ${RESPONDER_DESCONOCIDOS:-true}
+      # --- IA ---
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-}
+      # --- Ritmo / horario ---
+      DELAY_MIN: ${DELAY_MIN:-25}
+      DELAY_MAX: ${DELAY_MAX:-40}
+      MAX_POR_DIA: ${MAX_POR_DIA:-0}
+      HORA_INICIO: ${HORA_INICIO:-9}
+      HORA_FIN: ${HORA_FIN:-20}
+      LUNES_A_SABADO: ${LUNES_A_SABADO:-true}
+      SEGUIMIENTO_DIAS_1: ${SEGUIMIENTO_DIAS_1:-3}
+      SEGUIMIENTO_DIAS_2: ${SEGUIMIENTO_DIAS_2:-10}
+      # --- Panel (CORS y QR con Basic Auth) ---
+      PANEL_URL: ${PANEL_URL:-https://crm.perfumeriafinaperu.com}
+      PANEL_ORIGINS: ${PANEL_ORIGINS:-https://crm.perfumeriafinaperu.com,https://crm-prfn-peru.pages.dev}
+      PANEL_USER: ${PANEL_USER:-dueno}
+      PANEL_PASS: ${PANEL_PASS:-}
     volumes:
-      # Persistencia: chats, pedidos, anuncios y la sesión de WhatsApp.
-      - ./bot/data:/app/bot/data
-      - ./bot/.wwebjs_auth:/app/bot/.wwebjs_auth
-      - ./bot/.wwebjs_cache:/app/bot/.wwebjs_cache
-    # Chromium dentro del contenedor necesita /dev/shm amplio.
-    shm_size: "1gb"
-    security_opt:
-      - seccomp:unconfined
-    healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/estado').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 60s
+      - bot-data:/app/data
+      - bot-auth:/app/.wwebjs_auth
+      - bot-cache:/app/.wwebjs_cache
+    expose:
+      - "25577"
+
+volumes:
+  bot-data:
+  bot-auth:
+  bot-cache:
