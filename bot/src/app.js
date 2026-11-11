@@ -425,6 +425,7 @@ async function enviarCatalogo({ tel, nombre, clienteId, sesionId }) {
       await logMensaje({ clienteId, telefono: tel, direccion: 'saliente', texto: '📕 [catálogo PDF enviado]', origen: 'ia' });
       registrar({ telefono: tel, texto: '📕 Catálogo Perfumería Fina (PDF)', direccion: 'saliente', nombre, clienteId, origen: 'ia', waId: env?.waId || '' });
       log(`Catálogo PDF enviado a +${tel}.`);
+      await dormir(3500); // dejar terminar la subida del PDF antes del video
     } catch (e) {
       log('No se pudo enviar el catálogo PDF: ' + e.message);
       await enviarRegistrado({
@@ -444,9 +445,11 @@ async function enviarCatalogo({ tel, nombre, clienteId, sesionId }) {
     const video = archivoPersonalizado('video') || path.join(raizProyecto, 'docs', 'entrega', 'experiencia-perfumeria.mp4');
     if (fs.existsSync(video)) {
       try {
-        const envV = await enviarVideo(tel, video, '🎬 Así es *Perfumería Fina Perú*', sesionId);
+        const captionVideo = '🎬 Así es *Perfumería Fina Perú*';
+        const envV = await enviarVideo(tel, video, captionVideo, sesionId);
         registrar({ telefono: tel, texto: '🎬 Video de Perfumería Fina', direccion: 'saliente', nombre, clienteId, origen: 'ia', waId: envV?.waId || '' });
         log(`Video enviado a +${tel}.`);
+        programarChequeoVideo({ tel, video, caption: captionVideo, sesionId, waId: envV?.waId, nombre, clienteId });
       } catch (e) {
         log('No se pudo enviar el video: ' + e.message);
       }
@@ -455,6 +458,30 @@ async function enviarCatalogo({ tel, nombre, clienteId, sesionId }) {
     }
   }
   return true;
+}
+
+/**
+ * Después de enviar un video, revisa si WhatsApp confirmó la entrega. Si el
+ * mensaje se queda en "enviado" (✓) y no pasa a entregado (✓✓), lo reenvía una
+ * sola vez, con una pequeña espera entre envíos.
+ */
+function programarChequeoVideo({ tel, video, caption, sesionId, waId, nombre = '', clienteId = null }) {
+  if (!waId) return;
+  setTimeout(async () => {
+    try {
+      const chat = obtener(tel);
+      const msg = (chat?.mensajes || []).find(m => m.waId === waId);
+      const ack = Number(msg?.ack || 0);
+      if (ack >= 2) return; // ya llegó
+      log(`Video a +${tel} sin confirmar entrega (ack ${ack}); se reenvía una vez.`);
+      await dormir(3000);
+      const env = await enviarVideo(tel, video, caption, sesionId);
+      registrar({ telefono: tel, texto: '🎬 ' + caption, direccion: 'saliente', nombre, clienteId, origen: 'ia', waId: env?.waId || '' });
+      log(`Video reenviado a +${tel}.`);
+    } catch (e) {
+      log('No se pudo reenviar el video a +' + tel + ': ' + e.message);
+    }
+  }, 25000).unref?.();
 }
 
 /** Ficha corta del producto: notas, ocasión y estilo (para acompañar la foto). */
@@ -928,6 +955,7 @@ async function enviarAdjuntosAnuncio(anuncio, destino) {
       const env = String(adj.mimetype || '').startsWith('video/')
         ? await enviarVideo(destino.telefono, adj.ruta, adj.caption)
         : await enviarArchivo(destino.telefono, adj.ruta, adj.mimetype, adj.nombre, adj.caption);
+      await dormir(2500);
       registrar({
         telefono: destino.telefono,
         texto: '📎 ' + adj.nombre,
@@ -2372,6 +2400,20 @@ app.post('/api/prueba', auth, async (req, res) => {
     await logMensaje({ telefono: tel, direccion: 'saliente', texto, origen: 'prueba' });
     // Que el mensaje de prueba también aparezca en la Bandeja del panel.
     registrar({ telefono: tel, texto, direccion: 'saliente', nombre: '', origen: 'prueba', waId: env?.waId || '' });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/prueba-catalogo', auth, async (req, res) => {
+  const tel = normalizar(req.body?.telefono || config.ownerNumber || '');
+  const permitidos = new Set([config.ownerNumber, ...config.numerosPrueba].filter(Boolean));
+  if (!config.modoPrueba && permitidos.size && !permitidos.has(tel)) {
+    return res.status(403).json({ error: 'En modo real solo puedes probar con OWNER_NUMBER o NUMEROS_PRUEBA.' });
+  }
+  try {
+    await enviarCatalogo({ tel, nombre: '', clienteId: null, sesionId: req.body?.sesion || null });
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: e.message });

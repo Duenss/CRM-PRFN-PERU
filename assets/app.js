@@ -997,6 +997,11 @@ async function cargarAjustes(){
     const es=$('#aj-status');if(es)es.textContent=`Actualizado: ${fmtFechaHora(a.actualizado)}`;
   }catch(e){const es=$('#aj-status');if(es)es.textContent='No se pudieron cargar los ajustes (revisa la conexión).';}
 }
+$('#aj-247')?.addEventListener('click',()=>{
+  if($('#aj-hora-ini'))$('#aj-hora-ini').value=0;
+  if($('#aj-hora-fin'))$('#aj-hora-fin').value=24;
+  toast('Horario 24/7 listo. Pulsa Guardar para aplicarlo.');
+});
 $('#aj-save')?.addEventListener('click',async()=>{
   const b=$('#aj-save');b.disabled=true;
   try{
@@ -1924,7 +1929,7 @@ function renderPreviewBienvenida(){
   if(!String(texto).trim()) html += '<p class="wa-empty" style="margin:auto">Escribe la bienvenida para verla aquí.</p>';
   else html += burbuja(cuerpo);
   if($('#bw-texto')?.value?.includes('{saludo}')||$('#bw-texto')?.value?.includes('{nombre}')){}
-  html += burbuja('Claro, estimado. A continuación le envío un PDF con nuestras fragancias 📄<br><br>• Páginas <b>4 a 28</b>: perfumes de Diseñador<br>• Páginas <b>30 a 35</b>: perfumes de Árabes<br>• Páginas <b>37 a 41</b>: perfumes de Nicho', '');
+
   if(pdf) html += '<div class="wa-bubble media"><div class="wa-ico">📕</div><div><div class="wa-nom">Catálogo Perfumería Fina (PDF)</div><small style="opacity:.7">Documento PDF</small></div><span class="wa-meta">'+new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'})+'</span></div>';
   if(video) html += '<div class="wa-bubble media"><div class="wa-ico">🎬</div><div><div class="wa-nom">Así es Perfumería Fina Perú</div><small style="opacity:.7">Video · 1.4 MB</small></div><span class="wa-meta">'+new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'})+'</span></div>';
   cont.innerHTML=html;

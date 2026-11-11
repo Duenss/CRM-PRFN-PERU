@@ -14,16 +14,31 @@
 <body>
 
 <section id="login" hidden>
-  <div class="box">
-    <img src="/assets/img/logo-pf-128.png" alt="Perfumería Fina Perú" class="login-logo">
-    <h1 class="logo" style="padding:0">Perfumería Fina Perú</h1>
-    <p class="muted">Panel de clientes y campañas</p>
-    <form id="lform">
-      <label for="l-mail">Correo</label><input id="l-mail" type="email" autocomplete="username" required>
-      <label for="l-pass">Contraseña</label><input id="l-pass" type="password" autocomplete="current-password" required>
-      <div class="acts"><button id="l-btn">Entrar</button></div>
-      <p id="l-err" class="muted" style="color:var(--bad)"></p>
-    </form>
+  <div class="login-bg" aria-hidden="true"></div>
+  <div class="login-wrap">
+    <div class="login-hero">
+      <img class="login-seal" src="/assets/img/logo-pf.png" alt="Perfumería Fina Perú">
+      <p class="login-kicker">CRM · WhatsApp · Perfumería Fina Perú</p>
+      <h1 class="login-title">Aromas que<br><em>fascinan</em></h1>
+      <p class="login-lead">Clientes, pedidos, campañas y tu bot de WhatsApp en un solo panel. Perfumes equivalentes con <b>50&nbsp;% de esencia</b>.</p>
+      <div class="login-gallery" aria-hidden="true">
+        <img src="/assets/img/brand/bottles-duo.jpg" alt="">
+        <img src="/assets/img/brand/essence-key.jpg" alt="">
+        <img src="/assets/img/brand/hero-slide-3.webp" alt="">
+      </div>
+    </div>
+    <div class="box login-card">
+      <p class="login-eyebrow">Panel de gestión</p>
+      <h2 class="login-h2">Inicia sesión</h2>
+      <p class="muted login-sub">Acceso del administrador</p>
+      <form id="lform">
+        <label for="l-mail">Correo</label><input id="l-mail" type="email" autocomplete="username" required>
+        <label for="l-pass">Contraseña</label><input id="l-pass" type="password" autocomplete="current-password" required>
+        <div class="acts"><button id="l-btn">Entrar</button></div>
+        <p id="l-err" class="muted" style="color:var(--bad)"></p>
+      </form>
+      <p class="login-foot">Perfumería Fina Perú · CRM con IA</p>
+    </div>
   </div>
 </section>
 
@@ -31,17 +46,20 @@
   <aside class="side">
     <div class="logo"><b><img class="brand-mark" src="/assets/img/logo-pf.png" alt="" width="26" height="26">Perfumería Fina</b><small>CRM · WhatsApp</small></div>
     <nav id="tabs" aria-label="Secciones">
-      <p class="navgroup">Principal</p>
+      <p class="navgroup">Operación</p>
       <button data-tab="inicio" aria-label="Inicio" class="on"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span class="nl">Inicio</span></button>
       <button data-tab="bandeja" aria-label="Bandeja"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span class="nl">Bandeja</span><i class="nbadge" id="unread-badge" hidden>0</i><i class="nbadge" id="alert-badge" hidden>!</i></button>
       <button data-tab="pedidos" aria-label="Pedidos"><svg viewBox="0 0 24 24"><path d="M6 2h9l4 4v16H6z"/><path d="M9 8h6M9 12h6M9 16h4"/></svg><span class="nl">Pedidos</span><i class="nbadge" id="pedidos-badge" hidden>0</i></button>
       <button data-tab="analiticas" aria-label="Analíticas"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span class="nl">Analíticas</span></button>
+      <p class="navgroup">Comunicación</p>
       <button data-tab="campanas" aria-label="Campañas"><svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg><span class="nl">Campañas</span></button>
       <button data-tab="anuncios" aria-label="Anuncios"><svg viewBox="0 0 24 24"><path d="M3 11v3a1 1 0 0 0 1 1h2l4 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M15 8a5 5 0 0 1 0 8M18 5a9 9 0 0 1 0 14"/></svg><span class="nl">Anuncios</span></button>
+      <p class="navgroup">Contactos</p>
       <button data-tab="clientes" aria-label="Clientes"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6M17 4a4 4 0 0 1 0 8M22 21c0-3-2-5-5-5.7"/></svg><span class="nl">Clientes</span></button>
+      <p class="navgroup">Contenido</p>
       <button data-tab="catalogo" aria-label="Catálogo"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span class="nl">Catálogo</span></button>
       <button data-tab="calendario" aria-label="Calendario"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg><span class="nl">Calendario</span></button>
-      <p class="navgroup">Asistente</p>
+      <p class="navgroup">Personalización</p>
       <button data-tab="ia" aria-label="Asistente IA"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8z"/><path d="M18.5 15.2l.8 1.9 1.9.8-1.9.8-.8 1.9-.8-1.9-1.9-.8 1.9-.8z"/></svg><span class="nl">Asistente IA</span></button>
       <button data-tab="bienvenida" aria-label="Bienvenida"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 12h5"/></svg><span class="nl">Bienvenida</span></button>
       <button data-tab="bot" aria-label="Ajustes"><svg viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V4M8 14h.01M16 14h.01M9 18h6"/></svg><span class="nl">Ajustes</span></button>
@@ -438,6 +456,8 @@
           <div><label for="aj-hora-ini">Hora de inicio (Lima)</label><input id="aj-hora-ini" type="number" min="0" max="23" step="1" placeholder="9"></div>
           <div><label for="aj-hora-fin">Hora de fin (Lima)</label><input id="aj-hora-fin" type="number" min="1" max="24" step="1" placeholder="20"></div>
         </div>
+        <p class="muted" style="font-size:.78rem;margin:.2rem 0 .4rem">Para que el bot trabaje <b>24/7</b> deja <b>inicio 0</b> y <b>fin 24</b>.</p>
+        <div class="acts" style="justify-content:flex-start"><button class="ghost" id="aj-247" type="button">Poner 24/7</button></div>
         <div class="acts"><button id="aj-save" type="button">Guardar límites y tiempos</button></div>
         <p class="muted" id="aj-status" style="margin-top:.6rem">—</p>
         <div style="margin-top:1rem;border-top:1px solid var(--line);padding-top:.9rem">

@@ -1,0 +1,30 @@
+# Mensaje para enviar al cliente por WhatsApp
+
+> Copia tal cual (WhatsApp respeta los *asteriscos* como negrita). Reemplaza `[Nombre]` por el nombre del cliente.
+
+---
+
+*"Sistema Secretaria Automática para Perfumería Fina Perú – Completado"* ✅
+
+Hola [Nombre] 👋 Ya está listo el sistema completo que estuvimos preparando. Te resumo lo que incluye:
+
+🤖 *Automatización de WhatsApp*
+• Respuesta automática y saludo automático: el cliente escribe “Hola” y recibe bienvenida + catálogo PDF + video.
+• Asistente de recomendación: pregunta si es para dama o caballero, notas y ocasión, y recomienda con foto y ficha.
+• Catálogo, PDF y video oficial de la marca; precios, promo de 3×30 ml por S/ 90 y medios de pago.
+• Pase automático al administrador cuando el cliente necesita atención personal.
+
+📋 *Gestión del negocio*
+• CRM de clientes con etiquetas, cumpleaños y control de bajas.
+• Pedidos con varios perfumes, delivery o recojo en estación y comprobantes de pago.
+• Campañas programadas y anuncios masivos con textos generados por IA.
+• Analíticas, calendario, mensaje de bienvenida personalizable y ajustes de horario (incluido 24/7).
+
+⏱️ *Tiempo de desarrollo:* 3 días de trabajo intensivo (8, 9 y 10 de noviembre), más de 40 horas.
+👨‍💻 *Desarrollado por:* Juan Pablo (Jvampi).
+
+💰 Con este sistema se ahorra tiempo de atención, se responde 24/7 y se dejan de perder ventas por mensajes sin responder.
+
+📎 A continuación te envío un *PDF detallado* con el funcionamiento de cada módulo, cómo usar cada uno y lo que se va a ahorrar con la secretaria automática.
+
+Quedo atento a cualquier consulta 🙌
