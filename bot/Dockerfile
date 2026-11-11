@@ -3,13 +3,10 @@ FROM node:22-bookworm-slim
 
 # Chromium del sistema: evita descargar Chrome dentro de la imagen y funciona
 # igual que en la VPS anterior. El bot detecta /usr/bin/chromium.
-ENV CHROME_PATH=/usr/bin/chromium \
-    PUPPETEER_SKIP_DOWNLOAD=1 \
-    NODE_ENV=production \
+ENV NODE_ENV=production \
     PORT=25577
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      chromium \
       ca-certificates \
       fonts-liberation \
       libasound2 \

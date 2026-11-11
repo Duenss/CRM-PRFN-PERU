@@ -17,8 +17,7 @@ services:
       NODE_ENV: production
       PORT: "25577"
       TZ: America/Lima
-      # Chromium del sistema instalado en la imagen
-      CHROME_PATH: /usr/bin/chromium
+      # Chromium: Puppeteer descarga Chrome for Testing al construir la imagen
       HEADLESS: "true"
       SESSION_PATH: /app/.wwebjs_auth
       # --- Supabase ---
@@ -54,12 +53,12 @@ services:
       PANEL_PASS: ${PANEL_PASS:-}
     volumes:
       - bot-data-v2:/app/data
-      - bot-auth-v2:/app/.wwebjs_auth
-      - bot-cache-v2:/app/.wwebjs_cache
+      - bot-auth-v3:/app/.wwebjs_auth
+      - bot-cache-v3:/app/.wwebjs_cache
     expose:
       - "25577"
 
 volumes:
   bot-data-v2:
-  bot-auth-v2:
-  bot-cache-v2:
+  bot-auth-v3:
+  bot-cache-v3:
