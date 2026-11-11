@@ -123,7 +123,7 @@ function hora12(hora) {
   h = h % 12 || 12;
   return `${h}:${m[2]} ${suf}`;
 }
-const puede = c => c && c.activo !== false && !!c.consentimiento && !c.baja;
+const puede = c => c && c.activo !== false && !c.baja;
 
 /* ---------------- pedidos, pagos y seguimiento ---------------- */
 const botDataDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data');
@@ -916,8 +916,6 @@ function destinatariosAnuncio(clientes, chats, anuncio) {
   const filtro = anuncio.filtro || { tipo: 'todos' };
   return listaDestinatarios(clientes, chats).filter(d => {
     if (!d.activo || d.baja) return false;
-    // Con "incluir sin consentimiento" se llega a TODOS los chats/clientes.
-    if (!anuncio.incluirSinConsentimiento && !d.consentimiento) return false;
     if (filtro.tipo === 'etiquetas') return filtro.etiquetas.some(t => d.etiquetas.includes(String(t).toLowerCase()));
     if (filtro.tipo === 'telefonos') return filtro.telefonos.includes(d.telefono);
     return true;
@@ -1197,8 +1195,7 @@ async function enviarCampana(id) {
     const mapa = new Map(clientes.map(c => [String(c.id), c]));
     // Campaña marcada como "a todos": incluye clientes sin consentimiento
     // (siempre respetando bajas e inactivos).
-    const paraTodos = Array.isArray(campana.segmento) && campana.segmento.includes('__TODOS__');
-    const elegibleCampana = c => c && c.activo !== false && !c.baja && (paraTodos || !!c.consentimiento);
+    const elegibleCampana = c => c && c.activo !== false && !c.baja;
     log(`Iniciando campaña "${campana.titulo}" con ${total} envíos pendientes.`);
     emitirProgresoCampana(campana, { enviados: 0, total, errores: 0 });
 
@@ -1213,7 +1210,7 @@ async function enviarCampana(id) {
       const c = mapa.get(String(e.cliente_id));
       if (!elegibleCampana(c)) {
         await actualizarEnvio(e.id, { estado: 'omitido', fecha_envio: new Date().toISOString() }, 'marcar envío omitido');
-        log(`Omitido: ${c?.nombre || e.cliente_id} (sin consentimiento, baja o inactivo).`);
+        log(`Omitido: ${c?.nombre || e.cliente_id} (baja o inactivo).`);
         continue;
       }
 
@@ -2267,7 +2264,7 @@ app.post('/api/sincronizar', auth, async (req, res) => {
           nombre: c.nombre || `+${c.telefono}`,
           telefono: c.telefono,
           activo: true,
-          consentimiento: false,
+          consentimiento: true,
           etiquetas: []
         }));
       salida.contactosExistentes = aptos.length - nuevos.length;

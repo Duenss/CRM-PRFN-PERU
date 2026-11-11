@@ -229,7 +229,7 @@ function limpiarStale(sub,texto){
   sub.textContent=texto;
   sub.style.color='';
 }
-const puede=c=>c.activo!==false&&!!c.consentimiento&&!c.baja;
+const puede=c=>c.activo!==false&&!c.baja;
 const imgURL=p=>p.imagen_ruta? (String(p.imagen_ruta).startsWith('http')?p.imagen_ruta:'https://perfumeriafinaperu.com/'+p.imagen_ruta):'';
 
 /* ---------- sesión ---------- */
@@ -360,8 +360,8 @@ function renderClientes(){
   const q=$('#cq').value.toLowerCase().trim();
   const l=clientes.filter(c=>[c.nombre,c.telefono,...(Array.isArray(c.etiquetas)?c.etiquetas:[]),c.notas].join(' ').toLowerCase().includes(q));
   const tope=500;const visibles=l.slice(0,tope);
-  $('#c-count').textContent=`${l.length} de ${clientes.length} clientes · ${clientes.filter(puede).length} pueden recibir promociones${l.length>tope?' · mostrando '+tope+', usa el buscador':''}`;
-  $('#c-list').innerHTML=visibles.map(c=>`<div class="row"><div><b>${esc(c.nombre)}</b><small>+${esc(c.telefono)}${(Array.isArray(c.etiquetas)?c.etiquetas:[]).map(t=>`<i class="tag">${esc(t)}</i>`).join('')}${c.consentimiento?'':'<i class="tag warn">sin consentimiento</i>'}${c.baja?'<i class="tag bad">baja</i>':''}${c.fecha_cumpleanos?`<i class="tag">🎂 ${esc(fmtDia(c.fecha_cumpleanos))}</i>`:''}</small></div><button class="ghost" data-edit="${esc(c.id)}">Editar</button></div>`).join('')||'<p class="empty">Aún no hay clientes. Agrega uno o importa un CSV con las columnas nombre y telefono.</p>';
+  $('#c-count').textContent=`${l.length} de ${clientes.length} clientes · ${clientes.filter(puede).length} activos${l.length>tope?' · mostrando '+tope+', usa el buscador':''}`;
+  $('#c-list').innerHTML=visibles.map(c=>`<div class="row"><div><b>${esc(c.nombre)}</b><small>+${esc(c.telefono)}${(Array.isArray(c.etiquetas)?c.etiquetas:[]).map(t=>`<i class="tag">${esc(t)}</i>`).join('')}${c.baja?'<i class="tag bad">baja</i>':''}${c.fecha_cumpleanos?`<i class="tag">🎂 ${esc(fmtDia(c.fecha_cumpleanos))}</i>`:''}</small></div><button class="ghost" data-edit="${esc(c.id)}">Editar</button></div>`).join('')||'<p class="empty">Aún no hay clientes. Agrega uno o importa un CSV con las columnas nombre y telefono.</p>';
 }
 $('#cq').oninput=renderClientes;
 $('#c-list').onclick=e=>{const b=e.target.closest('[data-edit]');if(b)abrirCliente(b.dataset.edit)};
@@ -372,7 +372,7 @@ function abrirCliente(id){
   $('#f-nom').value=c.nombre||'';$('#f-tel').value=c.telefono||'';
   $('#f-tag').value=(c.etiquetas||[]).join(', ');$('#f-cum').value=c.fecha_cumpleanos||'';
   $('#f-ult').value=c.ultima_compra||'';
-  $('#f-not').value=c.notas||'';$('#f-con').checked=!!c.consentimiento;$('#f-baja').checked=!!c.baja;
+  $('#f-not').value=c.notas||'';if($('#f-con'))$('#f-con').checked=!!c.consentimiento;$('#f-baja').checked=!!c.baja;
   $('#f-del').hidden=!id;$('#dlg').showModal();
 }
 $('#f-x').onclick=()=>$('#dlg').close();
@@ -384,9 +384,9 @@ $('#cform').onsubmit=async e=>{
   const con=$('#f-con').checked,baja=$('#f-baja').checked;
   const r={nombre:$('#f-nom').value.trim(),telefono:tel,etiquetas:tagsOf($('#f-tag').value),
     fecha_cumpleanos:$('#f-cum').value||null,ultima_compra:$('#f-ult').value||null,
-    notas:$('#f-not').value.trim()||null,consentimiento:con,baja};
+    notas:$('#f-not').value.trim()||null,consentimiento:true,baja};
   if(!editId)r.activo=true;
-  if(con&&!old.consentimiento)r.fecha_consentimiento=hoyISO();
+  if(!old.consentimiento)r.fecha_consentimiento=hoyISO();
   if(baja&&!old.baja)r.fecha_baja=hoyISO();
   const{error}=editId?await sb.from('clientes').update(r).eq('id',editId):await sb.from('clientes').insert(r);
   if(error)return alert(error.code==='23505'?'Ya existe un cliente con ese teléfono.':error.message);
@@ -418,7 +418,7 @@ const sinTilde=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').
 const VERDAD=/^(si|sí|s|1|true|x|yes|acepta|acepto|autoriza|autorizado)$/i;
 
 $('#c-imp').onclick=()=>{
-  if(!confirm('El CSV debe tener columnas de nombre y teléfono. Opcionalmente: consentimiento (si/no), etiquetas, cumpleaños y notas. ¿Continuar?'))return;
+  if(!confirm('El CSV debe tener columnas de nombre y teléfono. Opcionalmente: etiquetas, cumpleaños y notas. ¿Continuar?'))return;
   $('#c-file').click();
 };
 $('#c-file').onchange=async e=>{
@@ -449,7 +449,7 @@ $('#c-file').onchange=async e=>{
     const cum=iB>=0?String(r[iB]||'').trim():'';
     const fecha=/^\d{4}-\d{2}-\d{2}$/.test(cum)?cum:(/^\d{2}\/\d{2}\/\d{4}$/.test(cum)?cum.split('/').reverse().join('-'):null);
     valid.push({
-      nombre,telefono:tel,consentimiento:con,fecha_consentimiento:con?hoyISO():null,
+      nombre,telefono:tel,consentimiento:true,fecha_consentimiento:hoyISO(),
       fecha_cumpleanos:fecha,ultima_compra:iU>=0&&/^\d{4}-\d{2}-\d{2}$/.test(String(r[iU]||'').trim())?String(r[iU]).trim():null,
       notas:iNo>=0?(String(r[iNo]||'').trim()||null):null,
       etiquetas:iG>=0?tagsOf(String(r[iG]).replace(/;/g,',')):[],activo:true
@@ -457,8 +457,7 @@ $('#c-file').onchange=async e=>{
   }
   impRows=valid;
   const nuevos=valid.filter(x=>!existentes.has(x.telefono)).length;
-  const con=valid.filter(x=>x.consentimiento).length;
-  $('#imp-sum').innerHTML=`<p class="muted">Se encontraron <b>${valid.length}</b> teléfonos válidos: ${nuevos} nuevos y ${valid.length-nuevos} ya registrados. ${con} dieron consentimiento. ${invalid.length} filas se omitirán.</p>`;
+  $('#imp-sum').innerHTML=`<p class="muted">Se encontraron <b>${valid.length}</b> teléfonos válidos: ${nuevos} nuevos y ${valid.length-nuevos} ya registrados. ${invalid.length} filas se omitirán.</p>`;
   $('#imp-table').innerHTML=`<div class="row"><div><b>Vista previa</b><small>${valid.slice(0,6).map(x=>esc(x.nombre)+' +'+esc(x.telefono)).join(' · ')||'Sin filas válidas'}</small></div></div>`+
     (invalid.length?`<p class="muted">Omitidas: ${invalid.slice(0,5).map(x=>esc(x.nombre)+' ('+esc(x.tel||'sin teléfono')+')').join(', ')}${invalid.length>5?'…':''}</p>`:'');
   $('#imp-go').disabled=!valid.length;
@@ -468,7 +467,6 @@ $('#imp-x').onclick=()=>$('#dlgImp').close();
 $('#imp-go').onclick=async()=>{
   const btn=$('#imp-go');btn.disabled=true;btn.textContent='Importando…';
   let out=impRows;
-  if($('#imp-only').checked)out=out.filter(x=>x.consentimiento);
   if(!out.length){btn.disabled=false;btn.textContent='Importar';return alert('No hay filas para importar con esa opción.')}
   const upd=$('#imp-upd').checked;
   const{error}=await sb.from('clientes').upsert(out,{onConflict:'telefono',ignoreDuplicates:!upd});
@@ -502,7 +500,7 @@ $('#k-add').onclick=()=>{
   prev();
 };
 const destinos=()=>{const s=tagsOf($('#k-seg').value);const todos=!!$('#k-sin-consent')?.checked;return clientes.filter(c=>(todos?(c.activo!==false&&!c.baja):puede(c))&&(!s.length||s.some(t=>(Array.isArray(c.etiquetas)?c.etiquetas:[]).map(x=>String(x).toLowerCase()).includes(t))))};
-function infoDest(){const todos=!!$('#k-sin-consent')?.checked;$('#k-info').textContent=todos?`Se enviará a ${destinos().length} clientes (incluye sin consentimiento; no incluye bajas ni inactivos).`:`Se enviará a ${destinos().length} clientes que aceptaron promociones y no pidieron la baja.`}
+function infoDest(){$('#k-info').textContent=`Se enviará a ${destinos().length} clientes activos (no incluye bajas).`}
 $('#k-sin-consent')?.addEventListener('change',infoDest);
 $('#k-seg').oninput=infoDest;
 
@@ -529,7 +527,7 @@ async function crearCampana(estado){
   if(sending)return;
   const tit=$('#k-tit').value.trim(),msg=$('#k-msg').value.trim(),dest=destinos();
   if(!tit||!msg)return alert('Escribe el nombre interno y el mensaje.');
-  if(!dest.length)return alert('Ningún cliente cumple las condiciones (consentimiento, sin baja y etiqueta).');
+  if(!dest.length)return alert('Ningún cliente cumple las condiciones (etiqueta o bajas).');
   let fecha=null;
   if(estado==='programada'){
     const raw=$('#k-fecha').value;
@@ -541,7 +539,7 @@ async function crearCampana(estado){
   }
   sending=true;
   try{
-    const segmento=[...tagsOf($('#k-seg').value)];if($('#k-sin-consent')?.checked)segmento.push('__TODOS__');
+    const segmento=[...tagsOf($('#k-seg').value)];
     const{data:k,error}=await sb.from('campanas').insert({titulo:tit,mensaje_final:msg+($('#k-baja').checked?BAJA:''),segmento,fecha_programada:fecha,estado,numero_emisor:$('#k-num').value}).select().single();
     if(error)throw error;
     const{error:e2}=await sb.from('envios').insert(dest.map(c=>({campana_id:k.id,cliente_id:c.id})));
@@ -1501,7 +1499,7 @@ async function guardarEtiquetasChat(){
       if(error)throw new Error(error.message);
       cli.etiquetas=etiquetas;
     }else{
-      const {data,error}=await sb.from('clientes').insert({telefono:inTel,nombre,etiquetas,activo:true,consentimiento:false}).select();
+      const {data,error}=await sb.from('clientes').insert({telefono:inTel,nombre,etiquetas,activo:true,consentimiento:true}).select();
       if(error)throw new Error(error.message);
       if(data&&data[0]&&typeof clientes!=='undefined')clientes.push(data[0]);
     }
@@ -2233,8 +2231,8 @@ function pedirPreviewAnuncio(){
   anuPreviewTimer=setTimeout(async()=>{
     const p=$('#anu-preview');if(!p)return;
     try{
-      const r=await botFetch('/api/anuncios/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filtro:filtroAnuncioForm(),incluirSinConsentimiento:!!$('#anu-sin-consent')?.checked})});
-      p.textContent=`Llegará a ${r.total} destinatario(s)${r.soloChats?` · ${r.soloChats} solo desde chats`:''}${r.sinConsentimiento?` · ${r.sinConsentimiento} sin consentimiento`:''}.`;
+      const r=await botFetch('/api/anuncios/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filtro:filtroAnuncioForm(),incluirSinConsentimiento:true})});
+      p.textContent=`Llegará a ${r.total} destinatario(s)${r.soloChats?` · ${r.soloChats} solo desde chats`:''}.`;
     }catch(e){p.textContent='No se pudo calcular los destinatarios.'}
   },350);
 }
@@ -2257,7 +2255,7 @@ function renderAnuncios(){
     const ADJ=(a.adjuntos||[]).length?' · '+a.adjuntos.map(x=>x==='catalogo'?'📕 catálogo':'🎬 video').join(' + '):'';
     return `<div class="lrow"><div class="lt">
       <b>${esc(a.id)} · ${esc(a.titulo)} <i class="tag ${a.estado==='enviado'?'ok':a.estado==='enviando'?'warn':''}">${ESTADO_ANU[a.estado]||a.estado}</i></b>
-      <small>${seg} · ${s.enviados||0}/${s.total||0} enviados${s.errores?` · ${s.errores} errores`:''}${a.incluirSinConsentimiento?' · incluye sin consentimiento':''}${ADJ}</small>
+      <small>${seg} · ${s.enviados||0}/${s.total||0} enviados${s.errores?` · ${s.errores} errores`:''}${ADJ}</small>
       <small>${esc(fmtFechaHora(a.actualizado))}</small>
       ${s.total?`<div class="an-track" style="margin-top:.35rem"><i style="width:${Math.max(2,pct)}%"></i></div>`:''}
       <small class="muted" style="display:block;white-space:pre-wrap;margin-top:.3rem">${esc(String(a.texto||'').slice(0,160))}</small>
@@ -2274,7 +2272,7 @@ function datosAnuncioForm(){
     titulo:($('#anu-titulo')?.value||'').trim(),
     texto:($('#anu-texto')?.value||'').trim(),
     filtro:filtroAnuncioForm(),
-    incluirSinConsentimiento:!!$('#anu-sin-consent')?.checked,
+    incluirSinConsentimiento:true,
     adjuntos:[$('#anu-adj-catalogo')?.checked?'catalogo':null,$('#anu-adj-video')?.checked?'video':null].filter(Boolean)
   };
 }
@@ -2315,7 +2313,7 @@ function pintarPickerAnuncio(){
   const q=($('#anu-pick-q')?.value||'').toLowerCase().trim();
   const sel=anuTelefonosSet();
   const items=anuPickerCache.filter(d=>!q||String(d.nombre||'').toLowerCase().includes(q)||String(d.telefono).includes(q));
-  lista.innerHTML=items.map(d=>`<label style="display:flex;gap:.5rem;align-items:center;padding:.35rem .6rem;border-bottom:1px solid var(--line);cursor:pointer"><input type="checkbox" data-pick-tel="${esc(String(d.telefono))}" ${sel.has(String(d.telefono))?'checked':''} style="width:auto"><span><b>${esc(d.nombre||('+'+d.telefono))}</b> <small class="muted">+${esc(String(d.telefono))}${d.consentimiento?' · con consentimiento':' · sin consentimiento'}</small></span></label>`).join('')||'<p class="empty" style="padding:.6rem">Sin contactos.</p>';
+  lista.innerHTML=items.map(d=>`<label style="display:flex;gap:.5rem;align-items:center;padding:.35rem .6rem;border-bottom:1px solid var(--line);cursor:pointer"><input type="checkbox" data-pick-tel="${esc(String(d.telefono))}" ${sel.has(String(d.telefono))?'checked':''} style="width:auto"><span><b>${esc(d.nombre||('+'+d.telefono))}</b> <small class="muted">+${esc(String(d.telefono))}</small></span></label>`).join('')||'<p class="empty" style="padding:.6rem">Sin contactos.</p>';
 }
 async function cargarPickerAnuncio(){
   const lista=$('#anu-pick-list');if(!lista)return;
@@ -2389,7 +2387,7 @@ $('#anu-list')?.addEventListener('click',async e=>{
     $('#anu-filtro').value=a.filtro?.tipo||'todos';
     $('#anu-tags').value=(a.filtro?.etiquetas||[]).join(', ');
     $('#anu-tels').value=(a.filtro?.telefonos||[]).join(', ');
-    $('#anu-sin-consent').checked=!!a.incluirSinConsentimiento;
+    if($('#anu-sin-consent'))$('#anu-sin-consent').checked=true;
     if($('#anu-adj-catalogo'))$('#anu-adj-catalogo').checked=(a.adjuntos||[]).includes('catalogo');
     if($('#anu-adj-video'))$('#anu-adj-video').checked=(a.adjuntos||[]).includes('video');
     anuEditId=a.id;

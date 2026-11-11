@@ -318,7 +318,6 @@
             </div>
             <label class="ck"><input type="checkbox" id="k-baja" checked> Agregar aviso para darse de baja al final</label>
             <label for="k-seg">Enviar solo a clientes con etiqueta (separadas por coma; vacío = todos)</label><input id="k-seg" maxlength="200" placeholder="vip, mujer">
-            <label class="ck" style="margin-top:.45rem"><input type="checkbox" id="k-sin-consent"> <b>Enviar a TODOS</b> (incluye clientes sin consentimiento; respeta bajas e inactivos)</label>
             <p class="muted" id="k-info"></p>
             <div class="acts">
               <button class="ghost" id="k-manual" type="button">Preparar envío manual</button>
@@ -371,7 +370,6 @@
                 <div id="anu-pick-list" style="max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:10px;margin-top:.4rem"></div>
               </div>
             </div>
-            <label style="display:flex;gap:.5rem;align-items:center;margin:.7rem 0 .3rem"><input type="checkbox" id="anu-sin-consent" style="width:auto"> <span class="muted">Enviar a TODOS sin consentimiento (incluye chats que nunca aceptaron)</span></label>
             <p class="muted" id="anu-preview">—</p>
             <div class="acts"><button class="ghost" id="anu-guardar" type="button">Guardar borrador</button><button id="anu-enviar" type="button">Enviar ahora</button></div>
           </div>
@@ -532,7 +530,7 @@
       </div>
       <div class="box">
         <h2>Sincronizar chats y contactos</h2>
-        <p class="muted">Trae a la <b>Bandeja</b> todos los chats del WhatsApp vinculado y guarda los <b>contactos</b> (nombre y número) en Clientes. Los contactos se guardan <b>sin consentimiento</b>: tú luego completas cumpleaños y etiquetas. No sobrescribe a quien ya tengas cargado.</p>
+        <p class="muted">Trae a la <b>Bandeja</b> todos los chats del WhatsApp vinculado y guarda los <b>contactos</b> (nombre y número) en Clientes. Los contactos se guardan automáticamente para que puedas escribirles desde el CRM. No sobrescribe a quien ya tengas cargado.</p>
         <div class="acts" style="justify-content:flex-start">
           <button id="b-sync-todo" type="button">Sincronizar ahora</button>
           <button class="ghost" id="b-sync-chats" type="button">Solo chats (Bandeja)</button>
@@ -559,12 +557,12 @@
           <li>Enciendes el bot en la PC o servidor donde se ejecuta (sin ventana de Chrome si usas <code>HEADLESS=true</code>).</li>
           <li>En esta misma pantalla, en <b>Conectar WhatsApp (QR)</b>, escaneas el QR con el WhatsApp de la tienda. Solo se hace una vez; luego la sesión queda guardada en <code>bot/.wwebjs_auth</code>.</li>
           <li>En Campañas eliges fecha y pulsas <b>Programar con el bot</b>.</li>
-          <li>El bot envía de a un cliente cada 25-40 segundos, solo a quienes dieron consentimiento.</li>
+          <li>El bot envía de a un cliente cada 25-40 segundos.</li>
           <li>Si un cliente responde BAJA, el bot lo marca y no le vuelve a escribir.</li>
         </ol>
       </div>
       <div class="warnbox">
-        <b>Riesgo asumido por el cliente:</b> automatizar WhatsApp Web con librerías no oficiales va contra los términos de WhatsApp y puede provocar el bloqueo del número. Por eso el bot usa retraso aleatorio, límite diario, horario de atención y solo contacta a clientes con consentimiento. Úsalo primero en modo prueba con tu propio número.
+        <b>Riesgo asumido por el cliente:</b> automatizar WhatsApp Web con librerías no oficiales va contra los términos de WhatsApp y puede provocar el bloqueo del número. Por eso el bot usa retraso aleatorio, límite diario y horario de atención. Úsalo primero en modo prueba con tu propio número.
       </div>
     </section>
     </div>
@@ -580,7 +578,6 @@
     <label for="f-cum">Cumpleaños</label><input id="f-cum" type="date">
     <label for="f-ult">Última compra</label><input id="f-ult" type="date">
     <label for="f-not">Notas</label><input id="f-not" maxlength="300">
-    <label class="ck"><input type="checkbox" id="f-con"> Aceptó recibir promociones</label>
     <label class="ck"><input type="checkbox" id="f-baja"> Pidió no recibir más mensajes (baja)</label>
     <div class="acts"><button type="button" class="del" id="f-del" hidden>Eliminar</button><button type="button" class="ghost" id="f-x">Cancelar</button><button id="f-ok">Guardar</button></div>
   </form>
@@ -616,7 +613,6 @@
   <div id="imp-sum"></div>
   <div id="imp-table" style="margin-top:.8rem"></div>
   <label class="ck"><input type="checkbox" id="imp-upd"> Actualizar los datos de clientes que ya existen</label>
-  <label class="ck"><input type="checkbox" id="imp-only"> Importar solo a quienes dieron consentimiento</label>
   <div class="acts"><button type="button" class="ghost" id="imp-x">Cancelar</button><button type="button" id="imp-go">Importar</button></div>
 </dialog>
 
