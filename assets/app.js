@@ -281,15 +281,25 @@ $('#lform').onsubmit=async e=>{
 $('#out').onclick=()=>sb.auth.signOut();
 
 /* ---------- carga ---------- */
+async function cargarClientesTodos(){
+  const salida=[];const paso=1000;
+  for(let i=0;i<25;i++){
+    const {data,error}=await sb.from('clientes').select('*').order('nombre').range(i*paso,(i+1)*paso-1);
+    if(error)throw error;
+    salida.push(...(data||[]));
+    if(!data||data.length<paso)break;
+  }
+  return salida;
+}
 async function load(){
   const[c,p,t,k]=await Promise.all([
-    sb.from('clientes').select('*').order('nombre'),
+    cargarClientesTodos(),
     sb.from('productos').select('*').order('codigo'),
     sb.from('plantillas').select('*').order('nombre'),
     sb.from('campanas').select('*').order('creado_en',{ascending:false}).limit(200)]);
   if(p.error)throw new Error(p.error.message);
-  if(c.error||t.error||k.error)console.warn('Aviso al cargar:',(c.error||t.error||k.error).message);
-  clientes=c.data||[];
+  if(t.error||k.error)console.warn('Aviso al cargar:',(t.error||k.error).message);
+  clientes=c||[];
   productos=(p.data||[]).filter(x=>x.activo!==false);
   plantillas=t.data||[];campanas=k.data||[];
   $('#k-pla').innerHTML='<option value="">Escribir desde cero</option>'+plantillas.map(x=>`<option value="${esc(x.id)}">${esc(x.nombre)}</option>`).join('');
@@ -349,8 +359,9 @@ $('#tabs').onclick=e=>{const b=e.target.closest('button');if(b)irTab(b.dataset.t
 function renderClientes(){
   const q=$('#cq').value.toLowerCase().trim();
   const l=clientes.filter(c=>[c.nombre,c.telefono,...(Array.isArray(c.etiquetas)?c.etiquetas:[]),c.notas].join(' ').toLowerCase().includes(q));
-  $('#c-count').textContent=`${l.length} de ${clientes.length} clientes · ${clientes.filter(puede).length} pueden recibir promociones`;
-  $('#c-list').innerHTML=l.map(c=>`<div class="row"><div><b>${esc(c.nombre)}</b><small>+${esc(c.telefono)}${(Array.isArray(c.etiquetas)?c.etiquetas:[]).map(t=>`<i class="tag">${esc(t)}</i>`).join('')}${c.consentimiento?'':'<i class="tag warn">sin consentimiento</i>'}${c.baja?'<i class="tag bad">baja</i>':''}${c.fecha_cumpleanos?`<i class="tag">🎂 ${esc(fmtDia(c.fecha_cumpleanos))}</i>`:''}</small></div><button class="ghost" data-edit="${esc(c.id)}">Editar</button></div>`).join('')||'<p class="empty">Aún no hay clientes. Agrega uno o importa un CSV con las columnas nombre y telefono.</p>';
+  const tope=500;const visibles=l.slice(0,tope);
+  $('#c-count').textContent=`${l.length} de ${clientes.length} clientes · ${clientes.filter(puede).length} pueden recibir promociones${l.length>tope?' · mostrando '+tope+', usa el buscador':''}`;
+  $('#c-list').innerHTML=visibles.map(c=>`<div class="row"><div><b>${esc(c.nombre)}</b><small>+${esc(c.telefono)}${(Array.isArray(c.etiquetas)?c.etiquetas:[]).map(t=>`<i class="tag">${esc(t)}</i>`).join('')}${c.consentimiento?'':'<i class="tag warn">sin consentimiento</i>'}${c.baja?'<i class="tag bad">baja</i>':''}${c.fecha_cumpleanos?`<i class="tag">🎂 ${esc(fmtDia(c.fecha_cumpleanos))}</i>`:''}</small></div><button class="ghost" data-edit="${esc(c.id)}">Editar</button></div>`).join('')||'<p class="empty">Aún no hay clientes. Agrega uno o importa un CSV con las columnas nombre y telefono.</p>';
 }
 $('#cq').oninput=renderClientes;
 $('#c-list').onclick=e=>{const b=e.target.closest('[data-edit]');if(b)abrirCliente(b.dataset.edit)};
