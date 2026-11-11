@@ -332,6 +332,17 @@ async function procesarPedidoIA({ tel, nombre, clienteId, pedidoIA }) {
 
 /** Envía un texto y lo deja registrado en Bandeja + Supabase. */
 async function enviarRegistrado({ tel, texto, nombre = '', clienteId = null, sesionId = null, origen = 'bot', opciones = {} }) {
+  // Anti-duplicado: WhatsApp Web a veces reemite el mismo evento y dos
+  // instancias pueden responder a la vez. No se repite el mismo texto en 10 s.
+  try {
+    const chat = obtener(tel);
+    const ult = (chat?.mensajes || []).filter(m => m.direccion === 'saliente').slice(-2);
+    const ahora = Date.now();
+    if (ult.some(m => String(m.texto || '').trim() === String(texto || '').trim() && ahora - new Date(m.en || 0).getTime() < 10000)) {
+      log(`Mensaje duplicado evitado a +${tel}: ${String(texto).slice(0, 60)}`);
+      return { duplicado: true };
+    }
+  } catch { /* si falla la comprobación, se envía normal */ }
   const env = await enviar(tel, texto, sesionId, opciones);
   await logMensaje({ clienteId, telefono: tel, direccion: 'saliente', texto, origen });
   registrar({ telefono: tel, texto, direccion: 'saliente', nombre, clienteId, origen, waId: env?.waId || '' });
@@ -1402,6 +1413,28 @@ async function manejarAck(msg, ack, sesionId = null) {
   }
 }
 
+/** Resume el estilo de escritura del cliente en este chat para imitarlo. */
+const estiloCache = new Map();
+function estiloDelChat(tel) {
+  try {
+    const chat = obtener(tel);
+    if (!chat) return '';
+    const msgs = (chat.mensajes || []).filter(m => m.direccion === 'entrante' && String(m.texto || '').trim());
+    if (msgs.length < 3) return '';
+    const muestra = msgs.slice(-40);
+    const txt = muestra.map(m => m.texto).join('\n');
+    const emojis = txt.match(/\p{Extended_Pictographic}/gu) || [];
+    const unicos = [...new Set(emojis)].slice(0, 6).join(' ');
+    const conVineta = (txt.match(/^[•\-\*]\s/mg) || []).length;
+    const promedio = Math.round(txt.length / muestra.length);
+    let estilo = '';
+    if (emojis.length) estilo += `Usa emojis (${unicos}). `;
+    if (conVineta) estilo += 'Escribe con viñetas. ';
+    estilo += `Mensajes de ~${promedio} caracteres. `;
+    return estilo ? `Estilo aprendido de esta conversación: ${estilo}Responde imitando ese estilo (emojis y viñetas cuando encajen), sin exagerar.` : '';
+  } catch { return ''; }
+}
+
 async function notificarDueno(texto, sesionId = null) {
   if (!config.ownerNumber) return;
   try {
@@ -1565,8 +1598,20 @@ async function manejarMensaje(msg, sesionId = null) {
   // Multimedia sin texto: si es un comprobante y hay un pedido abierto, se
   // guarda en el módulo de pedidos. El bot NO confirma el pago: solo avisa.
   if (!esTextoReal) {
-    const abierto = pedidos.pedidoAbierto(tel);
     const tipo = String(msg.type || '');
+    let abierto = pedidos.pedidoAbierto(tel) || pedidos.ultimoPedido(tel);
+    // Si el chat menciona un número de pedido (P-0001), se busca ese pedido.
+    if (!abierto) {
+      try {
+        const chatTel = obtener(tel);
+        const refs = [...new Set(((chatTel?.mensajes || []).slice(-60).map(m => String(m.texto || '')).join(' ').match(/P-?\d{3,}/gi) || []))];
+        for (const ref of refs) {
+          const id = ref.replace(/[^0-9]/g, '');
+          const encontrado = pedidos.obtener(id) || pedidos.listar({ limite: 500 }).find(p => String(p.id).endsWith(id));
+          if (encontrado) { abierto = encontrado; break; }
+        }
+      } catch { /* sin referencia: se usa el último pedido del cliente */ }
+    }
     if (abierto && /^(image|document)$/.test(tipo)) {
       try {
         const media = await descargarMediaWa(msg, sesionId);
@@ -1598,6 +1643,7 @@ async function manejarMensaje(msg, sesionId = null) {
           await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'saliente', texto: aviso, origen: 'bot' });
           registrar({ telefono: tel, texto: aviso, direccion: 'saliente', nombre: nombreChat, clienteId: cliente?.id, origen: 'bot', waId: env?.waId || '' });
           log(`Comprobante del pedido ${actualizado.id} recibido de +${tel} (${archivo}). Sin confirmar pago.`);
+          emitir('comprobante_pedido', { telefono: tel, pedidoId: actualizado.id });
           return;
         }
         log(`No se pudo descargar el comprobante de +${tel}: ${media?.error || 'sin datos'}.`);
@@ -1677,7 +1723,7 @@ ${String(texto).slice(0, 300)}
 
   try {
     log(`Pensando respuesta para +${tel}...`);
-    const ai = await redactarRespuesta({ mensaje: textoIA, historial: hist, cliente, contexto: promptIA() });
+    const ai = await redactarRespuesta({ mensaje: textoIA, historial: hist, cliente, contexto: [promptIA(), estiloDelChat(tel)].filter(Boolean).join('\n\n') });
     if (ai.derivar) {
       // Con números de prueba (o el del dueño) nunca se pausa ni se avisa: se
       // responde algo útil para poder seguir probando el flujo con IA.
