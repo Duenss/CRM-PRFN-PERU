@@ -52,7 +52,7 @@ function leerSoundCfg(){
 }
 function guardarSoundCfg(c){try{localStorage.setItem(SOUND_KEY,JSON.stringify(c))}catch(e){}}
 let soundCfg=leerSoundCfg();
-const volumen=()=>Math.max(0,Math.min(1,soundCfg.vol));
+const volumen=()=>1; // volumen siempre al máximo (sin barra en Ajustes)
 const suenaEvento=ev=>!!(soundCfg.ev&&soundCfg.ev[ev]);
 const soundToggle=$('#soundToggle');
 function playTone(freq,duration,volume){
