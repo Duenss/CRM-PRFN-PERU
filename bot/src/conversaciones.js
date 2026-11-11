@@ -480,6 +480,34 @@ export function marcarAgregados(telefonos = []) {
   guardar();
 }
 
+/** Aplica la agenda de contactos: marca agregados y completa nombres faltantes. */
+export function aplicarContactos(contactos = []) {
+  const mapa = new Map();
+  for (const c of Array.isArray(contactos) ? contactos : []) {
+    const tel = limpiarTel(c.telefono);
+    if (tel) mapa.set(tel, c);
+  }
+  for (const tel of Object.keys(chats)) {
+    const c = mapa.get(tel);
+    if (!c) continue;
+    const ch = chats[tel];
+    if (c.guardado === true) {
+      ch.agregado = true;
+      const nom = String(c.nombreGuardado || c.nombre || '').trim();
+      if (nom) {
+        if (!ch.nombreGuardado) ch.nombreGuardado = nom;
+        if (!ch.nombre || /^\+?[\d\s]+$/.test(String(ch.nombre))) {
+          ch.nombre = nom;
+          ch.nombreWa = nom;
+        }
+      }
+    } else if (ch.agregado !== true) {
+      ch.agregado = false;
+    }
+  }
+  guardar();
+}
+
 export function obtener(telefono) {
   const c = chats[limpiarTel(telefono)];
   if (!c) return null;

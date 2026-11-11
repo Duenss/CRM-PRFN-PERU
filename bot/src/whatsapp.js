@@ -692,6 +692,7 @@ export async function listarChatsWa(sesionId = null) {
         tieneMensajes,
         ts: c.timestamp || ultimo?.timestamp || ultimo?.t || 0,
         tsReal: 0,
+        guardado: c.contact?.isMyContact === true || c.isMyContact === true,
         pin: !!(c.pinned === true || c.isPinned === true),
         archived: c.archived === true || c.isArchived === true || c.archive === true,
         real: true,
@@ -957,8 +958,13 @@ export async function listarContactosWa(sesionId = null) {
     const tel = telDe(c);
     if (!tel || tel === propio) continue;
     const nombre = String(c.name || c.pushname || c.shortName || '').trim();
+    const guardado = c.isMyContact === true;
     const previo = porTel.get(tel);
-    if (!previo || (!previo.nombre && nombre)) porTel.set(tel, { telefono: tel, nombre });
+    if (!previo || (!previo.nombre && nombre)) {
+      porTel.set(tel, { telefono: tel, nombre, guardado, nombreGuardado: String(c.name || '').trim() });
+    } else if (guardado && !previo.guardado) {
+      porTel.set(tel, { ...previo, guardado, nombreGuardado: String(c.name || '').trim() });
+    }
   }
   return [...porTel.values()];
 }
