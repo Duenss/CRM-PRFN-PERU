@@ -1,20 +1,20 @@
 {
   "kind": "self-test",
-  "ts": "2026-11-08T19:20:23.723Z",
+  "ts": "2026-11-12T09:37:05.261Z",
   "node": "v24.16.0",
   "platform": "win32/x64",
   "index": {
     "path": "C:\\Users\\Juan Pablo\\Documents\\WEB PROJECTS\\Crm Perfumeriafina\\index.html",
-    "bytes": 146815,
-    "sha256": "dd9e74530fd56ddc32f5c1f35af033857945ace55003fdf1b334feacf8f006bc",
-    "mtime": "2026-11-08T19:19:17.553Z"
+    "bytes": 53925,
+    "sha256": "7ea897cd2fbade63dbf0f78bfb75d4cd01d5f42b662152d340e3ee9912c67f9f",
+    "mtime": "2026-11-12T09:27:38.156Z"
   },
   "cases": [
     {
       "id": "ST-01",
       "name": "index.html real se sirve por HTTP",
-      "status": "PASS",
-      "detail": "HTTP 200 · 146320 bytes"
+      "status": "FAIL",
+      "detail": "no parece el panel real"
     },
     {
       "id": "ST-02",
@@ -26,7 +26,7 @@
       "id": "ST-03",
       "name": "GET /api/conversaciones y detalle (30 mensajes de scroll, orden por ultimoEn)",
       "status": "PASS",
-      "detail": "3 chats ordenados · hilo=30 mensajes"
+      "detail": "4 chats ordenados · hilo=30 mensajes"
     },
     {
       "id": "ST-03b",
@@ -56,7 +56,7 @@
       "id": "ST-07",
       "name": "la sesión falsa de Supabase es aceptada por supabase-js real",
       "status": "PASS",
-      "detail": "storageKey=sb-pcesvmsewfpvmqmfmswn-auth-token · sesión aceptada (exp 1794169223)"
+      "detail": "storageKey=sb-pcesvmsewfpvmqmfmswn-auth-token · sesión aceptada (exp 1794479825)"
     },
     {
       "id": "ST-08",
@@ -67,8 +67,8 @@
   ],
   "totals": {
     "total": 9,
-    "pass": 9,
-    "fail": 0,
+    "pass": 8,
+    "fail": 1,
     "skip": 0
   }
 }

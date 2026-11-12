@@ -425,6 +425,8 @@ export function listar(limite = 40) {
       noLeidos: c.noLeidos || 0,
       ultimoTexto: c.ultimoTexto,
       ultimoEn: c.ultimoEn,
+      // Dirección del último mensaje: permite filtrar "sin responder" en el panel.
+      ultimaDireccion: (c.mensajes && c.mensajes.length ? c.mensajes[c.mensajes.length - 1].direccion : '') || '',
       total: c.mensajes.length,
       pin: !!c.pin,
       fijado: !!(c.fijado || c.pin),
@@ -452,6 +454,7 @@ export function buscar({ limite = 80, offset = 0, q = '', filtro = 'todos' } = {
     noLeidos: c.noLeidos || 0,
     ultimoTexto: c.ultimoTexto,
     ultimoEn: c.ultimoEn,
+    ultimaDireccion: (c.mensajes && c.mensajes.length ? c.mensajes[c.mensajes.length - 1].direccion : '') || '',
     total: c.mensajes.length,
     pin: !!c.pin,
     fijado: !!(c.fijado || c.pin),

@@ -124,7 +124,16 @@
         <div><h1>Bandeja de entrada</h1><p class="muted" id="in-sub">Conversaciones de WhatsApp en vivo.</p></div>
         <div class="bar" style="margin:0"><input id="in-q" type="search" placeholder="Buscar por nombre o número"><button class="ghost" id="in-notify" type="button" title="Activar sonido y notificaciones de derivaciones">Activar avisos</button><button class="ghost" id="in-sync" type="button">Sincronizar WhatsApp</button><button class="ghost" id="in-refresh" type="button">Actualizar</button><button class="ghost" id="in-pause" type="button" title="Pausar la IA en todos los chats">Pausar IA</button></div>
       </div>
-      <div class="in-filtros-row"><div class="seg" id="in-filtros" role="group" aria-label="Filtrar chats"><button type="button" data-inf="todos" class="on">Todos</button><button type="button" data-inf="agregados">Agregados</button><button type="button" data-inf="noAgregados">No agregados</button><button type="button" data-inf="sinWhatsApp">Sin WhatsApp</button></div><span class="muted" id="in-filtro-info"></span></div>
+      <div class="in-filtros-row"><div class="seg" id="in-filtros" role="group" aria-label="Filtrar chats"><button type="button" data-inf="todos" class="on">Todos</button><button type="button" data-inf="noLeidos">No leídos</button><button type="button" data-inf="sinResponder">Sin responder</button><button type="button" data-inf="conPedido">Con pedido</button><button type="button" data-inf="agregados">Agregados</button><button type="button" data-inf="noAgregados">No agregados</button><button type="button" data-inf="sinWhatsApp">Sin WhatsApp</button></div><span class="muted" id="in-filtro-info"></span></div>
+      <div class="in-filtros-row filtros-extra">
+        <label class="filtro-lbl" for="in-e">Etiqueta</label>
+        <select id="in-e" class="filtro-sel" aria-label="Filtrar por etiqueta"><option value="">Todas</option></select>
+        <label class="filtro-lbl" for="in-fd">Desde</label>
+        <input id="in-fd" type="date" class="filtro-sel" aria-label="Mensajes desde">
+        <label class="filtro-lbl" for="in-fh">Hasta</label>
+        <input id="in-fh" type="date" class="filtro-sel" aria-label="Mensajes hasta">
+        <button class="ghost" type="button" id="in-flimpiar" title="Quitar todos los filtros y la búsqueda">Limpiar filtros</button>
+      </div>
       <div class="inbox">
         <div class="in-list" id="in-list"><p class="empty" style="padding:1rem">Cargando…</p></div>
         <div class="in-chat">
@@ -225,6 +234,18 @@
       <div>
         <div class="card">
           <div class="card-h"><b>Pedidos</b><span class="muted" id="pe-count">—</span></div>
+          <div class="in-filtros-row filtros-extra" id="pe-filtros">
+            <input id="pe-q" type="search" class="filtro-sel" placeholder="Buscar pedido, cliente o teléfono" aria-label="Buscar pedidos">
+            <label class="filtro-lbl" for="pe-f-estado">Estado</label>
+            <select id="pe-f-estado" class="filtro-sel" aria-label="Filtrar por estado"><option value="">Todos</option></select>
+            <label class="filtro-lbl" for="pe-f-entrega">Entrega</label>
+            <select id="pe-f-entrega" class="filtro-sel" aria-label="Filtrar por entrega"><option value="">Todas</option><option value="delivery">Delivery</option><option value="estacion">Recojo en estación</option><option value="sin">Sin definir</option></select>
+            <label class="filtro-lbl" for="pe-f-desde">Desde</label>
+            <input id="pe-f-desde" type="date" class="filtro-sel" aria-label="Pedidos desde">
+            <label class="filtro-lbl" for="pe-f-hasta">Hasta</label>
+            <input id="pe-f-hasta" type="date" class="filtro-sel" aria-label="Pedidos hasta">
+            <button class="ghost" type="button" id="pe-flimpiar" title="Quitar todos los filtros de pedidos">Limpiar</button>
+          </div>
           <div id="pe-list" style="padding:.4rem 1rem 1rem"><p class="empty">Cargando...</p></div>
         </div>
       </div>

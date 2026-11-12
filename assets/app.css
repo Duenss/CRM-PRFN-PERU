@@ -694,3 +694,16 @@ button:not(.ghost):not(.iconbtn):not(.toplogo):not(.chipstatus):not(.ai){}
 .inv-nota{color:var(--mute2);font-size:.74rem;margin:.7rem 0 0}
 .inv-foot{color:var(--gold);font-size:.75rem;text-align:center;margin:1rem 0 0}
 @media print{body>*{display:none!important}#dlgInvoice{display:block!important;position:static;max-width:none;width:100%;margin:0;background:#fff}#dlgInvoice .inv-card{background:#fff;color:#111;border:0;box-shadow:none;padding:0}#dlgInvoice .acts{display:none!important}#dlgInvoice .inv-head small,#dlgInvoice .inv-grid small,#dlgInvoice .inv-table th{color:#555}#dlgInvoice .inv-num b,#dlgInvoice .inv-foot{color:#8a6d1f}#dlgInvoice .inv-table td{border-color:#ddd}}
+
+/* ---------- filtros de bandeja y pedidos (Parte 5) ---------- */
+.filtros-extra{row-gap:.45rem}
+.filtro-lbl{font-size:.78rem;color:var(--mute);white-space:nowrap}
+.filtro-sel{min-height:34px;padding:.25rem .55rem;background:var(--s2);border:1px solid var(--line);border-radius:var(--rs);color:var(--ink);font:inherit;font-size:.8rem}
+.filtro-sel:focus-visible{outline:2px solid var(--gold);outline-offset:1px}
+#in-e{max-width:170px}
+#pe-q{min-width:220px;flex:1 1 220px;max-width:360px}
+#pe-f-estado{max-width:190px}
+@media (max-width:760px){
+  .filtro-sel{min-height:40px}
+  #pe-q{max-width:none;flex:1 1 100%}
+}
