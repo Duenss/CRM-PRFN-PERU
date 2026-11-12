@@ -30,3 +30,20 @@ jobs:
 
       - name: Pruebas unitarias
         run: npm test
+
+  secretos:
+    name: Escaneo de secretos
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar código (historial completo)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Escanear historial y árbol de trabajo
+        run: node scripts/scan-secrets.mjs

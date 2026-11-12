@@ -51,3 +51,15 @@ docs/catalogo/preview-*.png
 
 # respaldos locales del bot
 backups/
+
+# Higiene del repo (auditoría de secretos, 2026-11-11): respaldos y archivos
+# de operación del servidor no se versionan; la clave pública de Coolify tampoco.
+*.bak.html
+*.bak
+deploy/backup-http/
+deploy/coolify-public-key.txt
+
+# Capturas de pantalla del panel/Coolify: pueden mostrar nombres y teléfonos de
+# clientes. Las capturas que YA están versionadas se revisan a mano antes de
+# decidir si se retiran del índice (git rm --cached).
+docs/auditoria/capturas/*.png
