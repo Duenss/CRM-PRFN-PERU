@@ -25,3 +25,10 @@
   con +45 tests nuevos.
 - Diseño verificado con capturas propias en `docs/capturas/` (5 pantallas × 3 anchos),
   corrigiendo overflow horizontal, gráfico colapsado y cabecera del chat.
+
+## Extras post-plan (2026-11-12, pedido del dueño)
+
+| Extra | Estado | Commit | Tests |
+|---|---|---|---|
+| Chats duplicados LID (identidad canónica + fusión + script) | ✅ | 5dae80b | bot 248/249 (1 CRLF) |
+| Multimedia visible en el hilo (miniatura + carga bajo demanda) | ✅ | 5dae80b | e2e 22/22 |
