@@ -4,13 +4,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config, validarConfig, esNumeroPeru, normalizar } from './config.js';
 import { sb, getCliente, getClientes, getProductos, logMensaje, historial, marcarBaja, importarClientes } from './supabase.js';
-import { iniciarWhatsApp, enviar, enviarImagen, enviarVideo, enviarArchivo, estadoWa, cerrarSesion, reiniciarSesion, hayConexion, sesionDisponible, listarChatsWa, listarContactosWa, historialWa, resolverTelefonoWa, recordarDestinoWa, idMensaje, descargarMediaWa, conTimeout } from './whatsapp.js';
+import { iniciarWhatsApp, enviar, enviarImagen, enviarVideo, enviarArchivo, estadoWa, cerrarSesion, reiniciarSesion, hayConexion, sesionDisponible, listarChatsWa, listarContactosWa, historialWa, verificarNumeroWa, resolverTelefonoWa, recordarDestinoWa, idMensaje, descargarMediaWa, conTimeout } from './whatsapp.js';
 import { redactarRespuesta, transcribirAudio, redactarBorradores, redactarBienvenida, redactarAnuncio, productoPorId, productoMencionado } from './ai.js';
 import { Cola, dormir, esperaEntreEnvios } from './queue.js';
 import { estadoIA, actualizarIA, pausarIA, estaPausado, promptIA, resumenIA } from './ia.js';
 import { estadoAjustes, actualizarAjustes, esperaMasivaMs, esperaChatMs } from './ajustes.js';
 import { oculto, ocultar, limpiar as limpiarOcultos } from './ocultos.js';
-import { registrar, listar, buscar, marcarAgregados, aplicarContactos, aplicarNombresClientes, marcarSinWhatsApp, marcarSinChat, obtener, marcarLeido, respuestasIA, porDia, resumen as resumenChats, registrarCabecera, importarMensajes, yaExisteWa, actualizarAck, mensajesEntrantes, eliminar as eliminarConversacion, fijar as fijarChat, archivar as archivarChat, vaciar as vaciarConversaciones, flush as flushConversaciones } from './conversaciones.js';
+import { registrar, listar, buscar, chatsSinWhatsApp, marcarAgregados, aplicarContactos, aplicarNombresClientes, marcarSinWhatsApp, marcarSinChat, obtener, marcarLeido, respuestasIA, porDia, resumen as resumenChats, registrarCabecera, importarMensajes, yaExisteWa, actualizarAck, mensajesEntrantes, eliminar as eliminarConversacion, fijar as fijarChat, archivar as archivarChat, vaciar as vaciarConversaciones, flush as flushConversaciones } from './conversaciones.js';
 import * as pedidos from './pedidos.js';
 import * as anuncios from './anuncios.js';
 // (Las plantillas de pago se eliminaron: las billeteras digitales las verifica el admin.)
@@ -123,7 +123,7 @@ function hora12(hora) {
   h = h % 12 || 12;
   return `${h}:${m[2]} ${suf}`;
 }
-const puede = c => c && c.activo !== false && !c.baja;
+const puede = c => c && c.activo !== false && !c.baja && !(Array.isArray(c.etiquetas) && c.etiquetas.includes('sin-wsp'));
 
 /* ---------------- pedidos, pagos y seguimiento ---------------- */
 const botDataDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data');
@@ -904,6 +904,13 @@ function etiquetasDe(c) {
 }
 
 /** Une la base de clientes con los chats de la Bandeja en una sola lista. */
+function nombreEsAgregadoAnuncio(nombre) {
+  const t = String(nombre || '').trim();
+  if (!t) return false;
+  if (t.startsWith('@')) return false;
+  return !/^\+?[\d\s\-()]+$/.test(t);
+}
+
 function listaDestinatarios(clientes, chats) {
   const mapa = new Map();
   for (const c of clientes || []) {
@@ -917,6 +924,8 @@ function listaDestinatarios(clientes, chats) {
       activo: c.activo !== false,
       baja: !!c.baja || esBaja(tel),
       etiquetas: etiquetasDe(c),
+      agregado: nombreEsAgregadoAnuncio(c.nombre),
+      sinWhatsApp: etiquetasDe(c).includes('sin-wsp'),
       origen: 'cliente'
     });
   }
@@ -938,6 +947,8 @@ function listaDestinatarios(clientes, chats) {
       activo: true,
       baja: esBaja(tel),
       etiquetas: [],
+      agregado: nombreEsAgregadoAnuncio(ch.nombre || ch.nombreWa),
+      sinWhatsApp: ch.sinWhatsApp === true,
       origen: 'chat'
     });
   }
@@ -948,7 +959,8 @@ function listaDestinatarios(clientes, chats) {
 function destinatariosAnuncio(clientes, chats, anuncio) {
   const filtro = anuncio.filtro || { tipo: 'todos' };
   return listaDestinatarios(clientes, chats).filter(d => {
-    if (!d.activo || d.baja) return false;
+    if (!d.activo || d.baja || d.sinWhatsApp) return false;
+    if (filtro.tipo === 'noAgregados') return d.agregado !== true;
     if (filtro.tipo === 'etiquetas') return filtro.etiquetas.some(t => d.etiquetas.includes(String(t).toLowerCase()));
     if (filtro.tipo === 'telefonos') return filtro.telefonos.includes(d.telefono);
     return true;
@@ -2239,6 +2251,19 @@ app.get('/api/estadisticas', auth, (req, res) => {
  * con lo que pasó mientras el bot estaba apagado, sin borrar mensajes locales.
  * Devuelve { lista, chats } para que el llamador loguee/emita el evento.
  */
+/** Marca al cliente con la etiqueta "sin-wsp" cuando su número no existe en WhatsApp. */
+async function etiquetarClienteSinWa(tel) {
+  try {
+    if (!sb) return;
+    const cl = await getCliente(tel);
+    if (!cl || !cl.id) return;
+    const ets = Array.isArray(cl.etiquetas) ? cl.etiquetas : [];
+    if (ets.includes('sin-wsp')) return;
+    await sb.from('clientes').update({ etiquetas: [...ets, 'sin-wsp'] }).eq('id', cl.id);
+    log(`Cliente +${tel} marcado como sin WhatsApp.`);
+  } catch (e) { log('No se pudo etiquetar sin WhatsApp: ' + e.message); }
+}
+
 async function sincronizarChatsDesdeWhatsApp(sesionId = null) {
   // El dueño puede desactivar la importación de chats: la Bandeja queda solo
   // con conversaciones nuevas (los mensajes en vivo sí se registran igual).
@@ -2285,6 +2310,39 @@ async function sincronizarChatsDesdeWhatsApp(sesionId = null) {
 }
 
 let sincronizacionEnCurso = false;
+let validacionContactosEnCurso = false;
+app.post('/api/validar-contactos', auth, (_req, res) => {
+  if (validacionContactosEnCurso) return res.json({ ok: true, enCurso: true });
+  validacionContactosEnCurso = true;
+  res.json({ ok: true, enCurso: true });
+  (async () => {
+    try {
+      const clientes = await getClientes();
+      let revisados = 0;
+      let invalidos = 0;
+      for (const cl of clientes) {
+        const ets = Array.isArray(cl.etiquetas) ? cl.etiquetas : [];
+        if (ets.includes('sin-wsp')) continue;
+        revisados++;
+        try {
+          const ok = await verificarNumeroWa(cl.telefono);
+          if (!ok) {
+            await sb.from('clientes').update({ etiquetas: [...ets, 'sin-wsp'] }).eq('id', cl.id);
+            invalidos++;
+          }
+        } catch (e) { log('Validación interrumpida: ' + e.message); break; }
+        if (revisados % 100 === 0) log(`Validación de contactos: ${revisados}/${clientes.length} · ${invalidos} sin WhatsApp.`);
+        await dormir(80);
+      }
+      log(`Validación de contactos terminada: ${revisados} revisados · ${invalidos} sin WhatsApp.`);
+    } catch (e) {
+      log('Error validando contactos: ' + e.message);
+    } finally {
+      validacionContactosEnCurso = false;
+    }
+  })();
+});
+
 app.post('/api/sincronizar', auth, async (req, res) => {
   if (!config.modoPrueba && !sesionDisponible(req.body?.sesion || null)) {
     return res.status(503).json({ error: 'Ningún WhatsApp está conectado.' });
@@ -2309,6 +2367,7 @@ app.post('/api/sincronizar', auth, async (req, res) => {
       salida.sinNumero = r.sinNumero || 0;
       salida.archivados = r.archivados || 0;
       salida.sinConversacion = r.sinConversacion || 0;
+      for (const tel of chatsSinWhatsApp()) etiquetarClienteSinWa(tel).catch(() => {});
       if (req.body?.diagnostico) {
         salida.detalle = r.lista.map(c => ({
           telefono: c.telefono,
@@ -2357,7 +2416,15 @@ app.post('/api/sincronizar', auth, async (req, res) => {
         aplicarNombresClientes(todosClientes);
         salida.clientesTotal = todosClientes.length;
       } catch (e) { log('No se pudieron aplicar nombres de clientes: ' + e.message); }
-      const r = await importarClientes(nuevos);
+      // Solo se guardan contactos que WhatsApp confirme que existen (cualquier país).
+      const validos = [];
+      for (const n of nuevos) {
+        try {
+          if (await verificarNumeroWa(n.telefono, req.body?.sesion || null)) validos.push(n);
+          else log('Contacto omitido (no tiene WhatsApp): +' + n.telefono);
+        } catch { validos.push(n); }
+      }
+      const r = await importarClientes(validos);
       salida.contactosNuevos = r.insertados;
       log(`Contactos de WhatsApp: ${contactos.length} totales · ${aptos.length} con formato Perú · ${r.insertados} nuevos importados.`);
     }
@@ -2387,7 +2454,7 @@ app.post('/api/conversaciones/:telefono/importar', auth, async (req, res) => {
     const sinChat = e?.codigo === 'SIN_CHAT' || /no tiene conversación/i.test(mensaje);
     const noWa = /no tiene WhatsApp|no está registrado|not registered/i.test(mensaje);
     if (sinChat) marcarSinChat(tel, true);
-    if (noWa) marcarSinWhatsApp(tel, true);
+    if (noWa) { marcarSinWhatsApp(tel, true); etiquetarClienteSinWa(tel).catch(() => {}); }
     log('Error al importar historial de +' + tel + ': ' + mensaje);
     // Nunca se devuelve error duro al panel: el chat sigue visible y se puede
     // revisar; solo se avisa que ese número no tiene historial accesible.

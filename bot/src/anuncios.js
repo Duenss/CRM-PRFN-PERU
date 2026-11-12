@@ -14,7 +14,7 @@ const archivo = path.join(dataDir, 'anuncios.json');
 const MAX_ANUNCIOS = 300;
 
 export const ESTADOS = ['borrador', 'enviando', 'enviado', 'cancelado'];
-export const FILTROS = ['todos', 'etiquetas', 'telefonos'];
+export const FILTROS = ['todos', 'etiquetas', 'telefonos', 'noAgregados'];
 
 const ahora = () => new Date().toISOString();
 const limpiarTel = t => String(t || '').replace(/\D/g, '');

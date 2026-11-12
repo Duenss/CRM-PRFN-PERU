@@ -1004,6 +1004,18 @@ export async function listarContactosWa(sesionId = null) {
 }
 
 /** Historial reciente de un chat, leído directo de WhatsApp. */
+/** Valida si un número (de cualquier país) existe en WhatsApp. */
+export async function verificarNumeroWa(telefono, sesionId = null) {
+  const limpio = String(telefono || '').replace(/\D/g, '');
+  if (!limpio) return false;
+  const s = sesionParaEnviar(sesionId);
+  if (!s) throw new Error('Ningún WhatsApp está conectado');
+  try {
+    const id = await conTimeout(s.client.getNumberId(limpio), 15000, 'verificarNumeroWa');
+    return !!id;
+  } catch { return false; }
+}
+
 export async function historialWa(telefono, limite = 50, sesionId = null) {
   const s = sesionParaEnviar(sesionId);
   if (!s) throw new Error('Ningún WhatsApp está conectado');

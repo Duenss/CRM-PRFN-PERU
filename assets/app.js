@@ -229,7 +229,7 @@ function limpiarStale(sub,texto){
   sub.textContent=texto;
   sub.style.color='';
 }
-const puede=c=>c.activo!==false&&!c.baja;
+const puede=c=>c.activo!==false&&!c.baja&&!(Array.isArray(c.etiquetas)&&c.etiquetas.includes('sin-wsp'));
 const imgURL=p=>p.imagen_ruta? (String(p.imagen_ruta).startsWith('http')?p.imagen_ruta:'https://perfumeriafinaperu.com/'+p.imagen_ruta):'';
 
 /* ---------- sesión ---------- */
@@ -361,7 +361,7 @@ function renderClientes(){
   const l=clientes.filter(c=>[c.nombre,c.telefono,...(Array.isArray(c.etiquetas)?c.etiquetas:[]),c.notas].join(' ').toLowerCase().includes(q));
   const tope=500;const visibles=l.slice(0,tope);
   $('#c-count').textContent=`${l.length} de ${clientes.length} clientes · ${clientes.filter(puede).length} activos${l.length>tope?' · mostrando '+tope+', usa el buscador':''}`;
-  $('#c-list').innerHTML=visibles.map(c=>`<div class="row"><div><b>${esc(c.nombre)}</b><small>+${esc(c.telefono)}${(Array.isArray(c.etiquetas)?c.etiquetas:[]).map(t=>`<i class="tag">${esc(t)}</i>`).join('')}${c.baja?'<i class="tag bad">baja</i>':''}${c.fecha_cumpleanos?`<i class="tag">🎂 ${esc(fmtDia(c.fecha_cumpleanos))}</i>`:''}</small></div><button class="ghost" data-edit="${esc(c.id)}">Editar</button></div>`).join('')||'<p class="empty">Aún no hay clientes. Agrega uno o importa un CSV con las columnas nombre y telefono.</p>';
+  $('#c-list').innerHTML=visibles.map(c=>`<div class="row"><div><b>${esc(c.nombre)}</b><small>+${esc(c.telefono)}${(Array.isArray(c.etiquetas)?c.etiquetas:[]).filter(t=>t!=='sin-wsp').map(t=>`<i class="tag">${esc(t)}</i>`).join('')}${(Array.isArray(c.etiquetas)&&c.etiquetas.includes('sin-wsp'))?'<i class="tag bad">sin WhatsApp</i>':''}${c.baja?'<i class="tag bad">baja</i>':''}${c.fecha_cumpleanos?`<i class="tag">🎂 ${esc(fmtDia(c.fecha_cumpleanos))}</i>`:''}</small></div><button class="ghost" data-edit="${esc(c.id)}">Editar</button></div>`).join('')||'<p class="empty">Aún no hay clientes. Agrega uno o importa un CSV con las columnas nombre y telefono.</p>';
 }
 $('#cq').oninput=renderClientes;
 $('#c-list').onclick=e=>{const b=e.target.closest('[data-edit]');if(b)abrirCliente(b.dataset.edit)};
