@@ -573,9 +573,9 @@ function createBotMock() {
     /* pagos */
     if (p === '/api/pagos') return json(res, 200, { plantillas: [] });
 
-    /* archivos configurables (PDF y video subidos desde Ajustes) */
+    /* archivos configurables (PDF, video y foto subidos desde Ajustes) */
     if (p === '/api/archivos') {
-      return json(res, 200, { ok: true, archivos: { pdf: { personalizado: false, nombre: '', bytes: 0 }, video: { personalizado: false, nombre: '', bytes: 0 } } });
+      return json(res, 200, { ok: true, archivos: { pdf: { personalizado: false, nombre: '', bytes: 0 }, video: { personalizado: false, nombre: '', bytes: 0 }, foto: { personalizado: false, nombre: '', bytes: 0 } } });
     }
 
     /* ajustes de límites y tiempos */

@@ -8,6 +8,7 @@
  *           docs/catalogo/catalogo-info.json       (metadatos para el bot)
  *           docs/catalogo/preview-portada.png
  *           docs/catalogo/preview-productos.png
+ *           bot/media/catalogo-navidad-2026.pdf    (copia para la imagen Docker)
  *
  * Uso:  node scripts/catalogo/build.mjs [--html-only]
  *
@@ -999,6 +1000,17 @@ async function main() {
     }
   } else {
     console.log('(PyMuPDF no disponible: se informa el número de páginas calculado.)');
+  }
+
+  // ---- copia para la imagen del bot (context ./bot: bot/media sí entra en /app/media) ----
+  const mediaDir = path.join(REPO, 'bot', 'media');
+  const mediaPdf = path.join(mediaDir, 'catalogo-navidad-2026.pdf');
+  try {
+    fs.mkdirSync(mediaDir, { recursive: true });
+    fs.copyFileSync(PDF_FILE, mediaPdf);
+    console.log(`Copia para el bot: ${path.relative(REPO, mediaPdf)} (${(fs.statSync(mediaPdf).size / 1024).toFixed(0)} KB)`);
+  } catch (err) {
+    console.warn(`[aviso] no se pudo copiar el PDF a bot/media/: ${err.message}`);
   }
 }
 

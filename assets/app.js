@@ -969,25 +969,29 @@ async function cargarArchivosInfo(){
     const a=r.archivos||{};
     const txtPdf=a.pdf?.personalizado?('Actual: '+a.pdf.nombre+' · '+fmtBytes(a.pdf.bytes)):'Usando el PDF de fábrica.';
     const txtVid=a.video?.personalizado?('Actual: '+a.video.nombre+' · '+fmtBytes(a.video.bytes)):'Usando el video de fábrica.';
+    const txtFoto=a.foto?.personalizado?('Actual: '+a.foto.nombre+' · '+fmtBytes(a.foto.bytes)):'Usando la foto de fábrica.';
     if($('#aj-pdf-info'))$('#aj-pdf-info').textContent=txtPdf;
     if($('#aj-video-info'))$('#aj-video-info').textContent=txtVid;
+    if($('#aj-foto-info'))$('#aj-foto-info').textContent=txtFoto;
     if($('#bw-pdf-info'))$('#bw-pdf-info').textContent=txtPdf;
     if($('#bw-video-info'))$('#bw-video-info').textContent=txtVid;
+    if($('#bw-foto-info'))$('#bw-foto-info').textContent=txtFoto;
   }catch(e){/* si el bot está apagado se deja — */}
 }
 function leerArchivoBase64(file){
   return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result||'').split(',')[1]||'');r.onerror=()=>rej(new Error('No se pudo leer el archivo'));r.readAsDataURL(file)});
 }
+const INFO_ARCHIVO={pdf:['aj-pdf-info','bw-pdf-info'],video:['aj-video-info','bw-video-info'],foto:['aj-foto-info','bw-foto-info']};
 async function subirArchivoConfig(tipo,file){
-  const infoEl=tipo==='pdf'?$('#aj-pdf-info'):$('#aj-video-info');
-  const infoBw=tipo==='pdf'?$('#bw-pdf-info'):$('#bw-video-info');
+  const infoEl=INFO_ARCHIVO[tipo]?$('#'+INFO_ARCHIVO[tipo][0]):null;
+  const infoBw=INFO_ARCHIVO[tipo]?$('#'+INFO_ARCHIVO[tipo][1]):null;
   if(infoEl)infoEl.textContent='Subiendo '+file.name+' ('+fmtBytes(file.size)+')…';
   try{
     const base64=await leerArchivoBase64(file);
     const r=await botFetch('/api/archivos/'+tipo,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre:file.name,base64}),timeoutMs:180000});
     if(infoEl)infoEl.textContent='Actualizado: '+r.nombre+' · '+fmtBytes(r.bytes);
     if(infoBw)infoBw.textContent='Actualizado: '+r.nombre+' · '+fmtBytes(r.bytes);
-    toast(tipo==='pdf'?'PDF del catálogo actualizado':'Video actualizado');
+    toast(tipo==='pdf'?'PDF del catálogo actualizado':tipo==='video'?'Video actualizado':'Foto actualizada');
   }catch(e){
     if(infoEl)infoEl.textContent='Error: '+e.message;
     toast('No se pudo subir: '+e.message,'error');
@@ -995,8 +999,10 @@ async function subirArchivoConfig(tipo,file){
 }
 $('#aj-pdf-file')?.addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];if(f)subirArchivoConfig('pdf',f)});
 $('#aj-video-file')?.addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];if(f)subirArchivoConfig('video',f)});
+$('#aj-foto-file')?.addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];if(f)subirArchivoConfig('foto',f)});
 $('#bw-pdf-file')?.addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];if(f)subirArchivoConfig('pdf',f)});
 $('#bw-video-file')?.addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];if(f)subirArchivoConfig('video',f)});
+$('#bw-foto-file')?.addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];if(f)subirArchivoConfig('foto',f)});
 
 async function cargarAjustes(){
   try{
@@ -1011,6 +1017,8 @@ async function cargarAjustes(){
     if($('#aj-pdf'))$('#aj-pdf').checked=a.enviarCatalogo!==false;
     cargarArchivosInfo();
     if($('#aj-video'))$('#aj-video').checked=!!a.enviarVideo;
+    if($('#aj-foto'))$('#aj-foto').checked=a.enviarFoto!==false;
+    if($('#aj-minutos'))$('#aj-minutos').value=a.preguntaMinutos??2;
     if($('#aj-importar-chats'))$('#aj-importar-chats').checked=a.importarChats!==false;
     if($('#aj-limpieza'))$('#aj-limpieza').value=a.limpiezaAlDesconectar||'preguntar';
     const es=$('#aj-status');if(es)es.textContent=`Actualizado: ${fmtFechaHora(a.actualizado)}`;
@@ -1033,6 +1041,8 @@ $('#aj-save')?.addEventListener('click',async()=>{
       bienvenidaTexto:($('#aj-bienvenida')?.value||'').trim(),
       enviarCatalogo:!!$('#aj-pdf')?.checked,
       enviarVideo:!!$('#aj-video')?.checked,
+      enviarFoto:!!$('#aj-foto')?.checked,
+      preguntaMinutos:Math.min(10,Math.max(1,Number($('#aj-minutos')?.value)||2)),
       importarChats:!!$('#aj-importar-chats')?.checked,
       limpiezaAlDesconectar:$('#aj-limpieza')?.value||'preguntar'
     };
@@ -2040,7 +2050,7 @@ const BW_SUGERIDA = [
   '💳 En Lima aceptamos todos los medios de pago según tu preferencia: efectivo al recibir, Yape, Plin o transferencia.',
   '🚚 Envíos a Lima y provincia.',
   '',
-  '📕 Te envío nuestro catálogo y video para que conozcas las fragancias.',
+  '📕 Te envío nuestro catálogo, un video y una foto para que conozcas las fragancias.',
   '🌐 Web: https://www.perfumeriafinaperu.com'
 ].join('\n');
 
@@ -2052,7 +2062,7 @@ function remplazarTokensBienvenida(t){
 function renderPreviewBienvenida(){
   const cont=$('#bw-preview');if(!cont)return;
   const texto=remplazarTokensBienvenida($('#bw-texto')?.value||'');
-  const pdf=!!$('#bw-pdf')?.checked, video=!!$('#bw-video')?.checked;
+  const pdf=!!$('#bw-pdf')?.checked, video=!!$('#bw-video')?.checked, foto=!!$('#bw-foto')?.checked;
   const burbuja = (html, extra='') => '<div class="wa-bubble'+(extra?' '+extra:'')+'">'+html+'<span class="wa-meta">'+new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'})+'<span class="tick">✓✓</span></span></div>';
   const cuerpo = esc(texto).replace(/\*([^*\n]+)\*/g,'<b>$1</b>').replace(/(^|[\s(>])_([^_\n]+)_/g,'$1<i>$2</i>').replace(/~([^~\n]+)~/g,'<s>$1</s>').replace(/\n/g,'<br>');
   let html = '';
@@ -2062,11 +2072,22 @@ function renderPreviewBienvenida(){
 
   if(pdf) html += '<div class="wa-bubble media"><div class="wa-ico">📕</div><div><div class="wa-nom">Catálogo Perfumería Fina (PDF)</div><small style="opacity:.7">Documento PDF</small></div><span class="wa-meta">'+new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'})+'</span></div>';
   if(video) html += '<div class="wa-bubble media"><div class="wa-ico">🎬</div><div><div class="wa-nom">Así es Perfumería Fina Perú</div><small style="opacity:.7">Video · 1.4 MB</small></div><span class="wa-meta">'+new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'})+'</span></div>';
+  if(foto) html += '<div class="wa-bubble media"><div class="wa-ico">📸</div><div><div class="wa-nom">Nuestras fragancias en envase propio</div><small style="opacity:.7">Foto</small></div><span class="wa-meta">'+new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'})+'</span></div>';
   cont.innerHTML=html;
 }
 function actualizarContadorBienvenida(){
   const t=$('#bw-texto');const el=$('#bw-count');
   if(t&&el)el.textContent=String(t.value||'').length+'/600';
+}
+/** Aviso rojo en el módulo Bienvenida: problemas de medios del bot (/api/estado). */
+async function cargarAvisoMedios(){
+  const cont=$('#bw-aviso');if(!cont)return;
+  try{
+    const j=await botFetch('/api/estado');
+    const medios=Array.isArray(j.problemas)?j.problemas.filter(p=>String(p.codigo||'').startsWith('medio_')):[];
+    cont.innerHTML=medios.map(p=>`<div class="warnbox" style="margin-bottom:.7rem;border-color:rgba(255,92,108,.55);background:rgba(255,92,108,.07)"><b style="color:var(--bad)">${esc(p.mensaje||'Problema con los medios')}</b><br><span class="muted">${esc(p.solucion||'')}</span></div>`).join('');
+    cont.hidden=!medios.length;
+  }catch(e){cont.hidden=true;}
 }
 async function cargarBienvenida(){
   try{
@@ -2074,15 +2095,19 @@ async function cargarBienvenida(){
     const a=r.ajustes||{};
     if($('#bw-texto'))$('#bw-texto').value=a.bienvenidaTexto||BW_SUGERIDA;
     if($('#bw-pdf'))$('#bw-pdf').checked=a.enviarCatalogo!==false;
-    if($('#bw-video'))$('#bw-video').checked=a.enviarVideo===true;
+    if($('#bw-video'))$('#bw-video').checked=a.enviarVideo!==false;
+    if($('#bw-foto'))$('#bw-foto').checked=a.enviarFoto!==false;
+    if($('#bw-minutos'))$('#bw-minutos').value=a.preguntaMinutos??2;
     actualizarContadorBienvenida();renderPreviewBienvenida();
     if($('#bw-status'))$('#bw-status').textContent='Última actualización: '+(a.actualizado?fmtFechaHora(a.actualizado):'—');
     cargarArchivosInfo();
+    cargarAvisoMedios();
   }catch(e){if($('#bw-status'))$('#bw-status').textContent='No se pudo cargar (revisa la conexión).'}
 }
 $('#bw-texto')?.addEventListener('input',()=>{actualizarContadorBienvenida();renderPreviewBienvenida()});
 $('#bw-pdf')?.addEventListener('change',renderPreviewBienvenida);
 $('#bw-video')?.addEventListener('change',renderPreviewBienvenida);
+$('#bw-foto')?.addEventListener('change',renderPreviewBienvenida);
 document.querySelectorAll('[data-bw-token]').forEach(b=>b.addEventListener('click',()=>{
   const t=$('#bw-texto');if(!t)return;
   const token=b.dataset.bwToken;
@@ -2111,12 +2136,15 @@ $('#bw-save')?.addEventListener('click',async()=>{
     const r=await botFetch('/api/ajustes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
       bienvenidaTexto:($('#bw-texto')?.value||'').trim(),
       enviarCatalogo:!!$('#bw-pdf')?.checked,
-      enviarVideo:!!$('#bw-video')?.checked
+      enviarVideo:!!$('#bw-video')?.checked,
+      enviarFoto:!!$('#bw-foto')?.checked,
+      preguntaMinutos:Math.min(10,Math.max(1,Number($('#bw-minutos')?.value)||2))
     })});
     const a=r.ajustes||{};
     if($('#bw-texto'))$('#bw-texto').value=a.bienvenidaTexto??$('#bw-texto').value;
     if($('#bw-status'))$('#bw-status').textContent='Guardado ✅ · '+(a.bienvenidaTexto||'').length+' caracteres';
     toast('Bienvenida guardada');
+    cargarAvisoMedios();
   }catch(e){toast('No se guardó: '+e.message,'error')}
   b.disabled=false;
 });

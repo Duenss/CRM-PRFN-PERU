@@ -37,3 +37,20 @@
    dueño** (F-07, F-08, F-11, F-12, F-14, F-15, F-16, F-17, H-03 RLS por usuario, etc.).
    Tareas 3-8 de la cola (anti-bloqueo, bienvenida determinista, estabilidad conexión,
    IA few-shot, rediseño UI, auditoría T2-T8) siguen pendientes de aprobación una a una.
+10. `scripts/e2e-panel.mjs` ST-01 (línea ~1161): el self-test exige que `index.html`
+    contenga `SUPABASE_AUTH_KEY` o `SUPABASE_URL`, pero ese marcador no está en el HTML
+    actual (tampoco en el HEAD previo a la rama de bienvenida). ST-01 falla por el panel,
+    no por el mock; el resto del self-test y el e2e completo (11/11) pasan.
+    (Encontrado al validar la rama `bienvenida/secuencia-determinista`, 2026-11-12.)
+
+## Bienvenida determinista (notas de la rama bienvenida/secuencia-determinista)
+
+11. Los medios de fábrica ahora viven en `bot/media/` (dentro de la imagen). Si se regenera
+    el catálogo con `node scripts/catalogo/build.mjs`, el script ya copia el PDF a
+    `bot/media/`; pero el video y la foto de fábrica **no tienen generador**: si se cambian
+    en `docs/entrega/` o `assets/img/brand/`, hay que copiarlos a `bot/media/` a mano
+    (o subir los nuevos desde Ajustes del panel, que siempre tienen prioridad).
+12. Si en producción `data/ajustes.json` (volumen bot-data-v2) ya tenía `enviarVideo: false`
+    guardado de antes, ese valor persiste (respetamos la elección guardada): el video seguirá
+    apagado hasta que el dueño lo active en el panel. Los valores por defecto del código
+    (video y foto activados) solo aplican a instalaciones sin ese archivo.

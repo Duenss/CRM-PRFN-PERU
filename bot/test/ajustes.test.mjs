@@ -30,6 +30,23 @@ test('valores por defecto coherentes', () => {
   assert.ok(a.intervaloMasivo >= 1);
 });
 
+test('bienvenida: catálogo, video y foto activados por defecto', () => {
+  const a = ajustes.estadoAjustes();
+  assert.equal(a.enviarCatalogo, true);
+  assert.equal(a.enviarVideo, true);
+  assert.equal(a.enviarFoto, true);
+  assert.equal(a.preguntaMinutos, 2);
+  assert.equal(a.bienvenidaDiasInactivo, 90);
+});
+
+test('bienvenida: preguntaMinutos se limita a 1-10 y los días de inactividad a 1-3650', () => {
+  const a = ajustes.actualizarAjustes({ preguntaMinutos: 0, bienvenidaDiasInactivo: 99999, enviarFoto: false });
+  assert.equal(a.preguntaMinutos, 1);
+  assert.equal(a.bienvenidaDiasInactivo, 3650);
+  assert.equal(a.enviarFoto, false);
+  ajustes.actualizarAjustes({ enviarFoto: true });
+});
+
 test('normaliza números inválidos y negativos', () => {
   const a = ajustes.actualizarAjustes({
     maxPorDia: -5,

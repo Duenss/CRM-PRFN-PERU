@@ -413,9 +413,10 @@
 
     <section class="tab" id="t-bienvenida" hidden>
       <div class="pagehead">
-        <div><h1>Mensaje de bienvenida</h1><p class="muted">Es lo primero que recibe el cliente, junto con el catálogo, el PDF y el video.</p></div>
+        <div><h1>Mensaje de bienvenida</h1><p class="muted">Es lo primero que recibe el cliente, junto con el catálogo (PDF), el video y la foto.</p></div>
         <div class="bar" style="margin:0"><button class="ghost" id="bw-refresh" type="button">Actualizar</button></div>
       </div>
+      <div id="bw-aviso" hidden></div>
       <div class="grid2">
         <div class="card" style="padding:1rem">
           <div class="card-h" style="padding:0 0 .6rem"><b>Texto de la bienvenida</b><span class="muted" id="bw-count">0/600</span></div>
@@ -430,11 +431,14 @@
             <button class="ghost" type="button" data-bw-token="💳">+ 💳</button>
           </div>
           <label class="ck" style="display:flex;gap:.5rem;align-items:center;margin:.5rem 0 0"><input type="checkbox" id="bw-pdf" style="width:auto"> <span>Enviar el <b>PDF</b> con la bienvenida y el catálogo</span></label>
-          <label class="ck" style="display:flex;gap:.5rem;align-items:center;margin:.2rem 0 .6rem"><input type="checkbox" id="bw-video" style="width:auto"> <span>Enviar el <b>video</b> con la bienvenida y el catálogo</span></label>
+          <label class="ck" style="display:flex;gap:.5rem;align-items:center;margin:.2rem 0 0"><input type="checkbox" id="bw-video" style="width:auto"> <span>Enviar el <b>video</b> con la bienvenida y el catálogo</span></label>
+          <label class="ck" style="display:flex;gap:.5rem;align-items:center;margin:.2rem 0 0"><input type="checkbox" id="bw-foto" style="width:auto"> <span>Enviar la <b>foto</b> con la bienvenida y el catálogo</span></label>
+          <div style="margin:.5rem 0 .6rem"><label for="bw-minutos">Pregunta "¿te ayudo a elegir?" a los … minutos (1-10)</label><input id="bw-minutos" type="number" min="1" max="10" step="1" placeholder="2" style="max-width:9rem"></div>
           <div class="acts" style="margin-top:.2rem"><button class="ghost" id="bw-ia" type="button">✨ Generar con IA</button></div>
           <div class="grid2" style="margin-top:.7rem">
             <div><label for="bw-pdf-file">PDF del catálogo (máx. 20 MB)</label><input type="file" id="bw-pdf-file" accept="application/pdf"><p class="muted" id="bw-pdf-info" style="margin:.3rem 0 0">—</p></div>
             <div><label for="bw-video-file">Video (máx. 60 MB)</label><input type="file" id="bw-video-file" accept="video/mp4,video/webm"><p class="muted" id="bw-video-info" style="margin:.3rem 0 0">—</p></div>
+            <div><label for="bw-foto-file">Foto (máx. 10 MB)</label><input type="file" id="bw-foto-file" accept="image/jpeg,image/png,image/webp"><p class="muted" id="bw-foto-info" style="margin:.3rem 0 0">—</p></div>
           </div>
           <div class="acts"><button class="ghost" id="bw-reset" type="button">Restaurar texto sugerido</button><button id="bw-save" type="button">Guardar bienvenida</button></div>
           <p class="muted" id="bw-status" style="margin-top:.6rem">—</p>
@@ -476,10 +480,13 @@
           <textarea id="aj-bienvenida" rows="3" maxlength="600" placeholder="{saludo}, {nombre}. Nos alegra que hayas elegido a *Perfumería Fina Perú*…"></textarea>
           <label style="display:flex;gap:.5rem;align-items:center;margin-top:.5rem"><input type="checkbox" id="aj-pdf" style="width:auto"> <span>Enviar el <b>PDF</b> con la bienvenida y el catálogo</span></label>
           <label style="display:flex;gap:.5rem;align-items:center;margin-top:.2rem"><input type="checkbox" id="aj-video" style="width:auto"> <span>Enviar el <b>video</b> con la bienvenida y el catálogo</span></label>
+          <label style="display:flex;gap:.5rem;align-items:center;margin-top:.2rem"><input type="checkbox" id="aj-foto" style="width:auto"> <span>Enviar la <b>foto</b> con la bienvenida y el catálogo</span></label>
+          <label style="display:flex;gap:.5rem;align-items:center;margin-top:.2rem"><span>Pregunta "¿te ayudo a elegir?" a los …</span><input id="aj-minutos" type="number" min="1" max="10" step="1" placeholder="2" style="width:5rem"> <span>minutos</span></label>
           <label style="display:flex;gap:.5rem;align-items:center;margin-top:.5rem"><input type="checkbox" id="aj-importar-chats" style="width:auto"> <span>Importar conversaciones existentes al <b>sincronizar</b> (desmarcado = la Bandeja solo muestra mensajes nuevos)</span></label>
           <div class="grid2" style="margin-top:.9rem">
             <div><label for="aj-pdf-file">Cambiar el PDF del catálogo (máx. 20 MB)</label><input type="file" id="aj-pdf-file" accept="application/pdf"><p class="muted" id="aj-pdf-info" style="margin:.3rem 0 0">—</p></div>
             <div><label for="aj-video-file">Cambiar el video (máx. 60 MB)</label><input type="file" id="aj-video-file" accept="video/mp4,video/webm"><p class="muted" id="aj-video-info" style="margin:.3rem 0 0">—</p></div>
+            <div><label for="aj-foto-file">Cambiar la foto (máx. 10 MB)</label><input type="file" id="aj-foto-file" accept="image/jpeg,image/png,image/webp"><p class="muted" id="aj-foto-info" style="margin:.3rem 0 0">—</p></div>
           </div>
         </div>
       </div>

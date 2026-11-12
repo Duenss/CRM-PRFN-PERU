@@ -15,6 +15,7 @@ import * as pedidos from './pedidos.js';
 import * as anuncios from './anuncios.js';
 // (Las plantillas de pago se eliminaron: las billeteras digitales las verifica el admin.)
 import * as seguimiento from './seguimiento.js';
+import * as bienvenida from './bienvenida.js';
 import { crearAuth, crearAuthPanel, crearLimitador } from './auth.js';
 import { registrarAjustes } from './routes/ajustes.js';
 import { esBaja, marcarBajaLocal } from './bajas.js';
@@ -372,26 +373,63 @@ function conSaludo(tel, nombre, cuerpo) {
   return s ? `${s}. ${cuerpo}` : cuerpo;
 }
 
-/** Mensaje 1 de toda conversación nueva: saludo + agradecimiento. */
-async function enviarBienvenida({ tel, nombre, clienteId, sesionId }) {
+/** Arma el texto de bienvenida con la plantilla de Ajustes. */
+function plantillaBienvenida(plantilla, nombre) {
   const nom = /^\+/.test(String(nombre || '')) ? '' : primerNombre(nombre);
-  const plantilla = String(estadoAjustes().bienvenidaTexto || '').trim()
+  const texto = String(plantilla || '').trim()
     || '{saludo}, {nombre}. Nos alegra que hayas elegido a *Perfumería Fina Perú* como tu perfumería de preferencia. ✨';
-  const texto = plantilla
+  return texto
     .replaceAll('{saludo}', saludoHora())
     .replaceAll('{nombre}', nom || 'estimado');
-  await enviarRegistrado({ tel, texto, nombre, clienteId, sesionId, origen: 'ia', opciones: { linkPreview: true } });
-  marcarSaludado(tel);
-  log(`Bienvenida enviada a +${tel}.`);
-  return true;
 }
 
-/** ¿El mensaje es solo un saludo o pide "información" sin más? */
-function esSaludoOInfo(texto) {
-  const t = String(texto || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/[¡!¿?.,;:/\\\-]+/g, ' ').replace(/\s+/g, ' ').trim();
-  if (!t) return false;
-  return /^(hola|holi|buenas|buenos dias|buenas tardes|buenas noches|hey|que tal|saludos|informacion|info|hola informacion|hola info|me das informacion|me puedes dar informacion|me pasas informacion)$/.test(t);
+/**
+ * Secuencia de bienvenida determinista (sin IA): texto → PDF → video → foto
+ * con pausas cortas y 1 reintento por medio (ver bot/src/bienvenida.js).
+ * Al final programa la pregunta "¿te ayudo a elegir?" a los preguntaMinutos.
+ */
+async function ejecutarSecuenciaBienvenida({ tel, nombre, clienteId, sesionId }) {
+  const a = estadoAjustes();
+  const texto = plantillaBienvenida(a.bienvenidaTexto, nombre);
+  const res = await bienvenida.ejecutarSecuencia({
+    telefono: tel,
+    nombre,
+    clienteId,
+    sesionId,
+    ajustes: a,
+    texto,
+    deps: {
+      enviarTexto: async (t) => {
+        await enviarRegistrado({ tel, texto: t, nombre, clienteId, sesionId, origen: 'ia', opciones: { linkPreview: true } });
+        marcarSaludado(tel);
+      },
+      enviarPdf: async (ruta) => {
+        const env = await enviarArchivo(tel, ruta, 'application/pdf', 'Catalogo-Perfumeria-Fina.pdf', '📕 Catálogo *Perfumería Fina* · Perfumería Fina Perú', sesionId);
+        await logMensaje({ clienteId, telefono: tel, direccion: 'saliente', texto: '📕 [catálogo PDF enviado]', origen: 'ia' });
+        registrar({ telefono: tel, texto: '📕 Catálogo Perfumería Fina (PDF)', direccion: 'saliente', nombre, clienteId, origen: 'ia', waId: env?.waId || '' });
+      },
+      enviarVideo: async (ruta) => {
+        const caption = '🎬 Así es *Perfumería Fina Perú*';
+        const envV = await enviarVideo(tel, ruta, caption, sesionId);
+        await logMensaje({ clienteId, telefono: tel, direccion: 'saliente', texto: '🎬 ' + caption, origen: 'ia' });
+        registrar({ telefono: tel, texto: '🎬 ' + caption, direccion: 'saliente', nombre, clienteId, origen: 'ia', waId: envV?.waId || '' });
+        programarChequeoVideo({ tel, video: ruta, caption, sesionId, waId: envV?.waId, nombre, clienteId });
+      },
+      enviarFoto: async (ruta) => {
+        const caption = '📸 Nuestras fragancias en envase propio ✨';
+        const envF = await enviarImagen(tel, { archivo: ruta }, caption, sesionId);
+        await logMensaje({ clienteId, telefono: tel, direccion: 'saliente', texto: '📷 ' + caption, origen: 'ia' });
+        registrar({ telefono: tel, texto: '📷 ' + caption, direccion: 'saliente', nombre, clienteId, origen: 'ia', waId: envF?.waId || '' });
+      },
+      programarSeguimiento: () => {
+        bienvenida.programarPregunta({ telefono: tel, nombre, clienteId, sesionId, minutos: a.preguntaMinutos });
+      },
+      log
+    }
+  });
+  if (!res.texto) throw new Error('La bienvenida (texto) no se pudo enviar.');
+  log(`Bienvenida enviada a +${tel} (PDF ${res.pdf ? '✓' : '—'} · video ${res.video ? '✓' : '—'} · foto ${res.foto ? '✓' : '—'}).`);
+  return res;
 }
 
 /** ¿Pide el catálogo completo / la lista de fragancias? */
@@ -417,7 +455,7 @@ function archivoPersonalizado(tipo) {
 
 function infoCatalogo() {
   const ruta = path.join(raizProyecto, 'docs', 'catalogo', 'catalogo-info.json');
-  const pdf = path.join(raizProyecto, 'docs', 'catalogo', 'catalogo-navidad-2026.pdf');
+  const pdf = path.join(bienvenida.mediaDir, 'catalogo-navidad-2026.pdf');
   let info = null;
   try { info = JSON.parse(fs.readFileSync(ruta, 'utf8')); } catch { info = null; }
   return { info, pdf, existe: fs.existsSync(pdf) };
@@ -430,15 +468,12 @@ async function enviarCatalogo({ tel, nombre, clienteId, sesionId }) {
   const existe = fs.existsSync(pdfRuta);
   // El catálogo se envía directo (PDF + video), sin texto explicativo.
   const cfg = estadoAjustes();
-  let catalogoEnviado = false;
-  let videoEnviado = false;
   if (existe && cfg.enviarCatalogo !== false) {
     try {
       const env = await enviarArchivo(tel, pdfRuta, 'application/pdf', 'Catalogo-Perfumeria-Fina.pdf', '📕 Catálogo *Perfumería Fina* · Perfumería Fina Perú', sesionId);
       await logMensaje({ clienteId, telefono: tel, direccion: 'saliente', texto: '📕 [catálogo PDF enviado]', origen: 'ia' });
       registrar({ telefono: tel, texto: '📕 Catálogo Perfumería Fina (PDF)', direccion: 'saliente', nombre, clienteId, origen: 'ia', waId: env?.waId || '' });
       log(`Catálogo PDF enviado a +${tel}.`);
-      catalogoEnviado = true;
       await dormir(3500); // dejar terminar la subida del PDF antes del video
     } catch (e) {
       log('No se pudo enviar el catálogo PDF: ' + e.message);
@@ -456,14 +491,13 @@ async function enviarCatalogo({ tel, nombre, clienteId, sesionId }) {
   }
   // Video explicativo (configurable desde Ajustes).
   if (cfg.enviarVideo) {
-    const video = archivoPersonalizado('video') || path.join(raizProyecto, 'docs', 'entrega', 'experiencia-perfumeria.mp4');
+    const video = bienvenida.rutaMedia('video', cfg.videoArchivo);
     if (fs.existsSync(video)) {
       try {
         const captionVideo = '🎬 Así es *Perfumería Fina Perú*';
         const envV = await enviarVideo(tel, video, captionVideo, sesionId);
         registrar({ telefono: tel, texto: '🎬 Video de Perfumería Fina', direccion: 'saliente', nombre, clienteId, origen: 'ia', waId: envV?.waId || '' });
         log(`Video enviado a +${tel}.`);
-        videoEnviado = true;
         programarChequeoVideo({ tel, video, caption: captionVideo, sesionId, waId: envV?.waId, nombre, clienteId });
       } catch (e) {
         log('No se pudo enviar el video: ' + e.message);
@@ -472,24 +506,8 @@ async function enviarCatalogo({ tel, nombre, clienteId, sesionId }) {
       log('Video de Perfumería Fina no encontrado en el servidor; se omite.');
     }
   }
-  // Después del catálogo/video se invita a elegir: una sola pregunta, con el
-  // estilo de la tienda, para que el cliente responda y la IA lo asesore.
-  if (catalogoEnviado || videoEnviado) {
-    try {
-      const pregunta = [
-        '✨ *¿Te ayudo a elegir tu perfume ideal?* ✨',
-        '',
-        'Cuéntame para qué ocasión lo buscas —día, noche, playa, trabajo o regalo— y te recomiendo las fragancias que mejor encajan contigo 🌸',
-        'Y si ya viste alguna que te llamó la atención, dime cuál y te cuento sus notas 😉',
-        '',
-        'Quedo atento a tu respuesta 💬'
-      ].join('\n');
-      await enviarRegistrado({ tel, texto: pregunta, nombre, clienteId, sesionId, origen: 'bot' });
-      log(`Pregunta de asesoría enviada a +${tel} después del catálogo.`);
-    } catch (e) {
-      log('No se pudo enviar la pregunta de asesoría: ' + e.message);
-    }
-  }
+  // La pregunta de asesoría ya NO sale aquí: va diferida 2-3 min después de la
+  // secuencia de bienvenida (bienvenida.programarPregunta / revisarPreguntasBienvenida).
   return true;
 }
 
@@ -971,13 +989,13 @@ function destinatariosAnuncio(clientes, chats, anuncio) {
 function adjuntosAnuncio() {
   return {
     catalogo: {
-      ruta: archivoPersonalizado('pdf') || path.join(raizProyecto, 'docs', 'catalogo', 'catalogo-navidad-2026.pdf'),
+      ruta: bienvenida.rutaMedia('pdf', estadoAjustes().catalogoArchivo),
       mimetype: 'application/pdf',
       nombre: 'Catalogo-Perfumeria-Fina-Navidad-2026.pdf',
       caption: '📕 Catálogo *Navidad 2026* · Perfumería Fina Perú'
     },
     video: {
-      ruta: archivoPersonalizado('video') || path.join(raizProyecto, 'docs', 'entrega', 'experiencia-perfumeria.mp4'),
+      ruta: bienvenida.rutaMedia('video', estadoAjustes().videoArchivo),
       mimetype: 'video/mp4',
       nombre: 'Perfumeria-Fina-Peru.mp4',
       caption: '🎬 Así es *Perfumería Fina Perú*'
@@ -1415,6 +1433,8 @@ async function manejarMensajePropio(msg, sesionId = null) {
   try { cliente = await getCliente(tel); } catch {}
   const nombre = msg._data?.notifyName || cliente?.nombre || '';
   registrar({ telefono: tel, texto, direccion: 'saliente', nombre, clienteId: cliente?.id, origen: 'panel', waId });
+  // Si el dueño atiende manualmente, la pregunta diferida pierde sentido.
+  if (bienvenida.cancelarPregunta(tel)) log(`Pregunta de asesoría a +${tel} cancelada: el dueño respondió manualmente.`);
   try { await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'saliente', texto, origen: 'panel' }); } catch {}
 }
 
@@ -1576,8 +1596,13 @@ async function manejarMensaje(msg, sesionId = null) {
   const cliente = await getCliente(tel);
   const hist = await historial(tel, 12);
   const nombreChat = msg._data?.notifyName || cliente?.nombre || `+${tel}`;
+  const chatAntes = obtener(tel);
   await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'entrante', texto, origen: 'cliente' });
   registrar({ telefono: tel, texto, direccion: 'entrante', nombre: nombreChat, clienteId: cliente?.id, origen: 'cliente', waId });
+
+  // Si había una pregunta de asesoría pendiente ("¿te ayudo a elegir?"), se
+  // cancela: el cliente escribió antes.
+  if (bienvenida.cancelarPregunta(tel)) log(`Pregunta de asesoría a +${tel} cancelada: el cliente escribió antes.`);
 
   // Si el audio no se pudo transcribir, nunca se deja al cliente en visto.
   if (audioFallido) {
@@ -1604,23 +1629,46 @@ async function manejarMensaje(msg, sesionId = null) {
     return;
   }
 
-  // Toda conversación nueva empieza con saludo + agradecimiento (mensaje 1).
-  // Solo se envía una vez por chat: si ya hay algún mensaje saliente, no repite.
-  const chatPrevio = obtener(tel);
-  const yaHuboSaliente = !!(chatPrevio && (chatPrevio.mensajes || []).some(m => m.direccion === 'saliente'));
-  if (esTextoReal && !yaHuboSaliente) {
-    try {
-      await enviarBienvenida({ tel, nombre: nombreChat, clienteId: cliente?.id, sesionId });
-    } catch (e) { log('No se pudo enviar la bienvenida: ' + e.message); }
+  // ---------------- Bienvenida determinista (sin IA) ----------------
+  // Cualquier primer mensaje en vivo de un chat dispara la secuencia completa
+  // (texto → PDF → video → foto), aunque el chat tenga mensajes importados o
+  // salientes del dueño. Un cliente que ya conversaba NO recibe la secuencia,
+  // salvo que lleve más de bienvenidaDiasInactivo días sin escribir.
+  let secuenciaEnviada = false;
+  if (!bienvenida.bienvenidaEnviada(tel)) {
+    const sinWsp = !!(cliente && (Array.isArray(cliente.etiquetas) ? cliente.etiquetas : String(cliente.etiquetas || '').split(',')).includes('sin-wsp'));
+    const puerta = bienvenida.puedeBienvenida({
+      telefono: tel,
+      ownerNumber: config.ownerNumber,
+      modoPrueba: config.modoPrueba,
+      numerosPrueba: config.numerosPrueba,
+      baja: !!(cliente?.baja || esBaja(tel)),
+      sinWhatsApp: sinWsp
+    });
+    if (!puerta.ok) {
+      log(`Bienvenida omitida para +${tel}: ${puerta.motivo}.`);
+    } else {
+      const decision = bienvenida.decidirBienvenida({ telefono: tel, chat: chatAntes, diasInactivo: estadoAjustes().bienvenidaDiasInactivo });
+      if (decision.enviar) {
+        // Marcar ANTES de enviar: si el bot muere a mitad, no reenvía todo.
+        bienvenida.marcarBienvenida(tel);
+        secuenciaEnviada = true;
+        try {
+          await ejecutarSecuenciaBienvenida({ tel, nombre: nombreChat, clienteId: cliente?.id, sesionId });
+        } catch (e) { log('No se pudo enviar la bienvenida: ' + e.message); }
+      } else {
+        bienvenida.marcarBienvenida(tel);
+        log(`Bienvenida omitida para +${tel}: ${decision.motivo}.`);
+      }
+    }
   }
 
-  // Catálogo: se envía el PDF con los rangos de páginas por categoría.
-  // En la primera interacción, un simple "Hola" o "Hola información" también
-  // dispara el catálogo (con el video si está activado).
-  const primerSaludoInfo = esSaludoOInfo(texto);
+  // Catálogo por pedido explícito (o saludo/info) en chats ya conocidos.
+  // Si la secuencia acaba de enviar el PDF, no se repite.
+  const primerSaludoInfo = bienvenida.esSaludoOInfo(texto);
   if (esTextoReal && (pideCatalogo(texto) || primerSaludoInfo)) {
-    // Si el cliente solo saluda y no es la primera vez, se le saluda igual.
-    if (primerSaludoInfo && yaHuboSaliente) {
+    if (secuenciaEnviada) return; // el catálogo ya salió en la secuencia
+    if (primerSaludoInfo) {
       const s = saludoONada(tel, nombreChat);
       if (s) {
         try {
@@ -1772,7 +1820,13 @@ ${String(texto).slice(0, 300)}
 
   try {
     log(`Pensando respuesta para +${tel}...`);
-    const ai = await redactarRespuesta({ mensaje: textoIA, historial: hist, cliente, contexto: [promptIA(), estiloDelChat(tel)].filter(Boolean).join('\n\n') });
+    // Si la secuencia de bienvenida acaba de salir (texto+PDF+video+foto), la
+    // IA no debe volver a saludar ni ofrecer el catálogo: solo responde la
+    // consulta concreta del cliente.
+    const contextoBienvenida = secuenciaEnviada
+      ? 'Acabas de enviar a este cliente la bienvenida completa: texto, catálogo PDF, video y foto. NO saludes de nuevo ni vuelvas a ofrecer el catálogo o la información general; responde únicamente su consulta.'
+      : '';
+    const ai = await redactarRespuesta({ mensaje: textoIA, historial: hist, cliente, contexto: [promptIA(), estiloDelChat(tel), contextoBienvenida].filter(Boolean).join('\n\n') });
     if (ai.derivar) {
       // Con números de prueba (o el del dueño) nunca se pausa ni se avisa: se
       // responde algo útil para poder seguir probando el flujo con IA.
@@ -2020,6 +2074,19 @@ let programadas = 0;
 let cacheEstado = { t: 0, cuerpo: null };
 // Problemas de esquema detectados al arrancar (se muestran en el panel).
 let problemasEsquema = [];
+// Problemas de medios de la bienvenida (PDF/video/foto): se validan al arrancar
+// y tras cada cambio de Ajustes. Nunca se omiten en silencio: salen en
+// /api/estado → "problemas" y el panel los pinta en rojo.
+let problemasMedios = [];
+function actualizarProblemasMedios() {
+  try {
+    problemasMedios = bienvenida.validarMedios(estadoAjustes());
+  } catch (e) {
+    problemasMedios = [{ codigo: 'medios_error', mensaje: 'No se pudieron validar los medios de bienvenida: ' + e.message, solucion: 'Revisa el log del bot.' }];
+  }
+  cacheEstado = { t: 0, cuerpo: null };
+  return problemasMedios;
+}
 
 async function refrescarProgramadas() {
   if (!sb) return;
@@ -2055,7 +2122,7 @@ app.get('/api/estado', auth, (_req, res) => {
     delay: { min: config.delayMin, max: config.delayMax },
     ia: resumenIA(),
     chats: resumenChats(),
-    problemas: problemasEsquema,
+    problemas: [...problemasEsquema, ...problemasMedios],
     version: '1.0.0'
   };
   cacheEstado = { t: ahora, cuerpo };
@@ -2221,7 +2288,14 @@ app.get('/api/stream', auth, (req, res) => {
 // Rutas de ajustes y de la IA (router aparte para no engordar app.js).
 registrarAjustes(app, {
   auth, log, emitir, normalizar,
-  estadoAjustes, actualizarAjustes,
+  estadoAjustes,
+  // Tras cada cambio de Ajustes se revalidan los medios de la bienvenida
+  // (los problemas se ven al instante en /api/estado y en el panel).
+  actualizarAjustes: (cambios = {}) => {
+    const r = actualizarAjustes(cambios);
+    actualizarProblemasMedios();
+    return r;
+  },
   estadoIA, actualizarIA, pausarIA
 });
 
@@ -2468,10 +2542,19 @@ app.post('/api/conversaciones/:telefono/importar', auth, async (req, res) => {
 });
 
 /* ---------------- Bandeja (router) ---------------- */
+// El registrar de la Bandeja también cancela la pregunta de asesoría pendiente
+// cuando el dueño responde manualmente desde el panel.
+const registrarPanel = (m = {}) => {
+  const r = registrar(m);
+  if (m && m.direccion === 'saliente' && bienvenida.cancelarPregunta(m.telefono)) {
+    log(`Pregunta de asesoría a +${m.telefono} cancelada: el dueño respondió manualmente.`);
+  }
+  return r;
+};
 registrarConversaciones(app, {
   auth, normalizar, listar, buscar, obtener, marcarLeido, estadoIA, seguimiento, pedidos,
   resumenChats, getClientes, getCliente, config, sesionDisponible, enviar,
-  logMensaje, registrar, log
+  logMensaje, registrar: registrarPanel, log
 });
 
 app.post('/api/conversaciones/:telefono/fijar', auth, (req, res) => {
@@ -2532,15 +2615,25 @@ app.delete('/api/conversaciones', auth, async (req, res) => {
   }
 });
 
-// ---------- Archivos configurables (PDF del catálogo y video) ----------
-const TIPOS_ARCHIVO = { pdf: { ext: 'pdf', limite: 20 * 1024 * 1024 }, video: { ext: 'mp4', limite: 60 * 1024 * 1024 } };
+// ---------- Archivos configurables (PDF del catálogo, video y foto) ----------
+const TIPOS_ARCHIVO = {
+  pdf: { ext: 'pdf', limite: 20 * 1024 * 1024 },
+  video: { ext: 'mp4', limite: 60 * 1024 * 1024 },
+  foto: { exts: ['jpg', 'jpeg', 'png', 'webp'], limite: 10 * 1024 * 1024 }
+};
+
+function nombreArchivoAjuste(tipo) {
+  const cfg = estadoAjustes();
+  if (tipo === 'pdf') return cfg.catalogoArchivo;
+  if (tipo === 'video') return cfg.videoArchivo;
+  return cfg.fotoArchivo;
+}
 
 app.get('/api/archivos', auth, (_req, res) => {
   try {
-    const cfg = estadoAjustes();
     const info = {};
     for (const tipo of Object.keys(TIPOS_ARCHIVO)) {
-      const nombre = tipo === 'pdf' ? cfg.catalogoArchivo : cfg.videoArchivo;
+      const nombre = nombreArchivoAjuste(tipo);
       const ruta = nombre ? path.join(archivosDir, nombre) : '';
       const existe = !!ruta && fs.existsSync(ruta);
       info[tipo] = {
@@ -2558,7 +2651,7 @@ app.get('/api/archivos', auth, (_req, res) => {
 app.post('/api/archivos/:tipo', auth, (req, res) => {
   const tipo = String(req.params.tipo || '');
   const def = TIPOS_ARCHIVO[tipo];
-  if (!def) return res.status(400).json({ error: 'Tipo no válido (pdf o video).' });
+  if (!def) return res.status(400).json({ error: 'Tipo no válido (pdf, video o foto).' });
   try {
     const base64 = String(req.body?.base64 || '').replace(/^data:[^;]+;base64,/, '');
     if (!base64) return res.status(400).json({ error: 'Falta el archivo.' });
@@ -2568,9 +2661,21 @@ app.post('/api/archivos/:tipo', auth, (req, res) => {
       return res.status(413).json({ error: `El archivo supera ${Math.round(def.limite / 1024 / 1024)} MB.` });
     }
     fs.mkdirSync(archivosDir, { recursive: true });
-    const nombre = tipo === 'pdf' ? `catalogo.${def.ext}` : `video.${def.ext}`;
+    let nombre;
+    if (tipo === 'pdf') {
+      nombre = `catalogo.${def.ext}`;
+    } else if (tipo === 'video') {
+      nombre = `video.${def.ext}`;
+    } else {
+      // Foto: se conserva la extensión real (MessageMedia la detecta por ella).
+      const subida = String(req.body?.nombre || '');
+      const m = subida.match(/\.(jpe?g|png|webp)$/i);
+      const ext = def.exts.includes(m ? m[1].toLowerCase() : '') ? m[1].toLowerCase() : 'jpg';
+      nombre = `foto.${ext}`;
+    }
     fs.writeFileSync(path.join(archivosDir, nombre), buffer);
-    actualizarAjustes(tipo === 'pdf' ? { catalogoArchivo: nombre } : { videoArchivo: nombre });
+    actualizarAjustes(tipo === 'pdf' ? { catalogoArchivo: nombre } : tipo === 'video' ? { videoArchivo: nombre } : { fotoArchivo: nombre });
+    actualizarProblemasMedios();
     log(`Archivo ${tipo} actualizado desde el panel (${nombre}, ${Math.round(buffer.length / 1024)} KB).`);
     res.json({ ok: true, nombre, bytes: buffer.length });
   } catch (e) {
@@ -2629,7 +2734,7 @@ app.post('/api/prueba-video', auth, async (req, res) => {
   if (!config.modoPrueba && permitidos.size && !permitidos.has(tel)) {
     return res.status(403).json({ error: 'En modo real solo puedes probar con OWNER_NUMBER o NUMEROS_PRUEBA.' });
   }
-  const archivo = archivoPersonalizado('video') || path.join(raizProyecto, 'docs', 'entrega', 'experiencia-perfumeria.mp4');
+  const archivo = bienvenida.rutaMedia('video', estadoAjustes().videoArchivo);
   if (!fs.existsSync(archivo)) return res.status(404).json({ error: 'No existe el video.' });
   try {
     const caption = String(req.body?.texto || '🎬 Así es *Perfumería Fina Perú*').slice(0, 300);
@@ -2715,6 +2820,30 @@ revisarEsquema(sb)
     if (lista.length) cacheEstado = { t: 0, cuerpo: null };
   })
   .catch(() => {});
+
+// Validación de medios de la bienvenida al arrancar: los problemas salen en
+// /api/estado "problemas" y el panel los pinta en rojo. Nunca en silencio.
+try {
+  const problemas = actualizarProblemasMedios();
+  for (const p of problemas) log('⚠ Medios: ' + p.mensaje + ' → ' + p.solucion);
+  if (!problemas.length) log('Medios de bienvenida OK (PDF, video y foto disponibles).');
+} catch (e) {
+  log('No se pudieron validar los medios de bienvenida: ' + e.message);
+}
+
+// Backfill ÚNICO de bienvenidas: los chats existentes quedan marcados como
+// "bienvenida ya enviada" (los inactivos más de bienvenidaDiasInactivo quedan
+// pendientes). La marca persiste en data/bienvenidas.json.
+try {
+  const r = bienvenida.backfillBienvenidas(listar(5000), estadoAjustes().bienvenidaDiasInactivo);
+  if (r.yaHecho) {
+    log('Backfill de bienvenidas: ya se había hecho; no se repite.');
+  } else {
+    log(`Backfill de bienvenidas: ${r.marcados} chat(s) marcados como "ya enviada" · ${r.pendientes} inactivo(s) pendientes de bienvenida.`);
+  }
+} catch (e) {
+  log('No se pudo hacer el backfill de bienvenidas: ' + e.message);
+}
 
 app.listen(config.port, () => {
   log(`Panel del bot: http://localhost:${config.port}/panel`);
@@ -2889,6 +3018,41 @@ async function revisarSeguimientos() {
 }
 setInterval(revisarSeguimientos, 60 * 1000);
 setTimeout(revisarSeguimientos, 15000);
+
+/* ---------------- pregunta diferida de bienvenida ("¿te ayudo a elegir?") ---------------- */
+// Job persistente (data/bienvenida-seguimiento.json): sobrevive reinicios.
+// - Se envía cuando vence (2-3 min configurados) y hay horario y conexión.
+// - Se cancela si el cliente o el dueño escribieron antes, o si la IA del
+//   chat está pausada.
+// - Si pasa más de 10 minutos sin poder enviarse, se descarta.
+async function revisarPreguntasBienvenida() {
+  if (cerrando) return;
+  if (!config.modoPrueba && !hayConexion()) return;
+  const ahoraMs = Date.now();
+  for (const telV of bienvenida.vencerPreguntas(ahoraMs, 10)) {
+    log(`Pregunta de asesoría a +${telV} descartada (venció sin poder enviarse).`);
+  }
+  if (!dentroHorario()) return;
+  for (const p of bienvenida.preguntasPendientes(ahoraMs)) {
+    if (estaPausado(p.telefono)) {
+      bienvenida.cancelarPregunta(p.telefono);
+      log(`Pregunta de asesoría a +${p.telefono} cancelada: la IA del chat está pausada.`);
+      continue;
+    }
+    try {
+      const texto = bienvenida.textoPregunta();
+      await enviarRegistrado({ tel: p.telefono, texto, nombre: p.nombre, clienteId: p.clienteId, sesionId: p.sesionId, origen: 'bot' });
+      bienvenida.marcarPreguntaEnviada(p.telefono);
+      contarEnvio();
+      log(`Pregunta de asesoría enviada a +${p.telefono}.`);
+    } catch (e) {
+      log(`No se pudo enviar la pregunta de asesoría a +${p.telefono}: ${e.message}`);
+    }
+    await dormir(1500);
+  }
+}
+setInterval(revisarPreguntasBienvenida, 20 * 1000);
+setTimeout(revisarPreguntasBienvenida, 10 * 1000);
 
 /* ---------------- apagado ordenado (SIGINT + SIGTERM, F-19) ---------------- */
 let cerrando = false;

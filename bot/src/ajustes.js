@@ -35,10 +35,16 @@ const base = () => ({
   horaInicio: Math.min(23, Math.max(0, num(config.horaInicio, 9))),
   horaFin: Math.min(24, Math.max(1, num(config.horaFin, 20))),
   // Mensaje de bienvenida (primer mensaje de cada chat). Admite {saludo} y {nombre}.
-  bienvenidaTexto: '{saludo}, {nombre}. ✨ Bienvenido(a) a *Perfumería Fina Perú*, aromas que fascinan.\n\nNuestras fragancias son *equivalentes de alta calidad* con *50% de esencia*, inspiradas en las casas perfumeras más reconocidas: buena fijación y en envase propio.\n\n💳 En Lima aceptamos todos los medios de pago según tu preferencia: efectivo al recibir, Yape, Plin o transferencia.\n🚚 Envíos a Lima y provincia.\n\n📕 Te envío nuestro catálogo y video para que conozcas las fragancias.\n🌐 Web: https://www.perfumeriafinaperu.com',
-  // Al pedir el catálogo: ¿adjuntamos el PDF? ¿y el video?
+  bienvenidaTexto: '{saludo}, {nombre}. ✨ Bienvenido(a) a *Perfumería Fina Perú*, aromas que fascinan.\n\nNuestras fragancias son *equivalentes de alta calidad* con *50% de esencia*, inspiradas en las casas perfumeras más reconocidas: buena fijación y en envase propio.\n\n💳 En Lima aceptamos todos los medios de pago según tu preferencia: efectivo al recibir, Yape, Plin o transferencia.\n🚚 Envíos a Lima y provincia.\n\n📕 Te envío nuestro catálogo, un video y una foto para que conozcas las fragancias.\n🌐 Web: https://www.perfumeriafinaperu.com',
+  // Secuencia de bienvenida: catálogo PDF, video y foto (activados por defecto).
   enviarCatalogo: true,
-  enviarVideo: false,
+  enviarVideo: true,
+  enviarFoto: true,
+  // Minutos hasta la pregunta "¿te ayudo a elegir?" (1-10).
+  preguntaMinutos: 2,
+  // Backfill de bienvenidas: los chats inactivos hace más de estos días SÍ
+  // reciben la secuencia en su próximo mensaje (el resto queda como ya enviada).
+  bienvenidaDiasInactivo: 90,
   // Si es false, al sincronizar no se importan chats existentes: la Bandeja
   // solo muestra conversaciones nuevas (el dueño la quiere limpia).
   importarChats: true,
@@ -46,6 +52,7 @@ const base = () => ({
   limpiezaAlDesconectar: 'preguntar',
   catalogoArchivo: '',
   videoArchivo: '',
+  fotoArchivo: '',
   actualizado: new Date().toISOString()
 });
 
@@ -72,11 +79,15 @@ function normalizar(a = {}) {
     horaFin: Math.min(24, Math.max(1, Math.round(num(a.horaFin, 20)))),
     bienvenidaTexto: String(a.bienvenidaTexto || '').slice(0, 600),
     enviarCatalogo: a.enviarCatalogo !== false,
-    enviarVideo: a.enviarVideo === true,
+    enviarVideo: a.enviarVideo !== false,
+    enviarFoto: a.enviarFoto !== false,
+    preguntaMinutos: clamp(a.preguntaMinutos, 1, 10),
+    bienvenidaDiasInactivo: clamp(a.bienvenidaDiasInactivo, 1, 3650),
     importarChats: a.importarChats !== false,
     limpiezaAlDesconectar: ['preguntar', 'chats', 'todo', 'nada'].includes(String(a.limpiezaAlDesconectar || '')) ? String(a.limpiezaAlDesconectar) : 'preguntar',
     catalogoArchivo: nombreSeguro(a.catalogoArchivo),
     videoArchivo: nombreSeguro(a.videoArchivo),
+    fotoArchivo: nombreSeguro(a.fotoArchivo),
     actualizado: new Date().toISOString()
   };
 }
