@@ -42,9 +42,6 @@ const base = () => ({
   enviarFoto: true,
   // Minutos hasta la pregunta "¿te ayudo a elegir?" (1-10).
   preguntaMinutos: 2,
-  // Backfill de bienvenidas: los chats inactivos hace más de estos días SÍ
-  // reciben la secuencia en su próximo mensaje (el resto queda como ya enviada).
-  bienvenidaDiasInactivo: 90,
   // Si es false, al sincronizar no se importan chats existentes: la Bandeja
   // solo muestra conversaciones nuevas (el dueño la quiere limpia).
   importarChats: true,
@@ -82,7 +79,6 @@ function normalizar(a = {}) {
     enviarVideo: a.enviarVideo !== false,
     enviarFoto: a.enviarFoto !== false,
     preguntaMinutos: clamp(a.preguntaMinutos, 1, 10),
-    bienvenidaDiasInactivo: clamp(a.bienvenidaDiasInactivo, 1, 3650),
     importarChats: a.importarChats !== false,
     limpiezaAlDesconectar: ['preguntar', 'chats', 'todo', 'nada'].includes(String(a.limpiezaAlDesconectar || '')) ? String(a.limpiezaAlDesconectar) : 'preguntar',
     catalogoArchivo: nombreSeguro(a.catalogoArchivo),

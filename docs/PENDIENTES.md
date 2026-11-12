@@ -54,3 +54,8 @@
     guardado de antes, ese valor persiste (respetamos la elección guardada): el video seguirá
     apagado hasta que el dueño lo active en el panel. Los valores por defecto del código
     (video y foto activados) solo aplican a instalaciones sin ese archivo.
+13. **A futuro (pedido del dueño, 2026-11-12)**: el catálogo puede llegar a ser **hasta 2**
+    (uno varón y otro dama, porque a veces maneja dos catálogos). Por ahora se mantiene el
+    catálogo único actual (`bot/media/catalogo-navidad-2026.pdf`). Requeriría un cambio de
+    esquema en Ajustes (lista de catálogos en vez de `catalogoArchivo` único) y en la
+    secuencia de bienvenida. NO implementado: quedó fuera del alcance de esta tarea.

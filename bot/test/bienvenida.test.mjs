@@ -1,6 +1,7 @@
 // Pruebas de la bienvenida determinista (bot/src/bienvenida.js):
-// secuencia texto→PDF→video→foto, reintentos, pregunta diferida persistente,
-// backfill de bienvenidas y validación de medios.
+// regla de disparo (saludo/info/catálogo → secuencia para nuevos y conocidos),
+// secuencia texto→PDF→video→foto con reintentos, pregunta diferida persistente
+// y validación de medios.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -8,35 +9,31 @@ import path from 'node:path';
 
 const raiz = path.join(import.meta.dirname, '..');
 const dataDir = path.join(raiz, 'data');
-const bFile = path.join(dataDir, 'bienvenidas.json');
 const sFile = path.join(dataDir, 'bienvenida-seguimiento.json');
 const mediaDir = path.join(raiz, 'media');
 const foto = path.join(mediaDir, 'bienvenida-foto.jpg');
 const fotoBak = path.join(mediaDir, 'bienvenida-foto.jpg.bak-test');
 
 // Estado limpio antes de importar el módulo (como ajustes.test.mjs).
-const respaldo = {
-  b: fs.existsSync(bFile) ? fs.readFileSync(bFile, 'utf8') : null,
-  s: fs.existsSync(sFile) ? fs.readFileSync(sFile, 'utf8') : null
-};
+const respaldo = fs.existsSync(sFile) ? fs.readFileSync(sFile, 'utf8') : null;
 fs.mkdirSync(dataDir, { recursive: true });
-fs.rmSync(bFile, { force: true });
 fs.rmSync(sFile, { force: true });
 
 const bw = await import('../src/bienvenida.js');
 
 test.after(() => {
   try {
-    if (respaldo.b === null) fs.rmSync(bFile, { force: true });
-    else fs.writeFileSync(bFile, respaldo.b, 'utf8');
-    if (respaldo.s === null) fs.rmSync(sFile, { force: true });
-    else fs.writeFileSync(sFile, respaldo.s, 'utf8');
-    for (const f of [bFile + '.tmp', sFile + '.tmp']) fs.rmSync(f, { force: true });
+    if (respaldo === null) fs.rmSync(sFile, { force: true });
+    else fs.writeFileSync(sFile, respaldo, 'utf8');
+    fs.rmSync(sFile + '.tmp', { force: true });
     if (fs.existsSync(fotoBak)) fs.renameSync(fotoBak, foto);
   } catch { /* best-effort */ }
 });
 
 const AJUSTES_TODO = { enviarCatalogo: true, enviarVideo: true, enviarFoto: true };
+const chatConocido = () => ({
+  mensajes: [{ direccion: 'entrante', origen: 'cliente', en: new Date().toISOString() }]
+});
 
 /* ---------------- saludos e información ---------------- */
 
@@ -64,6 +61,46 @@ test('frases de información sin saludo disparan', () => {
   assert.equal(bw.esSaludoOInfo('me pasas información de perfumes'), true);
 });
 
+/* ---------------- regla de disparo de la secuencia ---------------- */
+
+test('saludo/info dispara la secuencia en chats nuevos Y conocidos (cada vez que saludan)', () => {
+  const nuevo = bw.decidirSecuencia({ texto: 'Hola', chat: null });
+  assert.equal(nuevo.enviar, true);
+  assert.equal(nuevo.soloSecuencia, true);
+  const conocido = bw.decidirSecuencia({ texto: 'Buenas, quisiera información de perfumes', chat: chatConocido() });
+  assert.equal(conocido.enviar, true);
+  assert.equal(conocido.soloSecuencia, true);
+});
+
+test('pedir el catálogo dispara la secuencia en chats nuevos y conocidos', () => {
+  assert.equal(bw.decidirSecuencia({ texto: 'me pasas el catálogo', chat: chatConocido(), pideCatalogo: true }).enviar, true);
+  assert.equal(bw.decidirSecuencia({ texto: 'catalogo porfa', chat: null, pideCatalogo: true }).soloSecuencia, true);
+});
+
+test('consulta concreta en un chat nuevo: secuencia y DESPUÉS se responde la consulta', () => {
+  const d = bw.decidirSecuencia({ texto: 'cuánto cuesta el Árabe Blanco?', chat: null });
+  assert.equal(d.enviar, true);
+  assert.equal(d.soloSecuencia, false);
+});
+
+test('chat con solo mensajes del dueño/importados salientes cuenta como primer mensaje (bug yaHuboSaliente)', () => {
+  const chat = { mensajes: [{ direccion: 'saliente', origen: 'panel', en: new Date().toISOString() }] };
+  const d = bw.decidirSecuencia({ texto: 'quiero un perfume para regalo', chat });
+  assert.equal(d.enviar, true);
+  assert.equal(d.soloSecuencia, false);
+});
+
+test('cliente conocido con consulta concreta NO dispara la secuencia (solo se responde)', () => {
+  const d = bw.decidirSecuencia({ texto: 'cuánto cuesta el Árabe Blanco?', chat: chatConocido() });
+  assert.equal(d.enviar, false);
+});
+
+test('mensaje multimedia en un chat nuevo también cuenta como primer mensaje', () => {
+  const d = bw.decidirSecuencia({ texto: '[imagen]', chat: null });
+  assert.equal(d.enviar, true);
+  assert.equal(d.soloSecuencia, false);
+});
+
 /* ---------------- exclusiones ---------------- */
 
 test('exclusiones: grupo, difusión, dueño, prueba, baja y sin-wsp', () => {
@@ -76,66 +113,6 @@ test('exclusiones: grupo, difusión, dueño, prueba, baja y sin-wsp', () => {
   assert.equal(bw.puedeBienvenida({ telefono: '51911111111', sinWhatsApp: true }).ok, false);
   assert.equal(bw.puedeBienvenida({ telefono: '51911111111' }).ok, true);
   assert.equal(bw.puedeBienvenida({ telefono: 'abc' }).ok, false);
-});
-
-/* ---------------- decisión y backfill (marcador persistente) ---------------- */
-
-test('backfill único: recientes → enviada, inactivos y sin mensajes del cliente → pendiente', () => {
-  const reciente = new Date().toISOString();
-  const hace100 = new Date(Date.now() - 100 * 86400000).toISOString();
-  const chats = [
-    { telefono: '51900000001', mensajes: [{ direccion: 'entrante', en: reciente }] },
-    { telefono: '51900000002', mensajes: [{ direccion: 'entrante', en: hace100 }] },
-    { telefono: '+51 900 000 003', mensajes: [{ direccion: 'saliente', en: reciente }] }, // el cliente nunca escribió
-    { telefono: 'abc123', mensajes: [] } // inválido: se salta
-  ];
-  const r = bw.backfillBienvenidas(chats, 90);
-  assert.equal(r.yaHecho, false);
-  assert.equal(r.marcados, 1);
-  assert.equal(r.pendientes, 2);
-  assert.equal(bw.bienvenidaEnviada('51900000001'), true);
-  assert.equal(bw.bienvenidaPendiente('51900000002'), true);
-  assert.equal(bw.bienvenidaPendiente('51900000003'), true);
-  // Corre una sola vez (marca persistente).
-  const r2 = bw.backfillBienvenidas(chats, 90);
-  assert.equal(r2.yaHecho, true);
-  assert.equal(r2.marcados + r2.pendientes, 0);
-});
-
-test('decisión: chat existente y reciente NO dispara; inactivo >90 días SÍ; chat nuevo SÍ', () => {
-  const reciente = new Date().toISOString();
-  const hace100 = new Date(Date.now() - 100 * 86400000).toISOString();
-  assert.equal(bw.decidirBienvenida({ telefono: '51900000001', chat: { mensajes: [{ direccion: 'entrante', en: reciente }] } }).enviar, false);
-  assert.equal(bw.decidirBienvenida({ telefono: '51900000002', chat: { mensajes: [{ direccion: 'entrante', en: hace100 }] } }).enviar, true);
-  assert.equal(bw.decidirBienvenida({ telefono: '51900000009', chat: null }).enviar, true);
-});
-
-test('decisión: chat con mensajes importados recientes del cliente NO dispara', () => {
-  const reciente = new Date().toISOString();
-  const chat = {
-    mensajes: [
-      { direccion: 'saliente', origen: 'bot', en: reciente },   // importado
-      { direccion: 'entrante', origen: 'cliente', en: reciente } // importado
-    ]
-  };
-  assert.equal(bw.decidirBienvenida({ telefono: '51900000031', chat }).enviar, false);
-});
-
-test('decisión: chat solo con mensajes del dueño/importados salientes SÍ dispara (bug yaHuboSaliente)', () => {
-  const reciente = new Date().toISOString();
-  const chat = { mensajes: [{ direccion: 'saliente', origen: 'panel', en: reciente }] };
-  assert.equal(bw.decidirBienvenida({ telefono: '51900000032', chat }).enviar, true);
-});
-
-test('marcador "bienvenida enviada" persiste (sobrevive reinicio) y bloquea', () => {
-  const tel = '51900000007';
-  assert.equal(bw.decidirBienvenida({ telefono: tel, chat: null }).enviar, true);
-  bw.marcarBienvenida(tel);
-  assert.equal(bw.bienvenidaEnviada(tel), true);
-  assert.equal(bw.decidirBienvenida({ telefono: tel, chat: null }).enviar, false);
-  bw.recargar(); // simula reinicio
-  assert.equal(bw.bienvenidaEnviada(tel), true);
-  assert.equal(fs.existsSync(bFile + '.tmp'), false, 'escritura atómica: no queda .tmp');
 });
 
 /* ---------------- pregunta diferida (¿te ayudo a elegir?) ---------------- */

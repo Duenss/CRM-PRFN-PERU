@@ -1,13 +1,18 @@
-// Bienvenida determinista (SIN IA) para chats nuevos de clientes.
+// Bienvenida determinista (SIN IA) para chats de clientes.
 //
-// Secuencia: texto → catálogo PDF → video → foto, con pausas cortas aleatorias
-// (2-4 s) y UN reintento por medio. Si un medio falla se registra y se sigue
-// con los demás. Al final se programa la pregunta "¿te ayudo a elegir?" a los
-// 2-3 minutos (configurable) en un job persistente que sobrevive reinicios.
+// Regla de negocio (confirmada por el dueño, 2026-11-12): "hola", "hola info"
+// y los pedidos de catálogo disparan la secuencia completa — texto → PDF →
+// video → foto — para clientes NUEVOS y CONOCIDOS por igual, cada vez que
+// saludan. El primer mensaje de un cliente que nunca escribió también dispara
+// la secuencia y, si trae una consulta concreta, se responde después.
+// Un cliente conocido con una consulta concreta solo recibe la respuesta
+// (sin medios).
 //
-// Estado persistente (escritura atómica tmp+rename):
-//   data/bienvenidas.json             marcador "bienvenida ya enviada" por chat
-//   data/bienvenida-seguimiento.json  preguntas de asesoría pendientes
+// Secuencia: pausas cortas aleatorias (2-4 s) y UN reintento por medio. Si un
+// medio falla se registra y se sigue con los demás. Al final se programa la
+// pregunta "¿te ayudo a elegir?" a los 2-3 minutos (configurable) en un job
+// persistente que sobrevive reinicios (escritura atómica tmp+rename en
+// data/bienvenida-seguimiento.json).
 //
 // Los medios por defecto viven en bot/media/ (dentro de la imagen Docker):
 //   media/catalogo-navidad-2026.pdf · media/experiencia-perfumeria.mp4 · media/bienvenida-foto.jpg
@@ -20,7 +25,6 @@ const srcDir = path.dirname(fileURLToPath(import.meta.url));
 export const mediaDir = path.join(srcDir, '..', 'media');
 export const archivosDir = path.join(srcDir, '..', 'data', 'archivos');
 const dataDir = path.join(srcDir, '..', 'data');
-const bienvenidasFile = path.join(dataDir, 'bienvenidas.json');
 const seguimientoFile = path.join(dataDir, 'bienvenida-seguimiento.json');
 
 const MEDIOS_DEFECTO = {
@@ -55,107 +59,6 @@ function limpiarTexto(texto) {
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .replace(/[¡!¿?.,;:/\\\-]+/g, ' ')
     .replace(/\s+/g, ' ').trim();
-}
-
-/* ---------------- estado: bienvenidas ya enviadas ---------------- */
-
-let bienvenidas = null;
-function cargarBienvenidas() {
-  if (!bienvenidas) {
-    const j = leerJson(bienvenidasFile, {});
-    bienvenidas = {
-      backfillHecho: !!j.backfillHecho,
-      chats: j.chats && typeof j.chats === 'object' ? j.chats : {}
-    };
-  }
-  return bienvenidas;
-}
-
-/** ¿Este chat ya recibió la bienvenida? */
-export function bienvenidaEnviada(telefono) {
-  return cargarBienvenidas().chats[limpiarTel(telefono)]?.estado === 'enviada';
-}
-
-/** ¿Este chat quedó pendiente de bienvenida (inactivo en el backfill)? */
-export function bienvenidaPendiente(telefono) {
-  return cargarBienvenidas().chats[limpiarTel(telefono)]?.estado === 'pendiente';
-}
-
-export function marcarBienvenida(telefono, estado = 'enviada') {
-  const tel = limpiarTel(telefono);
-  if (!tel) return false;
-  const e = cargarBienvenidas();
-  e.chats[tel] = { estado: estado === 'pendiente' ? 'pendiente' : 'enviada', en: new Date().toISOString() };
-  escribirAtomico(bienvenidasFile, e);
-  return true;
-}
-
-/** Última fecha de un mensaje ENTRANTE del chat (0 si el cliente nunca escribió). */
-function ultimoEntranteEn(chat) {
-  const msgs = Array.isArray(chat?.mensajes) ? chat.mensajes : [];
-  let max = 0;
-  for (const m of msgs) {
-    if (!m || m.direccion !== 'entrante') continue;
-    const t = Date.parse(m?.en || '') || 0;
-    if (t > max) max = t;
-  }
-  return max;
-}
-
-/**
- * Backfill ÚNICO al primer arranque tras el deploy: todos los chats existentes
- * quedan marcados "bienvenida ya enviada" EXCEPTO:
- *  - los chats cuyo cliente nunca escribió (solo mensajes del dueño/importados
- *    salientes): quedan "pendientes" y reciben la secuencia en su primer mensaje;
- *  - los chats con último mensaje del cliente hace más de `diasInactivo` días.
- * Corre una sola vez (marca persistente `backfillHecho`).
- */
-export function backfillBienvenidas(chats = [], diasInactivo = 90) {
-  const e = cargarBienvenidas();
-  if (e.backfillHecho) return { marcados: 0, pendientes: 0, yaHecho: true };
-  const dias = Math.max(1, Number(diasInactivo) || 90);
-  const corte = Date.now() - dias * 86400000;
-  let marcados = 0;
-  let pendientes = 0;
-  for (const c of chats || []) {
-    const tel = limpiarTel(c && c.telefono);
-    if (!tel || !/^\d{8,15}$/.test(tel)) continue;
-    if (e.chats[tel]) continue;
-    const ultimo = ultimoEntranteEn(c);
-    // Cliente que nunca escribió → pendiente (la secuencia lo recibirá al
-    // escribir su primer mensaje). Sin fecha de su último mensaje → reciente.
-    const inactivo = ultimo === 0 || (ultimo > 0 && ultimo < corte);
-    e.chats[tel] = { estado: inactivo ? 'pendiente' : 'enviada', en: new Date().toISOString(), backfill: true };
-    if (inactivo) pendientes++;
-    else marcados++;
-  }
-  e.backfillHecho = true;
-  escribirAtomico(bienvenidasFile, e);
-  return { marcados, pendientes, yaHecho: false };
-}
-
-/**
- * Decide si un chat recibe la secuencia de bienvenida.
- *  - marcador 'enviada'     → no
- *  - marcador 'pendiente'   → sí (cliente inactivo o que nunca escribió)
- *  - sin mensajes previos   → sí (chat nuevo)
- *  - solo mensajes del dueño/importados salientes → sí (el cliente nunca
- *    escribió: es efectivamente un contacto nuevo)
- *  - con mensajes del cliente → solo si hace más de `diasInactivo` días
- */
-export function decidirBienvenida({ telefono, chat = null, diasInactivo = 90, ahoraMs = Date.now() }) {
-  const tel = limpiarTel(telefono);
-  const marcador = cargarBienvenidas().chats[tel];
-  if (marcador?.estado === 'enviada') return { enviar: false, motivo: 'bienvenida ya enviada' };
-  if (marcador?.estado === 'pendiente') return { enviar: true, motivo: 'cliente pendiente de bienvenida' };
-  const previos = Array.isArray(chat?.mensajes) ? chat.mensajes : [];
-  if (!previos.length) return { enviar: true, motivo: 'chat nuevo' };
-  const ultimo = ultimoEntranteEn(chat);
-  if (ultimo === 0) return { enviar: true, motivo: 'el cliente nunca escribió (solo mensajes del dueño)' };
-  const dias = Math.max(1, Number(diasInactivo) || 90);
-  const corte = ahoraMs - dias * 86400000;
-  if (ultimo < corte) return { enviar: true, motivo: `inactivo más de ${dias} días` };
-  return { enviar: false, motivo: 'chat existente con actividad reciente' };
 }
 
 /* ---------------- estado: pregunta diferida (¿te ayudo a elegir?) ---------------- */
@@ -252,6 +155,26 @@ export function esSaludoOInfo(texto) {
     if (/informaci|info\b|quisiera saber|quiero saber|me gustaria saber|deseo saber|saber mas|conocer mas|ver el catalogo|me pasas|me das|me puedes dar/.test(resto)) return true;
   }
   return /^(informacion|info|me das informacion|me puedes dar informacion|me pasas informacion|quisiera informacion|quiero informacion|deseo informacion)(\b.*)?$/.test(t);
+}
+
+/**
+ * Decide si un mensaje dispara la secuencia de bienvenida.
+ *  - "hola"/"hola info"/pedido de catálogo → secuencia completa SIEMPRE
+ *    (clientes nuevos y conocidos, cada vez que saluden); no se responde
+ *    nada más: la secuencia ya lo cubre todo.
+ *  - primer mensaje de un cliente que nunca escribió en el chat (aunque haya
+ *    mensajes importados o del dueño) → secuencia y DESPUÉS se responde su
+ *    consulta concreta.
+ *  - cliente conocido con consulta concreta → sin secuencia (solo respuesta).
+ */
+export function decidirSecuencia({ texto = '', chat = null, pideCatalogo = false }) {
+  if (esSaludoOInfo(texto)) return { enviar: true, motivo: 'saludo o pedido de información', soloSecuencia: true };
+  if (pideCatalogo) return { enviar: true, motivo: 'pide el catálogo', soloSecuencia: true };
+  const previos = Array.isArray(chat?.mensajes) ? chat.mensajes : [];
+  if (!previos.some(m => m && m.direccion === 'entrante')) {
+    return { enviar: true, motivo: 'primer mensaje del cliente', soloSecuencia: false };
+  }
+  return { enviar: false, motivo: 'cliente conocido con consulta concreta' };
 }
 
 /* ---------------- exclusiones ---------------- */
@@ -392,16 +315,13 @@ export async function ejecutarSecuencia({ telefono, nombre = '', clienteId = nul
 
 /** Recarga el estado desde disco (simula un reinicio; útil en tests). */
 export function recargar() {
-  bienvenidas = null;
   seguimiento = null;
-  cargarBienvenidas();
   cargarSeguimiento();
 }
 
 export default {
   mediaDir, archivosDir, rutaMedia, validarMedios,
-  esSaludoOInfo, puedeBienvenida,
-  bienvenidaEnviada, bienvenidaPendiente, marcarBienvenida, backfillBienvenidas, decidirBienvenida,
+  esSaludoOInfo, decidirSecuencia, puedeBienvenida,
   programarPregunta, cancelarPregunta, preguntasPendientes, marcarPreguntaEnviada, vencerPreguntas, textoPregunta,
   ejecutarSecuencia, recargar
 };

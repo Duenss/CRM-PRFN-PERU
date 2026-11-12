@@ -1630,12 +1630,14 @@ async function manejarMensaje(msg, sesionId = null) {
   }
 
   // ---------------- Bienvenida determinista (sin IA) ----------------
-  // Cualquier primer mensaje en vivo de un chat dispara la secuencia completa
-  // (texto → PDF → video → foto), aunque el chat tenga mensajes importados o
-  // salientes del dueño. Un cliente que ya conversaba NO recibe la secuencia,
-  // salvo que lleve más de bienvenidaDiasInactivo días sin escribir.
+  // "hola"/"hola info"/pedido de catálogo → secuencia completa (texto → PDF →
+  // video → foto) para clientes NUEVOS y CONOCIDOS, cada vez que saluden.
+  // El primer mensaje de un cliente que nunca escribió también dispara la
+  // secuencia y DESPUÉS se responde su consulta. Un cliente conocido con una
+  // consulta concreta solo recibe la respuesta (sin medios).
   let secuenciaEnviada = false;
-  if (!bienvenida.bienvenidaEnviada(tel)) {
+  const decisionBienvenida = bienvenida.decidirSecuencia({ texto, chat: chatAntes, pideCatalogo: pideCatalogo(texto) });
+  if (decisionBienvenida.enviar) {
     const sinWsp = !!(cliente && (Array.isArray(cliente.etiquetas) ? cliente.etiquetas : String(cliente.etiquetas || '').split(',')).includes('sin-wsp'));
     const puerta = bienvenida.puedeBienvenida({
       telefono: tel,
@@ -1647,39 +1649,15 @@ async function manejarMensaje(msg, sesionId = null) {
     });
     if (!puerta.ok) {
       log(`Bienvenida omitida para +${tel}: ${puerta.motivo}.`);
+      if (decisionBienvenida.soloSecuencia) return;
     } else {
-      const decision = bienvenida.decidirBienvenida({ telefono: tel, chat: chatAntes, diasInactivo: estadoAjustes().bienvenidaDiasInactivo });
-      if (decision.enviar) {
-        // Marcar ANTES de enviar: si el bot muere a mitad, no reenvía todo.
-        bienvenida.marcarBienvenida(tel);
-        secuenciaEnviada = true;
-        try {
-          await ejecutarSecuenciaBienvenida({ tel, nombre: nombreChat, clienteId: cliente?.id, sesionId });
-        } catch (e) { log('No se pudo enviar la bienvenida: ' + e.message); }
-      } else {
-        bienvenida.marcarBienvenida(tel);
-        log(`Bienvenida omitida para +${tel}: ${decision.motivo}.`);
-      }
+      secuenciaEnviada = true;
+      try {
+        await ejecutarSecuenciaBienvenida({ tel, nombre: nombreChat, clienteId: cliente?.id, sesionId });
+      } catch (e) { log('No se pudo enviar la bienvenida: ' + e.message); }
+      log(`Secuencia de bienvenida a +${tel} (${decisionBienvenida.motivo}).`);
+      if (decisionBienvenida.soloSecuencia) return;
     }
-  }
-
-  // Catálogo por pedido explícito (o saludo/info) en chats ya conocidos.
-  // Si la secuencia acaba de enviar el PDF, no se repite.
-  const primerSaludoInfo = bienvenida.esSaludoOInfo(texto);
-  if (esTextoReal && (pideCatalogo(texto) || primerSaludoInfo)) {
-    if (secuenciaEnviada) return; // el catálogo ya salió en la secuencia
-    if (primerSaludoInfo) {
-      const s = saludoONada(tel, nombreChat);
-      if (s) {
-        try {
-          await enviarRegistrado({ tel, texto: `${s}. ¿En qué te puedo ayudar? Te comparto el catálogo 😊`, nombre: nombreChat, clienteId: cliente?.id, sesionId });
-        } catch (e) { log('No se pudo responder el saludo: ' + e.message); }
-      }
-    }
-    try {
-      await enviarCatalogo({ tel, nombre: nombreChat, clienteId: cliente?.id, sesionId });
-    } catch (e) { log('No se pudo enviar el catálogo: ' + e.message); }
-    return;
   }
 
   // Flujos determinísticos de compra: resumen, método de pago y agenda.
@@ -2829,20 +2807,6 @@ try {
   if (!problemas.length) log('Medios de bienvenida OK (PDF, video y foto disponibles).');
 } catch (e) {
   log('No se pudieron validar los medios de bienvenida: ' + e.message);
-}
-
-// Backfill ÚNICO de bienvenidas: los chats existentes quedan marcados como
-// "bienvenida ya enviada" (los inactivos más de bienvenidaDiasInactivo quedan
-// pendientes). La marca persiste en data/bienvenidas.json.
-try {
-  const r = bienvenida.backfillBienvenidas(listar(5000), estadoAjustes().bienvenidaDiasInactivo);
-  if (r.yaHecho) {
-    log('Backfill de bienvenidas: ya se había hecho; no se repite.');
-  } else {
-    log(`Backfill de bienvenidas: ${r.marcados} chat(s) marcados como "ya enviada" · ${r.pendientes} inactivo(s) pendientes de bienvenida.`);
-  }
-} catch (e) {
-  log('No se pudo hacer el backfill de bienvenidas: ' + e.message);
 }
 
 app.listen(config.port, () => {

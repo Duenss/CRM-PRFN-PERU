@@ -36,13 +36,11 @@ test('bienvenida: catálogo, video y foto activados por defecto', () => {
   assert.equal(a.enviarVideo, true);
   assert.equal(a.enviarFoto, true);
   assert.equal(a.preguntaMinutos, 2);
-  assert.equal(a.bienvenidaDiasInactivo, 90);
 });
 
-test('bienvenida: preguntaMinutos se limita a 1-10 y los días de inactividad a 1-3650', () => {
-  const a = ajustes.actualizarAjustes({ preguntaMinutos: 0, bienvenidaDiasInactivo: 99999, enviarFoto: false });
+test('bienvenida: preguntaMinutos se limita a 1-10 y enviarFoto respeta el valor guardado', () => {
+  const a = ajustes.actualizarAjustes({ preguntaMinutos: 0, enviarFoto: false });
   assert.equal(a.preguntaMinutos, 1);
-  assert.equal(a.bienvenidaDiasInactivo, 3650);
   assert.equal(a.enviarFoto, false);
   ajustes.actualizarAjustes({ enviarFoto: true });
 });
