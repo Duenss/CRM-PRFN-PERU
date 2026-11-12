@@ -9,7 +9,7 @@
 | 1 · Validación (sin tope, ventana horaria, pausas largas) | ✅ | `0e1294b` | 167/168 (1 fallo CRLF preexistente) |
 | 2 · Bienvenida (cooldown, backfill, primer mensaje con consulta) | ✅ | `0bab823` | 173/174 (1 fallo CRLF preexistente) |
 | 3 · Backups (retención por ruta, última copia, restore) | ✅ | `e0f1399` | 177/178 (1 fallo CRLF preexistente) |
-| 4 · IA (ejemplos curados, respaldo ante fallo, evaluación) | ⬜ | — | — |
+| 4 · IA (ejemplos curados, respaldo ante fallo, evaluación) | ✅ | `22053d4` | 186/187 (1 fallo CRLF preexistente) |
 | 5 · Panel (filtros bandeja/pedidos, búsqueda persistente) | ⬜ | — | — |
 | 6 · Pendientes auditoría (T2, T3, T4, T5, T7, T8) | ⬜ | — | — |
 | 7 · Rediseño dashboard (tokens, tipografía, capturas) | ⬜ | — | — |
