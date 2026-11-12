@@ -1,5 +1,9 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { config } from './config.js';
 import { getProductos, getConfiguracion } from './supabase.js';
+import { estadoAjustes } from './ajustes.js';
 import {
   formatearCampana,
   formatearOpciones,
@@ -12,6 +16,135 @@ import {
 } from './mensajes.js';
 
 let cache = { at: 0, productos: [] };
+
+const dataDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data');
+export const EJEMPLOS_IA_FILE = process.env.EJEMPLOS_IA_FILE
+  ? path.resolve(process.env.EJEMPLOS_IA_FILE)
+  : path.join(dataDir, 'ejemplos-ia.json');
+
+/* ---------------- ejemplos curados del dueño (few-shot) ---------------- */
+// El dueño extrae pares pregunta→respuesta con scripts/extraer-ejemplos.mjs,
+// revisa bot/data/ejemplos-ia.json y marca `aprobado: true` en los que quiere
+// usar. Se activan con el ajuste `ejemplosIAActivos` (por defecto false).
+// Seguridad: precios, stock y promociones salen SIEMPRE del catálogo y los
+// ajustes; un ejemplo que mencione precios/stock/promos se descarta.
+
+/** ¿El texto menciona precios, stock o promociones? (se descarta del few-shot) */
+export function mencionaPrecio(texto) {
+  return /(s\s*\/\s*\.?\s*\d|\bsoles?\b|\bprecios?\b|\bcuesta(n)?\b|\bpromo(cion(es)?)?\b|\bdescuentos?\b|\bstock\b|\bagotado\b)/i
+    .test(String(texto || ''));
+}
+
+let cacheEjemplos = { at: -1, lista: [] };
+/** Carga bot/data/ejemplos-ia.json (cache por mtime: se puede editar sin reiniciar). */
+export function cargarEjemplos({ archivo = EJEMPLOS_IA_FILE } = {}) {
+  try {
+    const st = fs.statSync(archivo);
+    if (cacheEjemplos.at === st.mtimeMs) return cacheEjemplos.lista;
+    const j = JSON.parse(fs.readFileSync(archivo, 'utf8'));
+    const crudos = Array.isArray(j) ? j : (Array.isArray(j?.ejemplos) ? j.ejemplos : []);
+    const lista = crudos
+      .filter(e => e && typeof e === 'object')
+      .map(e => ({
+        id: String(e.id || '').slice(0, 80),
+        pregunta: String(e.pregunta || '').trim().slice(0, 600),
+        respuesta: String(e.respuesta || '').trim().slice(0, 900),
+        etiquetas: (Array.isArray(e.etiquetas) ? e.etiquetas : String(e.etiquetas || '').split(','))
+          .map(x => String(x || '').trim()).filter(Boolean).slice(0, 8),
+        aprobado: e.aprobado === true
+      }));
+    cacheEjemplos = { at: st.mtimeMs, lista };
+    return lista;
+  } catch {
+    cacheEjemplos = { at: -1, lista: [] };
+    return [];
+  }
+}
+
+/** Ejemplos usables: aprobados, completos y SIN precios/stock/promos. */
+export function ejemplosUtilizables(lista = []) {
+  return (Array.isArray(lista) ? lista : []).filter(e =>
+    e && e.aprobado === true && e.pregunta && e.respuesta &&
+    !mencionaPrecio(e.pregunta) && !mencionaPrecio(e.respuesta)
+  );
+}
+
+/** Similitud de un ejemplo con la consulta: palabras + familia olfativa. */
+export function puntajeEjemplo(texto, ejemplo = {}) {
+  const tokens = new Set(palabras(texto));
+  if (!tokens.size) return 0;
+  let score = 0;
+  const etiquetas = Array.isArray(ejemplo.etiquetas) ? ejemplo.etiquetas : [];
+  const campos = `${ejemplo.pregunta || ''} ${ejemplo.respuesta || ''} ${etiquetas.join(' ')}`;
+  for (const p of palabras(campos)) if (tokens.has(p)) score += 1;
+  const familia = detectarFamilia(texto);
+  if (familia) {
+    if (etiquetas.some(t => sinAcentos(t).includes(sinAcentos(familia)))) score += 3;
+    if (sinAcentos(campos).includes(sinAcentos(familia))) score += 1.5;
+  }
+  for (const tok of tokens) {
+    if (tok.length < 4) continue;
+    for (const ob of palabras(campos)) {
+      if (ob.length >= 4 && tok !== ob && similitud(tok, ob) >= 0.85) { score += 1.5; break; }
+    }
+  }
+  return score;
+}
+
+/**
+ * Elige los 3-5 ejemplos aprobados MÁS similares a la consulta (sin vector DB).
+ * Si hay menos de 3 con coincidencias, se completan con los mejores aprobados
+ * para que el modelo tenga al menos 3 referencias de estilo.
+ */
+export function seleccionarEjemplos(texto, lista = [], { min = 3, max = 5 } = {}) {
+  const utiles = ejemplosUtilizables(lista);
+  if (!utiles.length) return [];
+  const ordenados = utiles
+    .map(e => ({ e, score: puntajeEjemplo(texto, e) }))
+    .sort((a, b) => b.score - a.score);
+  const tope = Math.min(Math.max(1, Number(max) || 5), ordenados.length);
+  const elegidos = ordenados.slice(0, tope).filter(x => x.score > 0);
+  const minimo = Math.min(Math.max(1, Number(min) || 3), ordenados.length);
+  if (elegidos.length < minimo) {
+    for (const x of ordenados) {
+      if (elegidos.length >= minimo) break;
+      if (!elegidos.includes(x)) elegidos.push(x);
+    }
+  }
+  return elegidos.map(x => x.e);
+}
+
+/** Bloque de prompt con los ejemplos elegidos ('' si no hay). */
+export function textoEjemplosPrompt(texto, lista = cargarEjemplos()) {
+  const ejemplos = seleccionarEjemplos(texto, lista);
+  if (!ejemplos.length) return '';
+  const bloques = ejemplos.map((e, i) =>
+    `Ejemplo ${i + 1} (${e.etiquetas.join(', ') || 'general'}):\nCliente: ${e.pregunta}\nTienda: ${e.respuesta}`
+  ).join('\n\n');
+  return `Ejemplos de respuestas APROBADAS del dueño (imita el estilo y el tono; NO copies precios, stock ni promociones: esos datos salen SOLO del catálogo y los ajustes):\n\n${bloques}`;
+}
+
+/**
+ * Respuesta de respaldo cuando el LLM falla POR COMPLETO: el cliente recibe un
+ * mensaje útil (nunca queda en visto) y app.js avisa/deriva al administrador.
+ */
+export function respuestaFalloIA(mensaje, error) {
+  return {
+    ...fallback(mensaje),
+    respaldo: true,
+    derivarAviso: true,
+    motivoFallo: String((error && (error.message || error)) || 'error de IA').slice(0, 300)
+  };
+}
+
+/** Proveedores de IA configurados, en orden explícito: Gemini → Groq → Anthropic. */
+export function proveedoresConfigurados(cfg = config) {
+  const lista = [];
+  if (cfg.geminiKey) lista.push('Gemini');
+  if (cfg.groqKey) lista.push('Groq');
+  if (cfg.anthropicKey) lista.push('Anthropic');
+  return lista;
+}
 
 async function catalogo() {
   if (Date.now() - cache.at < 10 * 60 * 1000 && cache.productos.length) return cache.productos;
@@ -431,10 +564,16 @@ export async function redactarRespuesta({ mensaje, historial = [], cliente, cont
   ).join('\n');
 
   const extra = String(contexto || '').trim();
+  // Few-shot curado: solo si el dueño activó el ajuste y marcó ejemplos como
+  // aprobados. Los ejemplos con precios/stock/promos ya vienen filtrados.
+  let fewShot = '';
+  try {
+    if (estadoAjustes().ejemplosIAActivos === true) fewShot = textoEjemplosPrompt(mensaje);
+  } catch { fewShot = ''; }
 
   const hora = new Date().toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit', hour12: true });
   const prompt = `Datos de la tienda:
-${tienda}\nHora actual en Lima: ${hora} (saluda acorde a esta hora, nunca con otro momento del día)${extra ? `\n\nIndicaciones del dueño (respétalas siempre):\n${extra.slice(0, 1200)}` : ''}
+${tienda}\nHora actual en Lima: ${hora} (saluda acorde a esta hora, nunca con otro momento del día)${extra ? `\n\nIndicaciones del dueño (respétalas siempre):\n${extra.slice(0, 1200)}` : ''}${fewShot ? `\n\n${fewShot}` : ''}
 
 Catálogo relevante:
 ${lista}
@@ -446,20 +585,7 @@ Mensaje nuevo del cliente: ${String(mensaje).slice(0, 2500)}
 Responde ahora.`;
 
   try {
-    let raw;
-    if (config.geminiKey) {
-      try {
-        raw = await gemini(prompt);
-      } catch (eGem) {
-        if (!config.groqKey) throw eGem;
-        console.warn('[ia] Gemini sin cuota/error; se prueba Groq:', eGem.message);
-        raw = await groqChat(prompt);
-      }
-    } else if (config.groqKey) {
-      raw = await groqChat(prompt);
-    } else {
-      raw = await anthropic(prompt);
-    }
+    const raw = await generarRespuesta(prompt);
     const j = limpiarJSON(raw);
     if (!j) {
       const op = pideOpciones ? await respuestaOpciones(mensaje) : null;
@@ -524,9 +650,34 @@ Responde ahora.`;
   } catch (e) {
     console.warn('[ia] error:', e.message);
     const op = pideOpciones ? await respuestaOpciones(mensaje) : null;
-    if (op) return { responder: true, texto: op.texto, productoId: op.productoId, pedido: null, pregunta: '', respaldo: true, motivoFallo: e.message };
-    return { ...fallback(mensaje), respaldo: true, motivoFallo: e.message };
+    if (op) return { responder: true, texto: op.texto, productoId: op.productoId, pedido: null, pregunta: '', respaldo: true };
+    return respuestaFalloIA(mensaje, e);
   }
+}
+
+/**
+ * Orden explícito de proveedores para el chat: Gemini → Groq → Anthropic.
+ * Errores explícitos: si todos fallan se lanza un error con el detalle de cada
+ * proveedor; app.js avisa al dueño y el cliente ya recibió el respaldo.
+ */
+async function generarRespuesta(prompt) {
+  const intentos = [];
+  if (config.geminiKey) intentos.push(['Gemini', () => gemini(prompt)]);
+  if (config.groqKey) intentos.push(['Groq', () => groqChat(prompt)]);
+  if (config.anthropicKey) intentos.push(['Anthropic', () => anthropic(prompt)]);
+  if (!intentos.length) throw new Error('Sin proveedor de IA configurado');
+  const errores = [];
+  for (const [nombre, fn] of intentos) {
+    try {
+      const texto = await fn();
+      if (texto && String(texto).trim()) return texto;
+      errores.push(`${nombre}: respuesta vacía`);
+    } catch (e) {
+      errores.push(`${nombre}: ${e.message}`);
+      console.warn(`[ia] ${nombre} falló; se prueba el siguiente proveedor si existe: ${e.message}`);
+    }
+  }
+  throw new Error(`Todos los proveedores de IA fallaron → ${errores.join(' | ').slice(0, 500)}`);
 }
 
 async function gemini(prompt, opts = {}) {

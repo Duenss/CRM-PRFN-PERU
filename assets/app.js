@@ -2565,6 +2565,7 @@ async function cargarIA(){
     if($('#ia-auto'))$('#ia-auto').checked=!!j.autoRespuesta;
     if($('#ia-max'))$('#ia-max').value=(j.maxPorConversacion??0);
     if($('#ia-prompt'))$('#ia-prompt').value=j.prompt||'';
+    try{const aj=await botFetch('/api/ajustes');if($('#ia-ejemplos'))$('#ia-ejemplos').checked=!!aj.ajustes?.ejemplosIAActivos;}catch{}
     actualizarOrbe();
     const c=await botFetch('/api/conversaciones?limite=30');
     const pausados=new Set((j.pausados||[]).map(p=>p.telefono));
@@ -2596,6 +2597,13 @@ $('#ia-save')?.addEventListener('click',async()=>{try{await guardarIA();actualiz
 $('#ia-reload')?.addEventListener('click',cargarIA);
 $('#ia-activa')?.addEventListener('change',async()=>{try{await guardarIA();actualizarOrbe();toast('Cambio guardado')}catch(e){toast('Error: '+e.message)}});
 $('#ia-auto')?.addEventListener('change',async()=>{try{await guardarIA();actualizarOrbe();toast('Cambio guardado')}catch(e){toast('Error: '+e.message)}});
+$('#ia-ejemplos')?.addEventListener('change',async()=>{
+  const on=!!$('#ia-ejemplos')?.checked;
+  try{
+    await botFetch('/api/ajustes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ejemplosIAActivos:on})});
+    toast(on?'Ejemplos curados activados':'Ejemplos curados desactivados');
+  }catch(e){toast('No se guardó: '+e.message,'error');if($('#ia-ejemplos'))$('#ia-ejemplos').checked=!on;}
+});
 $('#ia-chats')?.addEventListener('click',async e=>{
   const b=e.target.closest('[data-ia-tel]');if(!b)return;
   const tel=b.dataset.iaTel,pausado=b.dataset.p==='1';b.disabled=true;

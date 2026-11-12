@@ -1562,6 +1562,26 @@ async function notificarDueno(texto, sesionId = null) {
   }
 }
 
+// Fallo total del LLM: el cliente ya recibió el mensaje de respaldo (nunca queda
+// en visto) y el dueño se entera para revisar/derivar. Máx. 1 aviso cada 30 min
+// por chat para no convertirlo en spam.
+const avisosFalloIA = new Map();
+async function avisarFalloIA(tel, nombre, motivo, sesionId = null) {
+  const ahora = Date.now();
+  if (ahora - (avisosFalloIA.get(tel) || 0) < 30 * 60 * 1000) return;
+  avisosFalloIA.set(tel, ahora);
+  if (avisosFalloIA.size > 500) avisosFalloIA.delete(avisosFalloIA.keys().next().value);
+  emitir('derivacion', { telefono: tel, nombre, motivo: 'fallo de IA', mensaje: String(motivo || '').slice(0, 300) });
+  try {
+    await notificarDueno(
+      `⚠️ *IA sin respuesta*\n\nNo se pudo generar la respuesta para +${tel} (${nombre}). El cliente recibió un mensaje de respaldo.\nMotivo: ${String(motivo || 'sin detalle').slice(0, 200)}\n\nRevísalo en la pestaña *Bandeja*.`,
+      sesionId
+    );
+  } catch (e) {
+    log('No se pudo avisar al dueño del fallo de IA: ' + e.message);
+  }
+}
+
 async function manejarMensaje(msg, sesionId = null) {
   if (msg.fromMe || msg.isStatus) return;
   if (String(msg.type || '') === 'reaction' || msg.isNotification) return;
@@ -2009,6 +2029,9 @@ ${String(texto).slice(0, 300)}
 
     if (ai.respaldo) {
       log(`Respuesta de respaldo a +${tel}${ai.motivoFallo ? ' (falló la IA: ' + ai.motivoFallo + ')' : ''}: ${ai.texto.slice(0, 90)}`);
+      // Fallo del LLM (no "IA no configurada"): se avisa/deriva al administrador
+      // para que revise la conversación; el cliente ya recibió el respaldo.
+      if (ai.motivoFallo) await avisarFalloIA(tel, nombreChat, ai.motivoFallo, sesionId);
     } else {
       log(`Respuesta IA a +${tel}: ${ai.texto.slice(0, 90)}${ai.texto.length > 90 ? '...' : ''}`);
     }

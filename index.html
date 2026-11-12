@@ -279,6 +279,7 @@
             <input id="ia-max" type="number" min="0" max="99" step="1" placeholder="0 = sin límite">
             <label for="ia-prompt">Indicaciones para la IA (tono, promos vigentes, qué evitar)</label>
             <textarea id="ia-prompt" rows="4" maxlength="1200" placeholder="Ej. Tono cercano y peruano. Somos equivalentes, nunca digas que es original. Envío a todo el Perú."></textarea>
+            <label style="display:flex;gap:.5rem;align-items:flex-start;margin-top:.7rem;font-size:.85rem"><input type="checkbox" id="ia-ejemplos" style="width:auto;margin-top:.2rem"> <span><b>Usar ejemplos curados</b> aprobados por el dueño como referencia de estilo<br><small class="muted">Se extraen con <code>scripts/extraer-ejemplos.mjs</code> y tú marcas <code>aprobado:true</code> en <code>bot/data/ejemplos-ia.json</code>. Precios, stock y promos nunca salen de los ejemplos.</small></span></label>
             <div class="acts"><button class="ghost" id="ia-reload" type="button">Descartar cambios</button><button id="ia-save" type="button">Guardar</button></div>
           </div>
         </div>
