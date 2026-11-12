@@ -177,3 +177,17 @@ Reglas: **nada de scroll horizontal** en 360/768/1280; todo bloque con
 6. Contraste AA en texto normal; controles táctiles ≥ 44 px en móvil.
 7. Sin claves privadas en el HTML y sin CDN en fuentes (CSP intacto).
 8. `docs/capturas/` actualizado y revisado en las tres anchuras.
+
+## 10. Multimedia en el hilo (2026-11-12)
+
+- Cada mensaje con multimedia muestra un bloque `.msg-media` dentro de la burbuja:
+  miniatura (`img.msg-thumb`) si WhatsApp la trae + botón para cargar el original.
+- Al pulsar el botón, se descarga el archivo bajo demanda y se sustituye por
+  `img.msg-img` (imagen/sticker), `video.msg-video` (video/GIF), `audio.msg-audio`
+  (notas de voz) o un enlace `a.msg-doc` (documentos).
+- Mensajes antiguos con `[imagen]`/`[video]`: el mismo bloque con botón (si tienen `waId`).
+- Estados: `.msg-media.loading` atenúa la miniatura mientras descarga; si el archivo
+  expiró, el botón se restaura y se muestra un toast de “No disponible”.
+- La multimedia va por la ruta autenticada del proxy (`/api/media/chats/...`): nunca
+  hay URLs públicas ni base64 en el HTML (solo la miniatura data-URI, pequeña).
+- En móvil, imágenes/videos se limitan a ~72–80 vw y el botón mide 40 px.

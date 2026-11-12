@@ -127,3 +127,22 @@
 27. **Artefactos e2e**: `docs/auditoria/capturas/*.json` y `*.png` se regeneran en cada corrida
     del arnés (timestamps); no tratarlos como que el panel cambió. Las capturas de diseño
     revisadas viven en `docs/capturas/`. (2026-11-12.)
+
+## Chats duplicados (LID) y multimedia de chats (2026-11-12)
+
+28. **Multimedia caducada**: WhatsApp borra los archivos antiguos de sus servidores. Los
+    mensajes viejos con `[imagen]`/`[video]` se podrán abrir solo mientras el archivo siga
+    disponible; si no, el panel muestra “No disponible”. No hay forma de recuperarlos.
+29. **`bot/data/chats/` no se respalda** (solo se respaldan `data/*.json`, `comprobantes/` y
+    `archivos/`). Si se borra el volumen `bot-data-v2`, se pierden los originales descargados
+    bajo demanda; las miniaturas viven en `conversaciones.json` y sí van en el backup.
+30. **Videos bajo demanda**: se descarga el archivo completo antes de reproducir (WhatsApp no
+    ofrece streaming); archivos muy grandes (>50 MB) se rechazan con aviso. Si en el futuro se
+    quiere streaming real, habría que migrar a Supabase Storage/objeto con URL firmada.
+31. **Fusión automática prudente**: al arrancar solo se fusionan duplicados de confianza ALTA
+    (mismo `chat.waId` o ≥2 mensajes con el mismo `waId`). Los de confianza media se revisan a
+    mano con `scripts/dedupe-conversaciones.mjs` (dry-run por defecto). (2026-11-12.)
+32. **LID sin número resoluble**: si un cliente escribe desde un LID que WhatsApp no deja
+    resolver (número oculto), el mensaje entrante se descarta para no crear un chat fantasma.
+    Queda un log `Mensaje de un LID sin número resoluble`. Si en el futuro se decide mostrarlo,
+    hace falta un esquema de clave `lid:<uid>` en la Bandeja y en el panel.

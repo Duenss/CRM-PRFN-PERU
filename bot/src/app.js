@@ -11,7 +11,9 @@ import { configValidacion, esperaValidacionMs, aplicarResultado, pausaTrasErrore
 import { estadoIA, actualizarIA, pausarIA, estaPausado, promptIA, resumenIA, podarPausados } from './ia.js';
 import { estadoAjustes, actualizarAjustes, esperaMasivaMs, esperaChatMs } from './ajustes.js';
 import { oculto, ocultar, limpiar as limpiarOcultos } from './ocultos.js';
-import { registrar, listar, buscar, marcarAgregados, aplicarContactos, aplicarNombresClientes, marcarSinWhatsApp, marcarSinChat, obtener, marcarLeido, respuestasIA, porDia, resumen as resumenChats, registrarCabecera, importarMensajes, yaExisteWa, actualizarAck, mensajesEntrantes, eliminar as eliminarConversacion, fijar as fijarChat, archivar as archivarChat, vaciar as vaciarConversaciones, flush as flushConversaciones } from './conversaciones.js';
+import { registrar, listar, buscar, marcarAgregados, aplicarContactos, aplicarNombresClientes, marcarSinWhatsApp, marcarSinChat, obtener, marcarLeido, respuestasIA, porDia, resumen as resumenChats, registrarCabecera, importarMensajes, yaExisteWa, actualizarAck, mensajesEntrantes, eliminar as eliminarConversacion, fijar as fijarChat, archivar as archivarChat, vaciar as vaciarConversaciones, flush as flushConversaciones, buscarMensajePorWa, actualizarMediaMensaje, fusionarDuplicados } from './conversaciones.js';
+import { telefonoDeDestino } from './identidad.js';
+import { datosMediaEntrante, esMarcadorMedia, tipoDeMarcador, guardarMediaChat, podarMediaChats, archivoMediaSeguro, rutaMediaSegura } from './media-chats.js';
 import * as pedidos from './pedidos.js';
 import * as anuncios from './anuncios.js';
 // (Las plantillas de pago se eliminaron: las billeteras digitales las verifica el admin.)
@@ -139,6 +141,8 @@ const puede = c => c && c.activo !== false && !c.baja && !(Array.isArray(c.etiqu
 const botDataDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data');
 const comprobantesDir = path.join(botDataDir, 'comprobantes');
 const archivosDir = path.join(botDataDir, 'archivos');
+// Multimedia de los chats descargada bajo demanda (no se respalda: ver RUNBOOK).
+const chatsMediaDir = path.join(botDataDir, 'chats');
 const raizProyecto = path.join(botDataDir, '..', '..');
 
 /** Guarda la imagen de un comprobante y devuelve su nombre de archivo. */
@@ -1484,12 +1488,17 @@ async function manejarMensajePropio(msg, sesionId = null) {
   if (String(msg.type || '') === 'reaction' || msg.isNotification) return;
   const dest = String(msg.to || '');
   if (dest.endsWith('@g.us') || dest === 'status@broadcast') return;
-  let tel = normalizar(dest.split('@')[0]);
-  if (!dest.endsWith('@c.us')) {
-    const real = await resolverTelefonoWa(dest, sesionId);
-    if (real) tel = real;
+  // Identidad: un @lid NUNCA se guarda como si fuera un teléfono. Si el número
+  // no se resuelve con certeza, el mensaje propio no se registra (evita chats
+  // duplicados con el userid del LID).
+  const canonico = telefonoCanonico(dest);
+  let resuelto = '';
+  if (!/^\d{8,15}$/.test(canonico)) resuelto = await resolverTelefonoWa(dest, sesionId);
+  const tel = telefonoDeDestino(dest, { canonico, resuelto });
+  if (!tel) {
+    log(`Mensaje propio a ${dest || 'destino desconocido'} sin número resuelto (LID); no se registra como teléfono.`);
+    return;
   }
-  if (!/^\d{8,15}$/.test(tel)) return;
   // Ignora mensajes dirigidos al propio número del bot (chat contigo mismo / ubicaciones).
   let propios = [];
   try { propios = estadoWa().map(s => String(s.numero || '')).filter(Boolean); } catch {}
@@ -1501,7 +1510,7 @@ async function manejarMensajePropio(msg, sesionId = null) {
   let cliente = null;
   try { cliente = await getCliente(tel); } catch {}
   const nombre = msg._data?.notifyName || cliente?.nombre || '';
-  registrar({ telefono: tel, texto, direccion: 'saliente', nombre, clienteId: cliente?.id, origen: 'panel', waId });
+  registrar({ telefono: tel, texto, direccion: 'saliente', nombre, clienteId: cliente?.id, origen: 'panel', waId, media: datosMediaEntrante(msg) });
   // Si el dueño atiende manualmente, la pregunta diferida pierde sentido.
   if (bienvenida.cancelarPregunta(tel)) log(`Pregunta de asesoría a +${tel} cancelada: el dueño respondió manualmente.`);
   try { await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'saliente', texto, origen: 'panel' }); } catch {}
@@ -1534,11 +1543,10 @@ async function manejarAck(msg, ack, sesionId = null) {
     if (!msg || !msg.fromMe) return;
     const dest = String(msg.to || '');
     if (!dest || dest.endsWith('@g.us') || dest === 'status@broadcast') return;
-    let tel = normalizar(dest.split('@')[0]);
-    if (!dest.endsWith('@c.us')) {
-      const real = await resolverTelefonoWa(dest, sesionId);
-      if (real) tel = real;
-    }
+    const canonicoAck = telefonoCanonico(dest);
+    let resueltoAck = '';
+    if (!/^\d{8,15}$/.test(canonicoAck)) resueltoAck = await resolverTelefonoWa(dest, sesionId);
+    const tel = telefonoDeDestino(dest, { canonico: canonicoAck, resuelto: resueltoAck });
     if (!/^\d{8,15}$/.test(tel)) return;
     const waId = idMensaje(msg);
     if (!waId) return;
@@ -1631,17 +1639,21 @@ async function manejarMensaje(msg, sesionId = null) {
   const chat = String(msg.from || '');
   if (chat.endsWith('@g.us') || chat === 'status@broadcast') return;
   // Teléfono canónico: @c.us/@s.whatsapp.net/@lid normalizados a un único
-  // teléfono (un @lid solo se fusiona si el mapa lo resolvió con certeza).
-  let tel = telefonoCanonico(chat);
-  if (chat.endsWith('@lid')) {
-    if (/^\d{8,15}$/.test(tel)) {
-      recordarDestinoWa(tel, chat);
-    } else {
-      const real = await resolverTelefonoWa(chat, sesionId);
-      if (real) tel = telefonoCanonico(real);
-    }
+  // teléfono. Un @lid solo se usa si el número se resolvió con certeza; si no,
+  // el mensaje se descarta (nunca se guarda el userid del LID como teléfono).
+  const canonico = telefonoCanonico(chat);
+  let resuelto = '';
+  if (!/^\d{8,15}$/.test(canonico) && chat.endsWith('@lid')) {
+    resuelto = await resolverTelefonoWa(chat, sesionId);
   }
-  if (!/^\d{8,15}$/.test(tel)) return;
+  const tel = telefonoDeDestino(chat, { canonico, resuelto });
+  if (!/^\d{8,15}$/.test(tel)) {
+    if (chat.endsWith('@lid')) log(`Mensaje de un LID sin número resoluble (${chat}); no se crea chat.`);
+    return;
+  }
+  // Refuerza el mapa teléfono→LID: los próximos mensajes propios/acks ya no
+  // dependen de resolver el LID otra vez (menos fallos y cero duplicados).
+  recordarDestinoWa(tel, chat);
 
   if (config.modoPrueba && !config.numerosPrueba.includes(tel)) {
     log(`[PRUEBA] Mensaje de +${tel} ignorado (no está en NUMEROS_PRUEBA).`);
@@ -1667,6 +1679,9 @@ async function manejarMensaje(msg, sesionId = null) {
     return;
   }
   let esTextoReal = !/^\[/.test(texto);
+  // Metadatos de multimedia (miniatura + tamaño + duración) para que el panel
+  // pueda visualizarla. El archivo completo se descarga bajo demanda.
+  const mediaEntrante = datosMediaEntrante(msg);
   // Texto que se envía a la IA: sin el prefijo de las notas de voz, para que las
   // reglas (saludos, precios, etc.) funcionen igual que con texto normal.
   let textoIA = texto; // los marcadores [imagen]/[video]/… no son texto real
@@ -1713,7 +1728,7 @@ async function manejarMensaje(msg, sesionId = null) {
   const sinHistorial = hist.length === 0 && !((chatAntes?.mensajes || []).length);
   const nombreChat = msg._data?.notifyName || cliente?.nombre || `+${tel}`;
   await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'entrante', texto, origen: 'cliente' });
-  registrar({ telefono: tel, texto, direccion: 'entrante', nombre: nombreChat, clienteId: cliente?.id, origen: 'cliente', waId });
+  registrar({ telefono: tel, texto, direccion: 'entrante', nombre: nombreChat, clienteId: cliente?.id, origen: 'cliente', waId, media: mediaEntrante });
 
   // Si había una pregunta de asesoría pendiente ("¿te ayudo a elegir?"), se
   // cancela: el cliente escribió antes.
@@ -2829,6 +2844,76 @@ app.post('/api/conversaciones/:telefono/importar', auth, async (req, res) => {
   }
 });
 
+/* ---------------- multimedia de los chats (visualización bajo demanda) -------- */
+// El mensaje guarda miniatura/metadatos al recibirse; el archivo completo se
+// descarga aquí solo cuando el dueño pulsa "Ver" en el panel. Se sirve por una
+// ruta autenticada (nunca un directorio público).
+app.post('/api/conversaciones/:telefono/media', auth, async (req, res) => {
+  const tel = normalizar(req.params.telefono);
+  const waId = String(req.body?.waId || '').trim();
+  if (!/^\d{8,15}$/.test(tel)) return res.status(400).json({ error: 'Teléfono inválido.' });
+  if (!/^[A-Za-z0-9:_-]{4,200}$/.test(waId)) return res.status(400).json({ error: 'Mensaje inválido.' });
+  if (!config.modoPrueba && !sesionDisponible(req.body?.sesion || null)) {
+    return res.status(503).json({ error: 'Ningún WhatsApp está conectado.' });
+  }
+  try {
+    const chat = obtener(tel);
+    let mensaje = chat && (chat.mensajes || []).find(m => String(m.waId || '') === waId);
+    if (!mensaje) {
+      const encontrado = buscarMensajePorWa(waId);
+      if (encontrado) mensaje = encontrado.mensaje;
+    }
+    if (!mensaje) return res.status(404).json({ error: 'Mensaje no encontrado.' });
+    const media = mensaje.media || {};
+    const archivoPrev = String(media.archivo || '');
+    if (archivoPrev && archivoMediaSeguro(archivoPrev) && fs.existsSync(path.join(chatsMediaDir, archivoPrev))) {
+      return res.json({ ok: true, archivo: archivoPrev, mimetype: media.mimetype || '', tipo: media.tipo || '', nombre: media.nombre || '' });
+    }
+    // Descarga bajo demanda desde WhatsApp (sirve también para mensajes antiguos
+    // mientras WhatsApp conserve el archivo; si expiró, se avisa sin romper nada).
+    const direccion = mensaje.direccion === 'saliente' ? 'saliente' : 'entrante';
+    const chatWaId = String((chat && chat.waId) || '');
+    const remote = chatWaId || `${tel}@c.us`;
+    const fromMe = direccion === 'saliente';
+    const pseudo = {
+      from: remote,
+      fromMe,
+      _data: {
+        t: Math.round((Date.parse(mensaje.en) || Date.now()) / 1000),
+        type: media.tipoWa || '',
+        id: { id: waId, remote, fromMe, _serialized: `${fromMe ? 'true' : 'false'}_${remote}_${waId}` }
+      }
+    };
+    const descargado = await conTimeout(descargarMediaWa(pseudo, req.body?.sesion || null), 190000, 'descargar multimedia del chat');
+    if (!descargado || descargado.error || !descargado.data) {
+      const motivo = (descargado && descargado.error) || 'sin datos';
+      actualizarMediaMensaje(waId, { error: 'No disponible (' + motivo + ')', intentadoEn: new Date().toISOString() });
+      return res.status(404).json({ error: 'No disponible: WhatsApp ya no tiene ese archivo (puede haber expirado).' });
+    }
+    const tipo = media.tipo || tipoDeMarcador(mensaje.texto) || '';
+    const guardado = guardarMediaChat(chatsMediaDir, {
+      base64: descargado.data,
+      mimetype: descargado.mimetype || media.mimetype || '',
+      tipo
+    });
+    actualizarMediaMensaje(waId, { archivo: guardado.archivo, mimetype: guardado.mimetype, bytes: guardado.bytes, error: '' });
+    log(`Multimedia del chat +${tel} guardada bajo demanda (${guardado.archivo}, ${Math.round(guardado.bytes / 1024)} KB).`);
+    res.json({ ok: true, archivo: guardado.archivo, mimetype: guardado.mimetype, tipo, nombre: media.nombre || '' });
+  } catch (e) {
+    log('No se pudo descargar multimedia de +' + tel + ': ' + e.message);
+    res.status(500).json({ error: 'No se pudo descargar el archivo: ' + e.message });
+  }
+});
+
+app.get('/api/media/chats/:archivo', auth, (req, res) => {
+  const archivo = String(req.params.archivo || '');
+  const ruta = rutaMediaSegura(chatsMediaDir, archivo);
+  if (!ruta || !fs.existsSync(ruta)) return res.status(404).json({ error: 'Archivo no encontrado.' });
+  res.set('Cache-Control', 'private, max-age=3600');
+  res.set('X-Content-Type-Options', 'nosniff');
+  res.sendFile(ruta);
+});
+
 /**
  * Restaura un cliente marcado "sin WhatsApp" desde el panel: vuelve a
  * 'sin_verificar' (con fallos en cero) y se le quita la etiqueta 'sin-wsp'.
@@ -3187,6 +3272,33 @@ setTimeout(() => {
     log('Backfill de bienvenidas falló: ' + e.message);
   }
 }, 2000).unref?.();
+
+/* ---------------- identidad: fusionar chats duplicados al arrancar ---------- */
+// WhatsApp LID puede dejar el mismo hilo bajo dos claves (teléfono y LID). Se
+// fusionan solo duplicados de confianza alta (mismo chat.waId o ≥2 mensajes con
+// el mismo waId) y queda en el log. Nunca toca grupos.
+setTimeout(() => {
+  try {
+    const r = fusionarDuplicados({ log });
+    if (r.fusionados) log(`Conversaciones: ${r.fusionados} chat(s) duplicado(s) fusionados al arrancar.`);
+  } catch (e) {
+    log('No se pudieron fusionar conversaciones duplicadas: ' + e.message);
+  }
+}, 1500).unref?.();
+
+/* ---------------- multimedia de chats: limpieza con tope de disco ---------- */
+function limpiarMediaChats() {
+  try {
+    const maxBytes = Math.max(100, Number(process.env.MEDIA_CHATS_MAX_MB) || 1500) * 1024 * 1024;
+    const maxDias = Math.max(1, Number(process.env.MEDIA_CHATS_DIAS) || 90);
+    const r = podarMediaChats({ dir: chatsMediaDir, maxBytes, maxDias });
+    if (r.borrados) log(`Multimedia de chats: ${r.borrados} archivo(s) eliminados (${Math.round(r.bytesLiberados / 1024 / 1024)} MB liberados).`);
+  } catch (e) {
+    log('No se pudo limpiar la multimedia de chats: ' + e.message);
+  }
+}
+setTimeout(limpiarMediaChats, 5 * 60 * 1000).unref?.();
+setInterval(limpiarMediaChats, 24 * 3600 * 1000).unref?.();
 
 iniciarWhatsApp({ onMensaje: manejarMensaje, onMensajePropio: manejarMensajePropio, onAck: manejarAck, log, sesionIds: config.sesiones }).catch(e => log('No se pudo iniciar WhatsApp: ' + e.message));
 

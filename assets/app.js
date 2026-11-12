@@ -1487,6 +1487,40 @@ function pintarLista(){
 }
 let hiloTel=null,hiloIds=new Set();
 function claveMensaje(m){return m.waId||m.id||((m.en||'')+'|'+(m.direccion||'')+'|'+String(m.texto||'').slice(0,120))}
+/* ---------- multimedia del hilo (miniaturas + carga bajo demanda) ---------- */
+function tipoMediaDeMarcador(texto){
+  const t=String(texto||'').trim().toLowerCase();
+  if(/^\[imagen\]/.test(t))return 'imagen';
+  if(/^\[video\]/.test(t))return 'video';
+  if(/^\[(nota de voz|audio)\]/.test(t))return 'audio';
+  if(/^\[documento/.test(t))return 'documento';
+  if(/^\[sticker\]/.test(t))return 'sticker';
+  if(/^\[(gif|archivo)\]/.test(t))return 'archivo';
+  return '';
+}
+function etiquetaMedia(tipo){
+  return ({imagen:'🔍 Ver imagen',sticker:'🔍 Ver sticker',video:'▶ Ver video',audio:'🔊 Escuchar audio',documento:'📄 Abrir documento',archivo:'⬇ Abrir archivo'})[tipo]||'Ver archivo';
+}
+function formatoBytes(n){
+  const b=Number(n)||0;
+  if(!b)return '';
+  if(b<1024)return b+' B';
+  if(b<1024*1024)return Math.round(b/1024)+' KB';
+  return (b/1024/1024).toFixed(1)+' MB';
+}
+function htmlMediaMensaje(m,tel){
+  const media=m.media&&typeof m.media==='object'?m.media:null;
+  const tipo=(media&&media.tipo)||tipoMediaDeMarcador(m.texto);
+  if(!tipo)return '';
+  const wa=String(m.waId||'');
+  if(!wa)return '';
+  const thumb=media&&media.thumb?`<img class="msg-thumb" src="${esc(media.thumb)}" alt="" loading="lazy">`:'';
+  const meta=[formatoBytes(media&&media.bytes)];
+  if(media&&media.duracion)meta.push(Math.round(media.duracion)+' s');
+  const nombre=media&&media.nombre?esc(media.nombre):'';
+  const info=meta.filter(Boolean).length?`<small class="msg-media-meta">${meta.filter(Boolean).join(' · ')}</small>`:'';
+  return `<div class="msg-media" data-media-tel="${esc(tel)}" data-media-wa="${esc(wa)}" data-media-tipo="${esc(tipo)}">${thumb}<button class="msg-media-btn" type="button">${etiquetaMedia(tipo)}${nombre?' · '+nombre:''}</button>${info}</div>`;
+}
 function nodoMensaje(m){
   const out=m.direccion!=='entrante';
   const cls=m.origen==='sistema'?'sys':out?'out':'in';
@@ -1495,9 +1529,44 @@ function nodoMensaje(m){
   const el=document.createElement('div');
   el.className='msg '+cls;
   el.dataset.k=claveMensaje(m);
-  el.innerHTML=`${who?`<span class="who">${who}</span>`:''}${waHTML(m.texto)}${marca}<time>${esc(new Date(m.en).toLocaleString('es-PE',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}))}</time>`;
+  const media=htmlMediaMensaje(m,inTel||'');
+  // Si el texto es solo el marcador de la multimedia, no se muestra el "[imagen]".
+  const texto=media&&tipoMediaDeMarcador(m.texto)?'':waHTML(m.texto);
+  el.innerHTML=`${who?`<span class="who">${who}</span>`:''}${media}${texto}${marca}<time>${esc(new Date(m.en).toLocaleString('es-PE',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}))}</time>`;
   return el;
 }
+/** Descarga (bajo demanda) y muestra una multimedia del hilo. */
+async function cargarMediaEnHilo(cont){
+  const tel=cont.dataset.mediaTel,waId=cont.dataset.mediaWa,tipo=cont.dataset.mediaTipo||'';
+  if(!tel||!waId)return;
+  const btn=cont.querySelector('.msg-media-btn');
+  const antes=btn?btn.textContent:'';
+  cont.classList.add('loading');
+  if(btn){btn.disabled=true;btn.textContent='Cargando…';}
+  try{
+    const r=await botFetch('/api/conversaciones/'+encodeURIComponent(tel)+'/media',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({waId}),timeoutMs:210000});
+    if(!r||!r.archivo)throw new Error((r&&r.error)||'sin archivo');
+    const blob=await botBlob('/api/media/chats/'+encodeURIComponent(r.archivo),{timeoutMs:120000});
+    const url=URL.createObjectURL(blob);
+    const mim=String(r.mimetype||'');
+    const tipoFinal=r.tipo||tipo;
+    let nodo;
+    if(/^video\//.test(mim)||tipoFinal==='video'){nodo=document.createElement('video');nodo.className='msg-video';nodo.controls=true;nodo.playsInline=true;nodo.preload='metadata';nodo.src=url;}
+    else if(/^audio\//.test(mim)||tipoFinal==='audio'){nodo=document.createElement('audio');nodo.className='msg-audio';nodo.controls=true;nodo.src=url;}
+    else if(/^image\//.test(mim)||['imagen','sticker'].includes(tipoFinal)){nodo=document.createElement('img');nodo.className='msg-img';nodo.src=url;nodo.alt='';}
+    else{nodo=document.createElement('a');nodo.className='msg-doc';nodo.href=url;nodo.download=r.nombre||r.archivo;nodo.target='_blank';nodo.rel='noopener';nodo.textContent='⬇ Descargar '+(r.nombre||'archivo');}
+    cont.innerHTML='';cont.appendChild(nodo);
+    cont.classList.remove('loading');
+  }catch(err){
+    cont.classList.remove('loading');
+    if(btn){btn.disabled=false;btn.textContent=antes||'Reintentar';}
+    toast('No disponible: '+err.message,'error');
+  }
+}
+$('#in-msgs')?.addEventListener('click',e=>{
+  const cont=e.target.closest('[data-media-wa]');
+  if(cont)cargarMediaEnHilo(cont);
+});
 function pintarHilo(msgs){
   const c=$('#in-msgs');if(!c)return;
   c.innerHTML='';hiloIds=new Set();

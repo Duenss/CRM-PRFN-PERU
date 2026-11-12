@@ -42,8 +42,10 @@ const RUTAS = {
 export function rutaPermitida(metodo, ruta) {
   const lista = RUTAS[metodo];
   if (!lista) return false;
-  // Archivos servidos por el bot (comprobantes y fotos de productos) vía /api/media.
+  // Archivos servidos por el bot (comprobantes, fotos y multimedia de chats).
+  // Los de chats van a una ruta AUTENTICADA del bot (no al /media estático).
   if (metodo === 'GET' && /^\/api\/media\/(comprobantes|productos)\/[A-Za-z0-9._\-]+$/.test(ruta)) return true;
+  if (metodo === 'GET' && /^\/api\/media\/chats\/[a-f0-9]{16,64}\.(jpg|jpeg|png|webp|gif|mp4|webm|mov|ogg|mp3|m4a|pdf|bin)$/.test(ruta)) return true;
   if (!/^\/api\/[A-Za-z0-9/_\-]*$/.test(ruta)) return false;
   return lista.some(prefijo => ruta === prefijo || ruta.startsWith(prefijo + '/') || ruta.startsWith(prefijo + '?'));
 }
@@ -139,8 +141,11 @@ export async function onRequest(context) {
   if (!esDueno(usuario, env)) return json({ error: 'Sin permisos para esta cuenta.' }, 403);
 
   // --- Reenvío al bot ---
-  // /api/media/... se reenvía al /media/... del bot.
-  const rutaBot = ruta.startsWith('/api/media/') ? ruta.slice(4) : ruta;
+  // /api/media/comprobantes y /api/media/productos se reenvían al /media/... del
+  // bot (estáticos). /api/media/chats/... se queda igual: es una ruta
+  // autenticada del bot (multimedia privada de las conversaciones).
+  const esMediaEstatica = ruta.startsWith('/api/media/comprobantes/') || ruta.startsWith('/api/media/productos/');
+  const rutaBot = esMediaEstatica ? ruta.slice(4) : ruta;
   const destino = base + rutaBot + url.search;
   const headers = new Headers(request.headers);
   headers.delete('host');

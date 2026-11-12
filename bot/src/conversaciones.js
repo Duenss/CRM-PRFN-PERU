@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { emitir } from './eventos.js';
+import { fusionarChats, elegirDestino, aplicarFusiones } from './fusion.js';
 
 const dataDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data');
 const archivo = path.join(dataDir, 'conversaciones.json');
@@ -119,7 +120,7 @@ const tiempo = c => {
   return Number.isFinite(t) ? t : 0;
 };
 
-export function registrar({ telefono, texto, direccion = 'entrante', nombre = '', clienteId = null, origen = '', estado = 'ok', waId = '', en = null, ack = null }) {
+export function registrar({ telefono, texto, direccion = 'entrante', nombre = '', clienteId = null, origen = '', estado = 'ok', waId = '', en = null, ack = null, media = null }) {
   const tel = limpiarTel(telefono);
   if (!tel) return null;
   // Nunca guardamos mensajes sin contenido (reacciones, avisos de sistema, etc.):
@@ -188,6 +189,8 @@ export function registrar({ telefono, texto, direccion = 'entrante', nombre = ''
     origen: origen || (direccion === 'entrante' ? 'cliente' : 'bot'),
     estado,
     en: en || ahora(),
+    // Metadatos de multimedia (miniatura y, si se descargó, archivo local).
+    ...(media && typeof media === 'object' ? { media } : {}),
     // Estado de entrega/lectura de WhatsApp (solo mensajes salientes):
     // 0 pendiente, 1 enviado, 2 entregado, 3 leído. Lo actualiza manejarAck().
     ...(direccion === 'saliente' ? { ack: Number.isFinite(Number(ack)) ? Number(ack) : 0 } : {})
@@ -240,7 +243,7 @@ function recortar() {
 export function registrarCabecera({ telefono, nombre = '', nombreWa = '', nombreGuardado = '', pushname = '', verifiedName = '', esEmpresa = null, ultimoTexto = '', ultimoEn = null, noLeidos = 0, pin = false, real = true, grupo = false, archivado = null, propio = false, waId = '' }) {
   const tel = limpiarTel(telefono);
   if (!tel) return null;
-  const chat = chats[tel] || {
+  let chat = chats[tel] || {
     telefono: tel,
     nombre: nombre || `+${tel}`,
     clienteId: null,
@@ -294,7 +297,22 @@ export function registrarCabecera({ telefono, nombre = '', nombreWa = '', nombre
   }
   chat.pin = !!pin;
   chat.wa = true;
-  chats[tel] = chat;
+  // Un mismo chat de WhatsApp puede llegar con otra clave (LID vs teléfono):
+  // si ya existe un chat con el mismo waId, se fusiona aquí (sin duplicados).
+  let claveFinal = tel;
+  if (waId) {
+    for (const [k, c] of Object.entries(chats)) {
+      if (k === tel) continue;
+      if (String(c.waId || '') !== String(waId)) continue;
+      const destino = elegirDestino({ clave: tel, chat }, { clave: k, chat: c });
+      const otro = destino.clave === tel ? c : chat;
+      chat = fusionarChats(destino.chat || chats[destino.clave] || {}, otro);
+      claveFinal = destino.clave;
+      delete chats[destino.clave === tel ? k : tel];
+      break;
+    }
+  }
+  chats[claveFinal] = chat;
   recortar();
   guardar();
   return chat;
@@ -365,6 +383,42 @@ export function yaExisteWa(telefono, waId) {
   const c = chats[limpiarTel(telefono)];
   if (!c || !waId) return false;
   return c.mensajes.some(m => m.waId === waId);
+}
+
+/** Busca un mensaje por su id de WhatsApp en TODOS los chats (identidad global). */
+export function buscarMensajePorWa(waId) {
+  const w = String(waId || '');
+  if (!w) return null;
+  for (const [clave, chat] of Object.entries(chats)) {
+    for (const mensaje of (chat && chat.mensajes) || []) {
+      if (String(mensaje.waId || '') === w) return { clave, chat, mensaje };
+    }
+  }
+  return null;
+}
+
+/** Actualiza los metadatos de multimedia de un mensaje (por waId). */
+export function actualizarMediaMensaje(waId, patch = {}) {
+  const encontrado = buscarMensajePorWa(waId);
+  if (!encontrado || !patch || typeof patch !== 'object') return null;
+  encontrado.mensaje.media = { ...(encontrado.mensaje.media || {}), ...patch };
+  guardar();
+  return encontrado;
+}
+
+/**
+ * Fusiona chats duplicados ya existentes (mismo chat.waId o mensajes con el
+ * mismo waId). Por defecto solo fusiona duplicados de confianza ALTA.
+ */
+export function fusionarDuplicados({ confianza = 'alta', log = () => {} } = {}) {
+  const { chats: resultado, fusiones } = aplicarFusiones(chats, { soloConfianza: confianza });
+  if (!fusiones.length) return { fusionados: 0, fusiones: [] };
+  chats = resultado;
+  guardar();
+  for (const f of fusiones) {
+    log(`Conversaciones: duplicado fusionado ${f.origen} → ${f.destino} (${(f.motivos || []).join('; ')}).`);
+  }
+  return { fusionados: fusiones.length, fusiones };
 }
 
 /** Borra todos los chats de la Bandeja (memoria + disco). */

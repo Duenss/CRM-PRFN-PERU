@@ -1,15 +1,15 @@
 {
   "kind": "e2e-parcial",
-  "ts": "2026-11-12T09:54:39.307Z",
+  "ts": "2026-11-12T21:25:33.630Z",
   "index": {
     "path": "C:\\Users\\Juan Pablo\\Documents\\WEB PROJECTS\\Crm Perfumeriafina\\index.html",
     "bytes": 54163,
     "sha256": "7d295c1d72bd8bb285c2f32b23428e6b8db129bb2805b0e239d9d880d093e6a8",
-    "mtime": "2026-11-12T09:50:06.742Z"
+    "mtime": "2026-11-12T09:55:15.024Z"
   },
   "totals": {
-    "total": 20,
-    "pass": 20,
+    "total": 22,
+    "pass": 22,
     "fail": 0,
     "skip": 0
   },
@@ -30,7 +30,7 @@
       "id": "E2E-03",
       "name": "Bandeja: lista pintada y chat abierto",
       "status": "PASS",
-      "detail": "4 chats · hilo 30 mensajes · captura 02-bandeja.png"
+      "detail": "4 chats · hilo 32 mensajes · captura 02-bandeja.png"
     },
     {
       "id": "E2E-04",
@@ -42,7 +42,7 @@
       "id": "E2E-05",
       "name": "Evento SSE \"mensaje\" se AGREGA al hilo sin remover nodos previos",
       "status": "PASS",
-      "detail": "+1 nodo(s), -0, 30/30 previos conservados"
+      "detail": "+1 nodo(s), -0, 32/32 previos conservados"
     },
     {
       "id": "E2E-06",
@@ -54,19 +54,19 @@
       "id": "E2E-07",
       "name": "Scroll del hilo se conserva si el usuario está arriba",
       "status": "PASS",
-      "detail": "scrollTop 0 → 0 · 31 mensajes conservados"
+      "detail": "scrollTop 0 → 0 · 33 mensajes conservados"
     },
     {
       "id": "E2E-08",
       "name": "Idle 20 s: sin mutaciones, sin polling de eventos ni recargas",
       "status": "PASS",
-      "detail": "0 mutaciones · 0 eventos · 1 req (conversaciones×1) · 0 REST"
+      "detail": "0 mutaciones · 0 eventos · 2 req (conversaciones×1, estado×1) · 0 REST"
     },
     {
       "id": "E2E-09",
       "name": "Fallo de red del bot NO borra la lista ya pintada",
       "status": "PASS",
-      "detail": "4 items intactos · aviso \"⚠ Sin conexión con el bot · datos de 04:54 a. m.\" · recuperada y asentada"
+      "detail": "4 items intactos · aviso \"⚠ Sin conexión con el bot · datos de 04:25 p. m.\" · recuperada y asentada"
     },
     {
       "id": "E2E-10",
@@ -129,10 +129,22 @@
       "detail": "\"Lucía\" guardada, restaurada y limpiada · 4 chats"
     },
     {
+      "id": "E2E-21",
+      "name": "Multimedia: miniatura de imagen y carga bajo demanda",
+      "status": "PASS",
+      "detail": "miniatura visible + original cargado bajo demanda"
+    },
+    {
+      "id": "E2E-22",
+      "name": "Multimedia antigua: el marcador [video] ofrece cargar el reproductor",
+      "status": "PASS",
+      "detail": "marcador [video] → botón → reproductor"
+    },
+    {
       "id": "E2E-11",
       "name": "Cero errores de consola JS y cero pageerror en toda la corrida",
       "status": "PASS",
-      "detail": "0 console.error JS · 0 pageerror · 1 aviso(s) de red esperados (fallo simulado/imágenes offline)"
+      "detail": "0 console.error JS · 0 pageerror · 2 aviso(s) de red esperados (fallo simulado/imágenes offline)"
     }
   ]
 }

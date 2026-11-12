@@ -103,3 +103,36 @@ limpias `no existe` en momentos distintos.
 - **Podas**: IA pausada >90 días y chats de seguimiento >180 días se limpian solos.
 - **Panel**: filtros de Bandeja (no leídos, sin responder, con pedido, etiqueta,
   fechas) y de Pedidos (estado, entrega, fechas), con búsqueda persistente.
+
+## 8 · Chats duplicados (WhatsApp LID) y multimedia (2026-11-12)
+
+### Chats duplicados (mismo cliente con nombre y con número)
+
+- Causa: WhatsApp migró a **LID**; el mismo contacto puede quedar bajo dos claves
+  (teléfono `51...@c.us` y un `@lid` opaco). El bot ya **no** crea nuevos duplicados:
+  un LID nunca se guarda como teléfono y los ecos/mensajes propios sin número
+  resuelto se ignoran.
+- Al arrancar, el bot fusiona automáticamente duplicados de **confianza alta**
+  (mismo `chat.waId` o ≥2 mensajes con el mismo `waId`) y lo deja en el log
+  (`Conversaciones: duplicado fusionado …`).
+- Para los históricos o de confianza media:
+  1. Copia `bot/data/conversaciones.json` del volumen `bot-data-v2` (o ejecuta el
+     script dentro del contenedor).
+  2. `node scripts/dedupe-conversaciones.mjs` → informe **dry-run** (no escribe).
+  3. `node scripts/dedupe-conversaciones.mjs --aplicar` → guarda backup
+     `.bak-pre-dedupe-<fecha>` y fusiona.
+  4. Coolify → Restart/Redeploy del bot.
+- El script prefiere conservar la clave del teléfono y el nombre real del contacto.
+
+### Multimedia de los chats (ver imágenes/videos en la Bandeja)
+
+- Al recibir multimedia se guardan solo **metadatos + miniatura** en el mensaje
+  (no se descarga el archivo). En el hilo aparece la miniatura y un botón.
+- Al pulsar, el bot descarga el original desde WhatsApp **bajo demanda**, lo guarda
+  en `bot/data/chats/` (volumen `bot-data-v2`) y lo sirve por ruta autenticada
+  (`/api/media/chats/...`; nunca público). Video/audio/documento se abren igual.
+- Mensajes viejos con `[imagen]`/`[video]`: el panel muestra un botón de carga;
+  funciona solo si WhatsApp aún conserva el archivo (si expiró, avisa “No disponible”).
+- Limpieza diaria: `MEDIA_CHATS_MAX_MB` (por defecto `1500`) y `MEDIA_CHATS_DIAS`
+  (por defecto `90`). `bot/data/chats/` **no se incluye** en el backup diario.
+- Ajustes por variable de entorno (opcionales): `MEDIA_CHATS_MAX_MB`, `MEDIA_CHATS_DIAS`.

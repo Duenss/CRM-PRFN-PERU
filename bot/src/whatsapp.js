@@ -989,8 +989,13 @@ function formatearChatsWa(crudos, propioNumero) {
       });
       const idSerial = String(c.id || '');
       const telGrupo = c.esGrupo ? idSerial.split('@')[0].replace(/\D/g, '') : '';
+      // REGLA ANTI-DUPLICADO: el `user` de un @lid NUNCA es un teléfono. Si el
+      // wrapper devolvió ese userid como "número" se descarta (el chat se
+      // resolverá por sus mensajes o se omitirá de la sincronización).
+      const telCrudo = c.esGrupo ? telGrupo : telDe({ isGroup: false, number: c.tel });
+      const telefono = (!c.esGrupo && c.lid && String(telCrudo) === String(c.lid)) ? '' : telCrudo;
       return {
-        telefono: c.esGrupo ? telGrupo : telDe({ isGroup: false, number: c.tel }),
+        telefono,
         waiver: '',
         grupo: !!c.esGrupo,
         waId: idSerial,
@@ -1064,7 +1069,10 @@ export async function listarChatsWa(sesionId = null) {
       }
       const tieneMensajes = !!(ultimo || c.unreadCount || (c.msgs && c.msgs.length));
       return {
-        tel: c.id?.server === 'c.us' ? c.id?.user : (c.contact?.number || c.contact?.phoneNumber?._serialized?.split('@')[0] || ''),
+        // Solo @c.us trae un teléfono fiable en el wrapper. Para @lid el número
+        // se resuelve en el respaldo de página o al recibir mensajes (nunca se
+        // usa el userid del LID como si fuera un teléfono).
+        tel: c.id?.server === 'c.us' ? c.id?.user : '',
         lid: c.id?.server === 'lid' ? String(c.id?.user || '') : '',
         id: String(c.id?._serialized || ''),
         esGrupo: !!c.isGroup,
@@ -1710,14 +1718,29 @@ export async function descargarMediaWa(msg, sesionId = null) {
         } catch (e) {}
       }
       // Respaldo: buscar el mensaje dentro del chat (por id crudo o por hora).
+      // Si no está cargado, se piden mensajes anteriores (multimedia bajo demanda
+      // de mensajes antiguos del hilo).
       if (!m && chatId) {
         try {
           const chat = await W.WWebJS.getChat(chatId, { getAsModel: false });
-          const lista = (chat && chat.msgs && chat.msgs.getModelsArray && chat.msgs.getModelsArray()) || [];
-          for (let i = lista.length - 1; i >= 0; i--) {
-            const cand = lista[i];
-            if (!cand || !cand.directPath) continue;
-            if ((idRaw && cand.id && cand.id.id === idRaw) || (ts && Math.abs((cand.t || 0) - ts) <= 2)) { m = cand; break; }
+          let lista = (chat && chat.msgs && chat.msgs.getModelsArray && chat.msgs.getModelsArray()) || [];
+          const buscar = () => {
+            for (let i = lista.length - 1; i >= 0; i--) {
+              const cand = lista[i];
+              if (!cand || !cand.directPath) continue;
+              if ((idRaw && cand.id && cand.id.id === idRaw) || (ts && Math.abs((cand.t || 0) - ts) <= 2)) return cand;
+            }
+            return null;
+          };
+          m = buscar();
+          let vueltas = 0;
+          while (!m && vueltas < 12) {
+            vueltas++;
+            let cargados = null;
+            try { cargados = await W.require('WAWebChatLoadMessages').loadEarlierMsgs({ chat }); } catch (e) { break; }
+            if (!cargados || !cargados.length) break;
+            lista = [...cargados.filter(x => x && !x.isNotification), ...lista];
+            m = buscar();
           }
         } catch (e) {}
       }

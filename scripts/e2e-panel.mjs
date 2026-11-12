@@ -59,6 +59,8 @@ const SUPABASE_JS_UMD = path.join(BOT_NODE_MODULES, '@supabase', 'supabase-js', 
 const SUPABASE_ORIGIN = 'https://pcesvmsewfpvmqmfmswn.supabase.co';
 const SUPABASE_AUTH_KEY = 'sb-pcesvmsewfpvmqmfmswn-auth-token';
 const SUPABASE_CDN_RE = /cdn\.jsdelivr\.net\/.*supabase/i;
+// PNG de 1×1 px para simular multimedia sin binarios externos.
+const PNG_1PX = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 
 const ARGS = parseArgs(process.argv.slice(2));
 const PANEL_PORT = Number(process.env.E2E_PANEL_PORT || 8099);
@@ -257,6 +259,17 @@ function createBotMock() {
         ...(saliente ? { ack: 3 } : {}),
       });
     }
+    // Mensajes de multimedia para probar la visualización en el hilo:
+    // 1) imagen nueva con miniatura, 2) video antiguo con solo marcador.
+    msgs.push({
+      id: 'm-e2e-media', waId: 'wamid.IN.E2E.MEDIA', direccion: 'entrante',
+      texto: '[imagen]', origen: 'cliente', estado: 'ok', en: isoAgo(1.5),
+      media: { tipo: 'imagen', tipoWa: 'image', mimetype: 'image/png', bytes: 68, thumb: 'data:image/png;base64,' + PNG_1PX },
+    });
+    msgs.push({
+      id: 'm-e2e-video-legacy', waId: 'wamid.IN.E2E.VIDEO', direccion: 'entrante',
+      texto: '[video]', origen: 'cliente', estado: 'ok', en: isoAgo(1),
+    });
     return msgs;
   }
 
@@ -680,6 +693,33 @@ function createBotMock() {
         resumen: resumen(),
         ia: { activa: state.ia.activa, autoRespuesta: state.ia.autoRespuesta, pausadas: state.ia.pausados },
       });
+    }
+
+    /* multimedia de chats: descarga bajo demanda simulada */
+    if (method === 'POST' && /^\/api\/conversaciones\/[^/]+\/media$/.test(p)) {
+      let body = '';
+      req.on('data', c => { body += c; });
+      req.on('end', () => {
+        let j = {}; try { j = JSON.parse(body || '{}'); } catch { /* noop */ }
+        const waId = String(j.waId || '');
+        const esVideo = /VIDEO/i.test(waId);
+        json(res, 200, esVideo
+          ? { ok: true, archivo: 'b'.repeat(32) + '.mp4', mimetype: 'video/mp4', tipo: 'video', nombre: '' }
+          : { ok: true, archivo: 'a'.repeat(32) + '.png', mimetype: 'image/png', tipo: 'imagen', nombre: 'foto.png' });
+      });
+      return;
+    }
+    if (method === 'GET' && /^\/api\/media\/chats\/[a-f0-9]{32}\.(png|mp4)$/.test(p)) {
+      const esMp4 = p.endsWith('.mp4');
+      const buf = esMp4 ? Buffer.from('0000000000000000', 'hex') : Buffer.from(PNG_1PX, 'base64');
+      res.writeHead(200, {
+        ...CORS_HEADERS,
+        'Content-Type': esMp4 ? 'video/mp4' : 'image/png',
+        'Content-Length': String(buf.length),
+        'Cache-Control': 'no-store',
+      });
+      res.end(buf);
+      return;
     }
 
     const convMatch = p.match(/^\/api\/conversaciones\/([^/]+)(?:\/(importar|leido|enviar))?$/);
@@ -2037,6 +2077,39 @@ async function runE2E() {
       await page.click('#tabs button[data-tab="inicio"]');
       await sleep(400);
     }
+
+    await runner.case('E2E-21', 'Multimedia: miniatura de imagen y carga bajo demanda', async () => {
+      await page.click('#tabs button[data-tab="bandeja"]');
+      await waitFor(async () => (await page.evaluate(() => document.querySelectorAll('#in-list .in-item').length)) >= 4, 8000, 'la bandeja no pintó los chats');
+      const it = await page.$('#in-list .in-item');
+      await it.click();
+      await waitFor(async () => (await page.evaluate(() => document.querySelectorAll('#in-msgs .msg-media').length)) >= 2, 10000, 'no aparecieron las multimedia en el hilo');
+      const thumb = await page.evaluate(() => {
+        const c = document.querySelector('.msg-media[data-media-wa="wamid.IN.E2E.MEDIA"]');
+        return c ? { thumb: !!c.querySelector('img.msg-thumb'), btn: !!c.querySelector('.msg-media-btn') } : null;
+      });
+      assert(thumb && thumb.thumb, 'la imagen recibida no mostró miniatura');
+      assert(thumb.btn, 'la imagen no tiene botón para cargar el original');
+      await page.click('.msg-media[data-media-wa="wamid.IN.E2E.MEDIA"] .msg-media-btn');
+      await waitFor(async () => (await page.evaluate(() => !!document.querySelector('.msg-media[data-media-wa="wamid.IN.E2E.MEDIA"] img.msg-img'))), 10000, 'la imagen completa no cargó');
+      const cargada = await page.evaluate(() => {
+        const img = document.querySelector('.msg-media[data-media-wa="wamid.IN.E2E.MEDIA"] img.msg-img');
+        return !!(img && String(img.src).startsWith('blob:'));
+      });
+      assert(cargada, 'la imagen no se mostró como blob autenticado');
+      return 'miniatura visible + original cargado bajo demanda';
+    });
+
+    await runner.case('E2E-22', 'Multimedia antigua: el marcador [video] ofrece cargar el reproductor', async () => {
+      const etiqueta = await page.evaluate(() => {
+        const c = document.querySelector('.msg-media[data-media-wa="wamid.IN.E2E.VIDEO"]');
+        return c && c.querySelector('.msg-media-btn') ? c.querySelector('.msg-media-btn').textContent : '';
+      });
+      assert(/video/i.test(etiqueta), `el video antiguo no mostró botón de carga: "${etiqueta}"`);
+      await page.click('.msg-media[data-media-wa="wamid.IN.E2E.VIDEO"] .msg-media-btn');
+      await waitFor(async () => (await page.evaluate(() => !!document.querySelector('.msg-media[data-media-wa="wamid.IN.E2E.VIDEO"] video.msg-video'))), 10000, 'el reproductor de video no apareció');
+      return 'marcador [video] → botón → reproductor';
+    });
 
     await runner.case('E2E-11', 'Cero errores de consola JS y cero pageerror en toda la corrida', async () => {
       // El assert real es "0 errores de consola JS y 0 pageerror". Los avisos de red
