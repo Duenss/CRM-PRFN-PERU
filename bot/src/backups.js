@@ -63,6 +63,89 @@ export function carpetasViejas(carpetas = [], hoy = fechaCarpeta(), dias = RETEN
     .sort();
 }
 
+/**
+ * Lista RECURSIVAMENTE las rutas completas de los objetos de una carpeta
+ * (`YYYY-MM-DD/...`). Supabase Storage lista un nivel por vez: las entradas de
+ * subcarpeta (id null) se recorren y las de archivo (id presente) se acumulan.
+ */
+export async function listarObjetos(storage, carpeta, { limite = 1000 } = {}) {
+  const base = String(carpeta || '').replace(/\/+$/, '');
+  if (!base) return [];
+  const salida = [];
+  const pendientes = [base];
+  while (pendientes.length) {
+    const prefijo = pendientes.shift();
+    let offset = 0;
+    for (;;) {
+      const { data, error } = await storage.list(prefijo, {
+        limit: limite, offset, sortBy: { column: 'name', order: 'asc' }
+      });
+      if (error) throw new Error(`No se pudo listar ${prefijo}: ${error.message || error}`);
+      const items = Array.isArray(data) ? data : [];
+      if (!items.length) break;
+      for (const x of items) {
+        const nombre = String((x && x.name) || '');
+        if (!nombre) continue;
+        const ruta = `${prefijo}/${nombre}`;
+        // Las "carpetas" vienen sin id; los archivos, con id/metadata.
+        if (x.id === null || x.id === undefined) pendientes.push(ruta);
+        else salida.push(ruta);
+      }
+      if (items.length < limite) break;
+      offset += limite;
+    }
+  }
+  return salida;
+}
+
+/**
+ * Borra objetos por RUTA completa, en lotes. Nunca se intenta borrar "la
+ * carpeta" como prefijo (Supabase Storage no funciona así).
+ */
+export async function borrarObjetos(storage, rutas = [], { lote = 100 } = {}) {
+  const lista = (Array.isArray(rutas) ? rutas : []).filter(r => typeof r === 'string' && r);
+  let borrados = 0;
+  for (let i = 0; i < lista.length; i += lote) {
+    const grupo = lista.slice(i, i + lote);
+    const { error } = await storage.remove(grupo);
+    if (error) throw new Error(`No se pudieron borrar ${grupo.length} objeto(s): ${error.message || error}`);
+    borrados += grupo.length;
+  }
+  return borrados;
+}
+
+/**
+ * Antes de borrar una carpeta antigua, conserva en el backup de HOY la última
+ * copia de cada archivo de `archivos/` que vivía solo ahí:
+ *  - si el archivo sigue en disco, se resube su versión vigente;
+ *  - si ya no está en disco, se copia el objeto remoto de la carpeta antigua.
+ * Devuelve los nombres protegidos. `subir(nombre, buffer|null)` sube al
+ * backup de hoy (buffer null = leer la versión local de archivos/).
+ */
+export async function protegerArchivosDeCarpeta({ storage, vieja, carpetaHoy, rutas = [], yaEnHoy = new Set(), hashes = {}, subir = null, log = () => {} } = {}) {
+  const marca = `${String(vieja).replace(/\/+$/, '')}/archivos/`;
+  const protegidos = [];
+  for (const ruta of Array.isArray(rutas) ? rutas : []) {
+    const i = String(ruta).indexOf(marca);
+    if (i < 0) continue;
+    const nombre = String(ruta).slice(i + marca.length);
+    if (!nombre || yaEnHoy.has(nombre)) continue;
+    if (typeof subir !== 'function') throw new Error('falta la función de subida del backup de hoy');
+    if (hashes[nombre]) {
+      await subir(nombre, null); // versión vigente en disco
+    } else {
+      const { data, error } = await storage.download(ruta);
+      if (error || !data) throw new Error(`no se pudo descargar ${ruta}: ${(error && error.message) || 'sin datos'}`);
+      const buffer = Buffer.from(await data.arrayBuffer());
+      await subir(nombre, buffer); // el archivo ya no está en disco: se conserva el remoto
+    }
+    yaEnHoy.add(nombre);
+    protegidos.push(nombre);
+    log(`Backup: se conservó archivos/${nombre} (última copia en ${vieja}) en el backup de hoy.`);
+  }
+  return protegidos;
+}
+
 function leerEstado() {
   try { return JSON.parse(fs.readFileSync(estadoFile, 'utf8')); } catch { return {}; }
 }
@@ -117,12 +200,17 @@ export async function ejecutarBackup({ log = console.log } = {}) {
     try { await subir(path.join(comprobantesDir, f), `comprobantes/${f}`, 'application/octet-stream'); subidos++; }
     catch (e) { errores.push(e.message); }
   }
+  const archivosOk = new Set();
   for (const f of archivos) {
-    try { await subir(path.join(archivosDir, f), `archivos/${f}`, 'application/octet-stream'); subidos++; }
+    try { await subir(path.join(archivosDir, f), `archivos/${f}`, 'application/octet-stream'); archivosOk.add(f); subidos++; }
     catch (e) { errores.push(e.message); }
   }
 
-  // Retención: borrar carpetas diarias más viejas de RETENCION_DIAS días.
+  // Retención: borrar las carpetas diarias más viejas de RETENCION_DIAS días.
+  // Se LISTAN los objetos de cada carpeta y se borran POR RUTA (storage.remove
+  // no borra carpetas por prefijo). Antes de borrar, si una carpeta antigua
+  // guarda la última copia de un archivo de archivos/, se resube al backup de
+  // hoy; si eso falla, esa carpeta NO se borra (nunca se pierde la última copia).
   try {
     const { data: lista, error: errLista } = await sb.storage.from(BUCKET).list('', {
       limit: 200,
@@ -132,12 +220,32 @@ export async function ejecutarBackup({ log = console.log } = {}) {
       const carpetas = lista
         .filter(x => x && (x.id === null || x.id === undefined) && /^\d{4}-\d{2}-\d{2}$/.test(String(x.name)))
         .map(x => String(x.name));
+      const storage = sb.storage.from(BUCKET);
+      const archivosSubidosHoy = new Set(archivosOk);
+      const subirHoy = async (nombre, buffer) => {
+        const datos = buffer || fs.readFileSync(path.join(archivosDir, nombre));
+        const { error } = await sb.storage.from(BUCKET).upload(`${carpeta}/archivos/${nombre}`, datos, {
+          contentType: 'application/octet-stream',
+          upsert: false
+        });
+        // Si ya existe en el backup de hoy, la copia está a salvo.
+        if (error && !/already exists|duplicate/i.test(String(error.message || error))) {
+          throw new Error(`${nombre}: ${error.message || error}`);
+        }
+        archivosSubidosHoy.add(nombre);
+      };
       for (const vieja of carpetasViejas(carpetas, carpeta)) {
         try {
-          await sb.storage.from(BUCKET).remove([vieja]);
-          log(`Backup: carpeta antigua ${vieja} eliminada (retención ${RETENCION_DIAS} días).`);
+          const rutas = await listarObjetos(storage, vieja);
+          const protegidos = await protegerArchivosDeCarpeta({
+            storage, vieja, carpetaHoy: carpeta, rutas,
+            yaEnHoy: archivosSubidosHoy, hashes, subir: subirHoy, log
+          });
+          if (protegidos.length) log(`Backup: ${protegidos.length} archivo(s) de archivos/ conservados antes de borrar ${vieja}.`);
+          const borrados = await borrarObjetos(storage, rutas);
+          log(`Backup: carpeta antigua ${vieja} eliminada por ruta (${borrados} objetos, retención ${RETENCION_DIAS} días).`);
         } catch (e) {
-          log(`Backup: no se pudo eliminar la carpeta antigua ${vieja}: ${e.message}`);
+          log(`Backup: no se pudo eliminar la carpeta antigua ${vieja} (se conserva): ${e.message}`);
         }
       }
     }

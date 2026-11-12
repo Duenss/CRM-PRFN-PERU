@@ -10,6 +10,9 @@
  *
  * - --list  muestra las carpetas diarias disponibles (y sus tamaños no; solo fechas).
  * - Sin --from usa la carpeta más reciente.
+ * - `data/*.json` y `comprobantes/` salen de la carpeta elegida.
+ * - `archivos/` se reconstruye con la VERSIÓN MÁS RECIENTE de cada archivo
+ *   entre TODAS las carpetas (una subida nueva puede estar solo en la última).
  * - Valida que cada data/*.json sea JSON válido ANTES de tocar nada.
  * - Antes de sobrescribir, guarda una copia de los archivos actuales en
  *   <dir>/.pre-restore-<fecha>/ por si hay que revertir.
@@ -20,6 +23,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline/promises';
+import { elegirArchivosMasRecientes, planificarDescargas } from './restore-logica.mjs';
 
 const args = process.argv.slice(2);
 const arg = (n, d) => { const i = args.indexOf('--' + n); return i >= 0 && args[i + 1] ? args[i + 1] : d; };
@@ -80,20 +84,44 @@ if (!/^\d{4}-\d{2}-\d{2}$/.test(desde)) {
   process.exit(1);
 }
 
-// 1) Inventario del respaldo elegido.
+// 1) Inventario del respaldo elegido + `archivos/` más reciente de TODAS las carpetas.
 const r = await api(`object/list/${BUCKET}`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ prefix: `${desde}/`, limit: 500, offset: 0, sortBy: { column: 'name', order: 'asc' } })
 });
 const j = await r.json();
-const nombres = (j || [])
+const objetosDesde = (j || [])
   .map(x => String(x && x.name || ''))
-  .filter(n => n && !n.endsWith('/'))
-  .filter(n => !n.endsWith('backup-ultimo.json'));
-if (!nombres.length) {
+  .filter(n => n && !n.endsWith('/'));
+
+// Las carpetas del bucket vienen de la más nueva a la más vieja: se busca en
+// cada una la subcarpeta archivos/ y se elige la versión más reciente por nombre.
+const carpetasDesc = [...new Set(disponibles)].sort().reverse();
+const entradasArchivos = [];
+for (const c of carpetasDesc) {
+  try {
+    const rr = await api(`object/list/${BUCKET}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prefix: `${c}/archivos/`, limit: 1000, offset: 0, sortBy: { column: 'name', order: 'asc' } })
+    });
+    const jj = await rr.json();
+    entradasArchivos.push({
+      carpeta: c,
+      archivos: (jj || []).map(x => String(x && x.name || '')).filter(n => n && !n.endsWith('/'))
+    });
+  } catch { entradasArchivos.push({ carpeta: c, archivos: [] }); }
+}
+const archivosRecientes = elegirArchivosMasRecientes(entradasArchivos);
+const descargas = planificarDescargas({ desde, objetosDesde, archivosRecientes });
+if (!descargas.length && !archivosRecientes.length) {
   console.error(`La carpeta ${desde} no tiene archivos.`);
   process.exit(1);
+}
+const nombres = descargas.map(d => d.destino);
+if (archivosRecientes.length) {
+  console.log(`archivos/: ${archivosRecientes.length} archivo(s) se reconstruyen con la versión más reciente entre las ${carpetasDesc.length} carpetas.`);
 }
 
 // 2) Descarga a una zona de preparación y valida los JSON antes de tocar nada.
@@ -103,24 +131,24 @@ const previos = path.join(DIR, `.pre-restore-${marca}`);
 fs.mkdirSync(staging, { recursive: true });
 
 let descargados = 0;
-for (const nombre of nombres) {
+for (const { origen, destino: relativo } of descargas) {
   try {
-    const resp = await api(`object/${BUCKET}/${desde}/${nombre}`);
+    const resp = await api(`object/${BUCKET}/${origen}`);
     const buf = Buffer.from(await resp.arrayBuffer());
-    const destino = path.join(staging, ...nombre.split('/'));
+    const destino = path.join(staging, ...relativo.split('/'));
     fs.mkdirSync(path.dirname(destino), { recursive: true });
     fs.writeFileSync(destino, buf);
-    if (nombre.startsWith('data/') && nombre.endsWith('.json')) {
+    if (relativo.startsWith('data/') && relativo.endsWith('.json')) {
       try { JSON.parse(buf.toString('utf8')); } catch {
-        console.error(`  ERROR: ${nombre} del respaldo NO es JSON válido; se cancela la restauración.`);
+        console.error(`  ERROR: ${relativo} del respaldo NO es JSON válido; se cancela la restauración.`);
         fs.rmSync(staging, { recursive: true, force: true });
         process.exit(1);
       }
     }
     descargados++;
-    console.log('  ok', nombre);
+    console.log('  ok', origen);
   } catch (e) {
-    console.error(`  ERROR descargando ${nombre}: ${e.message}`);
+    console.error(`  ERROR descargando ${origen}: ${e.message}`);
     fs.rmSync(staging, { recursive: true, force: true });
     process.exit(1);
   }

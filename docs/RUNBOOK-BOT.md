@@ -21,6 +21,9 @@
 2. Restaurar (pide confirmación; `--si` para automatizar):
    `node --env-file=bot/.env scripts/restore-bot.mjs --from YYYY-MM-DD`
    - Valida JSON, guarda lo actual en `bot/data/.pre-restore-*` y escribe atómico.
+   - `data/*.json` y `comprobantes/` salen de la carpeta elegida; `archivos/`
+     (PDF, video, foto) se reconstruye con la **versión más reciente entre todas
+     las carpetas**, para no perder una subida nueva hecha después del día elegido.
 3. Reiniciar el bot (Coolify → Restart/Redeploy del servicio `bot`).
 4. **La sesión de WhatsApp NO se respalda** (`.wwebjs_auth`, volumen `bot-auth-v3`).
    Si el bot pide QR tras restaurar/reinstalar: escanear de nuevo. Por eso el volumen
