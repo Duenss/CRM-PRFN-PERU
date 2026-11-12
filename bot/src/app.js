@@ -7,7 +7,7 @@ import { sb, getCliente, getClientes, getProductos, logMensaje, historial, marca
 import { iniciarWhatsApp, enviar, enviarImagen, enviarVideo, enviarArchivo, estadoWa, cerrarSesion, reiniciarSesion, hayConexion, sesionDisponible, listarChatsWa, listarChatsActivosWa, listarContactosWa, historialWa, consultarNumeroWa, resolverTelefonoWa, recordarDestinoWa, telefonoCanonico, estadoSalud, idMensaje, descargarMediaWa, conTimeout } from './whatsapp.js';
 import { redactarRespuesta, transcribirAudio, redactarBorradores, redactarBienvenida, redactarAnuncio, productoPorId, productoMencionado } from './ai.js';
 import { Cola, dormir, esperaEntreEnvios, PRIORIDAD } from './queue.js';
-import { configValidacion, esperaValidacionMs, aplicarResultado, pausaTrasErrores, sinEtiqueta, conEtiqueta, ESTADOS_WA } from './validacion.js';
+import { configValidacion, esperaValidacionMs, aplicarResultado, pausaTrasErrores, sinEtiqueta, conEtiqueta, ESTADOS_WA, enVentanaHoraria, msHastaApertura, proximaPausaLarga, esperaPausaLargaMs } from './validacion.js';
 import { estadoIA, actualizarIA, pausarIA, estaPausado, promptIA, resumenIA } from './ia.js';
 import { estadoAjustes, actualizarAjustes, esperaMasivaMs, esperaChatMs } from './ajustes.js';
 import { oculto, ocultar, limpiar as limpiarOcultos } from './ocultos.js';
@@ -2483,7 +2483,8 @@ async function prepararValidacion() {
     log('Validación: sin candidatos pendientes (destinatarios de campaña o contactos nuevos).');
     return null;
   }
-  log(`Validación iniciada: ${candidatos.length} candidatos · cuota diaria ${cfg.porDia} · ritmo ${Math.round(cfg.minMs / 1000)}-${Math.round(cfg.maxMs / 1000)} s por número · lotes de ${VALIDACION_LOTE}.`);
+  const cuota = cfg.porDia > 0 ? `cuota diaria ${cfg.porDia}` : 'sin tope diario';
+  log(`Validación iniciada: ${candidatos.length} candidatos · ${cuota} · ventana ${pad(cfg.horaInicio)}:00-${pad(cfg.horaFin)}:00 Lima · ritmo ${Math.round(cfg.minMs / 1000)}-${Math.round(cfg.maxMs / 1000)} s por número · pausa larga cada ${cfg.loteMin}-${cfg.loteMax} números · lotes de ${VALIDACION_LOTE}.`);
   return {
     candidatos,
     desde: 0,
@@ -2493,6 +2494,8 @@ async function prepararValidacion() {
     confirmados: 0,
     infra: 0,
     infraSeguidos: 0,
+    consultados: 0,
+    pausaLargaEn: proximaPausaLarga(cfg),
     secuencia: 1
   };
 }
@@ -2507,9 +2510,23 @@ async function ejecutarLoteValidacion(estado) {
   const cfg = configValidacion();
   let hechos = 0;
   let pausaPendiente = 0;
+  /** Encola el siguiente lote (lo usan el fin del lote, la ventana y las pausas). */
+  const programar = () => {
+    if (!hayConexion() || (cfg.porDia > 0 && validacionHechosHoy().n >= cfg.porDia)) { terminarValidacion(estado); return; }
+    cola.add(`validar-contactos-${estado.secuencia++}`, () => ejecutarLoteValidacion(estado), { prioridad: 'baja', tiempoMaxMs: 10 * 60 * 1000 });
+  };
   while (hechos < VALIDACION_LOTE && estado.desde < estado.candidatos.length) {
     if (!hayConexion()) { log('Validación pausada: WhatsApp desconectado; el resto queda pendiente.'); terminarValidacion(estado); return; }
-    if (validacionHechosHoy().n >= cfg.porDia) { log(`Validación: cuota diaria de ${cfg.porDia} alcanzada; continúa mañana.`); terminarValidacion(estado); return; }
+    // Sin tope diario cuando VALIDACION_POR_DIA=0 (valor por defecto).
+    if (cfg.porDia > 0 && validacionHechosHoy().n >= cfg.porDia) { log(`Validación: cuota diaria de ${cfg.porDia} alcanzada; continúa mañana.`); terminarValidacion(estado); return; }
+    // Fuera de la ventana horaria de Lima no se consulta: se retoma al abrir.
+    const partes = partesLima();
+    if (!enVentanaHoraria(cfg, partes)) {
+      const ms = msHastaApertura(cfg, partes);
+      log(`Validación pausada: fuera de la ventana ${pad(cfg.horaInicio)}:00-${pad(cfg.horaFin)}:00 (Lima); retoma en ~${Math.max(1, Math.round(ms / 60000))} min.`);
+      setTimeout(programar, ms).unref?.();
+      return;
+    }
     const cl = estado.candidatos[estado.desde++];
     try {
       const r = await consultarNumeroWa(cl.telefono);
@@ -2548,17 +2565,24 @@ async function ejecutarLoteValidacion(estado) {
       }
     }
     hechos++;
+    estado.consultados = (Number(estado.consultados) || 0) + 1;
     validacionHechosHoy().n++;
     await dormir(esperaValidacionMs(cfg));
   }
   estado.revisados += hechos;
   if (estado.desde >= estado.candidatos.length) { terminarValidacion(estado); return; }
-  const programar = () => {
-    if (!hayConexion() || validacionHechosHoy().n >= cfg.porDia) { terminarValidacion(estado); return; }
-    cola.add(`validar-contactos-${estado.secuencia++}`, () => ejecutarLoteValidacion(estado), { prioridad: 'baja', tiempoMaxMs: 10 * 60 * 1000 });
-  };
-  if (pausaPendiente > 0) setTimeout(programar, pausaPendiente).unref?.();
-  else programar();
+  if (pausaPendiente > 0) { setTimeout(programar, pausaPendiente).unref?.(); return; }
+  // Pausa larga anti-bloqueo: cada 80-120 números consultados, 3-6 minutos.
+  const objetivoPausa = Number(estado.pausaLargaEn) || proximaPausaLarga(cfg);
+  if ((Number(estado.consultados) || 0) >= objetivoPausa) {
+    estado.consultados = 0;
+    estado.pausaLargaEn = proximaPausaLarga(cfg);
+    const ms = esperaPausaLargaMs(cfg);
+    log(`Validación: pausa larga anti-bloqueo de ${Math.round(ms / 60000)} min tras ${objetivoPausa} números consultados.`);
+    setTimeout(programar, ms).unref?.();
+    return;
+  }
+  programar();
 }
 
 app.post('/api/validar-contactos', auth, (_req, res) => {
