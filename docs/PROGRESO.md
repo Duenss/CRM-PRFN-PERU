@@ -10,8 +10,8 @@
 | 2 · Bienvenida (cooldown, backfill, primer mensaje con consulta) | ✅ | `0bab823` | 173/174 (1 fallo CRLF preexistente) |
 | 3 · Backups (retención por ruta, última copia, restore) | ✅ | `e0f1399` | 177/178 (1 fallo CRLF preexistente) |
 | 4 · IA (ejemplos curados, respaldo ante fallo, evaluación) | ✅ | `22053d4` | 186/187 (1 fallo CRLF preexistente) |
-| 5 · Panel (filtros bandeja/pedidos, búsqueda persistente) | ⬜ | — | — |
-| 6 · Pendientes auditoría (T2, T3, T4, T5, T7, T8) | ⬜ | — | — |
+| 5 · Panel (filtros bandeja/pedidos, búsqueda persistente) | ✅ | `52f11fc` | e2e 20/20 · bot 231/232 (1 CRLF) |
+| 6 · Pendientes auditoría (T2, T3, T4, T5, T7, T8) | ✅ | `ad90f1b` | 231/232 (1 fallo CRLF preexistente) |
 | 7 · Rediseño dashboard (tokens, tipografía, capturas) | ⬜ | — | — |
 | Cierre (docs, tests finales, push, deploy, health) | ⬜ | — | — |
 
