@@ -18,6 +18,8 @@ import {
   clasificarDesconexion,
   esZombi,
   estadoSalud,
+  consultarNumeroWa,
+  verificarNumeroWa,
   _fabricaClientParaPruebas
 } from '../src/whatsapp.js';
 
@@ -211,4 +213,53 @@ test('cerrarSesion deja la sesión sin timers ni cliente', async () => {
   assert.equal(s.cerrada, true);
   assert.equal(s.timers.size, 0);
   sesiones.delete(id);
+});
+
+/* ---------------- consulta tri-estado anti-bloqueo ---------------- */
+
+test('consultarNumeroWa: getNumberId null LIMPIO → {existe:false}', async () => {
+  const id = 'consulta-numero';
+  const s = crearEstado(id);
+  s.estado = 'conectado';
+  s.conectado = true;
+  s.numero = '51999999999';
+  s.client = { getNumberId: async () => null };
+  sesiones.set(id, s);
+  try {
+    assert.deepEqual(await consultarNumeroWa('51987654321', id), { existe: false });
+  } finally {
+    sesiones.delete(id);
+  }
+});
+
+test('consultarNumeroWa: un error de getNumberId LANZA (infra, nunca "sin WhatsApp")', async () => {
+  const id = 'consulta-numero-error';
+  const s = crearEstado(id);
+  s.estado = 'conectado';
+  s.conectado = true;
+  s.client = { getNumberId: async () => { throw new Error('boom de red'); } };
+  sesiones.set(id, s);
+  try {
+    await assert.rejects(consultarNumeroWa('51987654321', id), /boom de red/);
+  } finally {
+    sesiones.delete(id);
+  }
+});
+
+test('consultarNumeroWa sin sesión conectada lanza (infra, no "sin WhatsApp")', async () => {
+  await assert.rejects(consultarNumeroWa('51987654321', 'sesion-inexistente'), /Ningún WhatsApp está conectado/);
+});
+
+test('verificarNumeroWa conserva el booleano histórico: false ante error', async () => {
+  const id = 'verificar-numero';
+  const s = crearEstado(id);
+  s.estado = 'conectado';
+  s.conectado = true;
+  s.client = { getNumberId: async () => { throw new Error('red'); } };
+  sesiones.set(id, s);
+  try {
+    assert.equal(await verificarNumeroWa('51987654321', id), false);
+  } finally {
+    sesiones.delete(id);
+  }
 });

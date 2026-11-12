@@ -89,3 +89,32 @@ export async function importarClientes(lista = []) {
   }
   return { insertados, total: lista.length };
 }
+
+/* ---------------- estado anti-bloqueo de WhatsApp (columnas de sql/13) ---------------- */
+
+/**
+ * Estado de validación de un cliente. Defensivo: si las columnas de sql/13 no
+ * existen todavía, toda fila se lee como 'sin_verificar' sin fallos (nunca se
+ * marca nada, solo se degrada a "pendiente").
+ */
+export function estadoWaDe(cliente) {
+  return {
+    estado: String(cliente?.wa_estado || 'sin_verificar'),
+    fallos: Number(cliente?.wa_fallos) || 0,
+    primerFalloEn: cliente?.wa_primer_fallo_en || null,
+    ultimaVerificacionEn: cliente?.wa_ultima_verificacion_en || null
+  };
+}
+
+/** ¿La tabla clientes ya tiene las columnas de estado (sql/13 aplicado)? */
+export function hayColumnasWa(clienteEjemplo) {
+  return !!clienteEjemplo && Object.prototype.hasOwnProperty.call(clienteEjemplo, 'wa_estado');
+}
+
+/** Guarda cambios de estado de validación; lanza si Supabase devuelve error. */
+export async function guardarEstadoWa(clienteId, cambios = {}) {
+  if (!sb || !clienteId) return false;
+  const { error } = await sb.from('clientes').update(cambios).eq('id', clienteId);
+  if (error) throw error;
+  return true;
+}

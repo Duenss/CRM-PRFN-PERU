@@ -229,7 +229,9 @@ function limpiarStale(sub,texto){
   sub.textContent=texto;
   sub.style.color='';
 }
-const puede=c=>c.activo!==false&&!c.baja&&!(Array.isArray(c.etiquetas)&&c.etiquetas.includes('sin-wsp'));
+const esSinWsp=c=>Array.isArray(c.etiquetas)?c.etiquetas.includes('sin-wsp'):String(c.etiquetas||'').split(',').includes('sin-wsp');
+const puede=c=>c.activo!==false&&!c.baja&&!esSinWsp(c);
+let verSinWhatsApp=false;
 const imgURL=p=>p.imagen_ruta? (String(p.imagen_ruta).startsWith('http')?p.imagen_ruta:'https://perfumeriafinaperu.com/'+p.imagen_ruta):'';
 
 /* ---------- sesión ---------- */
@@ -358,13 +360,23 @@ $('#tabs').onclick=e=>{const b=e.target.closest('button');if(b)irTab(b.dataset.t
 /* ---------- clientes ---------- */
 function renderClientes(){
   const q=$('#cq').value.toLowerCase().trim();
-  const l=clientes.filter(c=>[c.nombre,c.telefono,...(Array.isArray(c.etiquetas)?c.etiquetas:[]),c.notas].join(' ').toLowerCase().includes(q));
+  const l=clientes.filter(c=>[c.nombre,c.telefono,...(Array.isArray(c.etiquetas)?c.etiquetas:[]),c.notas].join(' ').toLowerCase().includes(q)&&(verSinWhatsApp||!esSinWsp(c)));
   const tope=500;const visibles=l.slice(0,tope);
-  $('#c-count').textContent=`${l.length} de ${clientes.length} clientes · ${clientes.filter(puede).length} activos${l.length>tope?' · mostrando '+tope+', usa el buscador':''}`;
-  $('#c-list').innerHTML=visibles.map(c=>`<div class="row"><div><b>${esc(c.nombre)}</b><small>+${esc(c.telefono)}${(Array.isArray(c.etiquetas)?c.etiquetas:[]).filter(t=>t!=='sin-wsp').map(t=>`<i class="tag">${esc(t)}</i>`).join('')}${(Array.isArray(c.etiquetas)&&c.etiquetas.includes('sin-wsp'))?'<i class="tag bad">sin WhatsApp</i>':''}${c.baja?'<i class="tag bad">baja</i>':''}${c.fecha_cumpleanos?`<i class="tag">🎂 ${esc(fmtDia(c.fecha_cumpleanos))}</i>`:''}</small></div><button class="ghost" data-edit="${esc(c.id)}">Editar</button></div>`).join('')||'<p class="empty">Aún no hay clientes. Agrega uno o importa un CSV con las columnas nombre y telefono.</p>';
+  const nSinWsp=clientes.filter(esSinWsp).length;
+  $('#c-count').textContent=`${l.length} de ${clientes.length} clientes · ${clientes.filter(puede).length} activos${nSinWsp?` · ${nSinWsp} sin WhatsApp`:''}${l.length>tope?' · mostrando '+tope+', usa el buscador':''}`;
+  $('#c-list').innerHTML=visibles.map(c=>{const sin=esSinWsp(c);return `<div class="row"><div><b>${esc(c.nombre)}</b><small>+${esc(c.telefono)}${(Array.isArray(c.etiquetas)?c.etiquetas:[]).filter(t=>t!=='sin-wsp').map(t=>`<i class="tag">${esc(t)}</i>`).join('')}${sin?'<i class="tag bad">sin WhatsApp</i>':''}${c.baja?'<i class="tag bad">baja</i>':''}${c.fecha_cumpleanos?`<i class="tag">🎂 ${esc(fmtDia(c.fecha_cumpleanos))}</i>`:''}</small></div>${sin?`<button class="ghost" data-restaurar="${esc(c.telefono)}">Restaurar</button>`:''}<button class="ghost" data-edit="${esc(c.id)}">Editar</button></div>`}).join('')||'<p class="empty">Aún no hay clientes. Agrega uno o importa un CSV con las columnas nombre y telefono.</p>';
 }
 $('#cq').oninput=renderClientes;
-$('#c-list').onclick=e=>{const b=e.target.closest('[data-edit]');if(b)abrirCliente(b.dataset.edit)};
+$('#c-ver-sinwsp')?.addEventListener('click',()=>{
+  verSinWhatsApp=!verSinWhatsApp;
+  const b=$('#c-ver-sinwsp');
+  if(b)b.textContent=verSinWhatsApp?'Sin WhatsApp: visibles':'Sin WhatsApp: ocultos';
+  renderClientes();
+});
+$('#c-list').onclick=e=>{
+  const b=e.target.closest('[data-edit]');if(b){abrirCliente(b.dataset.edit);return}
+  const r=e.target.closest('[data-restaurar]');if(r)restaurarSinWsp(r.dataset.restaurar);
+};
 $('#c-new').onclick=()=>abrirCliente(null);
 function abrirCliente(id){
   editId=id;const c=clientes.find(x=>x.id===id)||{};
@@ -1400,6 +1412,7 @@ function pintarLista(){
     inFiltro==='fijados'?!!c.fijado:
     inFiltro==='personas'?(c.tipo==='persona'&&!c.grupo):
     inFiltro==='empresas'?(c.tipo==='empresa'):
+    inFiltro==='sinWhatsApp'?c.sinWhatsApp===true:
     true;
   const l=inChats.filter(c=>pasaFiltro(c)&&(!q||[c.nombreWa,c.nombre,c.telefono,c.ultimoTexto].join(' ').toLowerCase().includes(q)));
   const fijados=l.filter(c=>c.fijado&&!c.archivado);
@@ -1511,8 +1524,23 @@ function pintarEtiquetasChat(){
   const noChat=item?.sinChat===true;
   const ets=inTel?etiquetasDelChat(inTel):[];
   cont.innerHTML=(noWa?'<i class="etag warn" title="WhatsApp no reconoce este número">sin WhatsApp</i>':noChat?'<i class="etag mute" title="No hay conversación en WhatsApp">sin conversación</i>':'')+ets.map(t=>'<i class="etag">'+esc(t)+'</i>').join('');
+  if($('#in-restaurar-wa'))$('#in-restaurar-wa').hidden=!noWa;
   if($('#in-tag-add'))$('#in-tag-add').hidden=!inTel;
 }
+/** Quita la marca "sin WhatsApp" (bot) y deja el número para re-verificar. */
+async function restaurarSinWsp(tel){
+  try{
+    const r=await botFetch('/api/clientes/restaurar-wa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({telefono:tel})});
+    if(!r.ok)throw new Error(r.error||'sin respuesta');
+    toast('+'+tel+' restaurado: se volverá a verificar con calma.');
+    const item=inChats.find(c=>String(c.telefono)===String(tel));
+    if(item){item.sinWhatsApp=false;item.etiquetas=(item.etiquetas||[]).filter(t=>t!=='sin-wsp')}
+    const cli=(typeof clientes!=='undefined'?clientes:[]).find(c=>String(c.telefono)===String(tel));
+    if(cli){cli.etiquetas=(cli.etiquetas||[]).filter(t=>t!=='sin-wsp');cli.wa_estado='sin_verificar'}
+    pintarEtiquetasChat();pintarLista();renderClientes();
+  }catch(e){toast('No se pudo restaurar: '+e.message,'error')}
+}
+$('#in-restaurar-wa')?.addEventListener('click',()=>{if(inTel)restaurarSinWsp(inTel)});
 function abrirEtiquetasChat(){
   if(!inTel)return;
   const item=inChats.find(c=>String(c.telefono)===String(inTel));

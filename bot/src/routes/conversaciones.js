@@ -18,7 +18,7 @@ export function registrarConversaciones(app, ctx) {
     const limite = Math.min(200, Math.max(1, Number(req.query.limite) || 80));
     const offset = Math.max(0, Number(req.query.offset) || 0);
     const q = String(req.query.q || '').trim();
-    const filtro = ['todos', 'agregados', 'noAgregados', 'noLeidos', 'fijados', 'personas', 'empresas'].includes(req.query.filtro)
+    const filtro = ['todos', 'agregados', 'noAgregados', 'noLeidos', 'fijados', 'personas', 'empresas', 'sinWhatsApp'].includes(req.query.filtro)
       ? req.query.filtro : 'todos';
     const ia = estadoIA();
     const pausados = new Set(ia.pausados.map(p => p.telefono));

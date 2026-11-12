@@ -75,3 +75,20 @@
 16. `Dockerfile` de la raíz: marcado **OBSOLETO** con banner (usar `bot/Dockerfile`). Si algún
     flujo externo lo referencia (p. ej. documentación vieja), apuntarlo a `bot/Dockerfile`;
     se conserva el archivo solo como referencia histórica. (2026-11-12.)
+
+## Anti-bloqueo de WhatsApp (rama wa/anti-bloqueo-validacion)
+
+17. `bot/test/sanitizacion.test.mjs` (líneas 11-12): **falla en checkout Windows con finales de
+    línea CRLF** — la regex de extracción de `esc()` exige `;\n` y `assets/app.js` usa `\r\n`.
+    Verificado que falla igual en HEAD (worktree temporal) y que en Linux/LF pasa; NO lo arreglé
+    por estar fuera del alcance de esta tarea. Si se quiere verde en Windows: aceptar `\r?\n`
+    en las dos regex del test (1 línea). (2026-11-12.)
+18. El panel no tiene botón que dispare `POST /api/validar-contactos` (solo se llama por API/curl);
+    con el nuevo flujo por lotes convendría un botón "Validar WhatsApp (lento)" en Ajustes/Bot.
+    Fuera del alcance de esta tarea (el alcance solo pedía revisar/restaurar los marcados).
+    (2026-11-12.)
+19. `actualizarHistorialesConocidos()` (bot/src/app.js) sigue importando el historial completo de
+    hasta 250 chats al conectar/reconectar: es una sola pasada por conexión (no periódica), pero
+    es la lectura más pesada que queda. Si el número vuelve a mostrar señales de bloqueo, el
+    siguiente paso natural es convertirla también a incremental (misma técnica que
+    `listarChatsActivosWa`). Anotado, no implementado. (2026-11-12.)

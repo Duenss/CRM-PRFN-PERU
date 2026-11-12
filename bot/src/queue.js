@@ -1,5 +1,12 @@
-// Cola secuencial de trabajos (campañas, envíos manuales, etc.).
+// Cola secuencial de trabajos (campañas, envíos manuales, validación, sync).
 // Un solo worker: evita envíos concurrentes por el mismo WhatsApp.
+// Prioridades: ALTA (atender a un cliente que acaba de escribir) >
+// NORMAL (campañas/anuncios) > BAJA (validación de contactos, sincronización).
+// Un trabajo BAJA además espera mientras `pausaBaja()` sea verdadero y cede
+// el turno a cualquier trabajo de mayor prioridad que llegue mientras tanto.
+
+/** Prioridades numéricas (menor = más urgente). */
+export const PRIORIDAD = { ALTA: 0, NORMAL: 1, BAJA: 2 };
 
 /** Ningún trabajo puede bloquear la cola más de este tiempo (watchdog F-02). */
 export const MS_WATCHDOG = 120000;
@@ -15,20 +22,34 @@ function conLimite(promesa, ms, etiqueta) {
 }
 
 export class Cola {
-  constructor(log = () => {}) {
+  constructor(log = () => {}, { pausaBaja = () => false, esperaPausaMs = 2000 } = {}) {
     this.items = [];
     this.corriendo = false;
     this.actual = null;
     this.log = log;
+    this.pausaBaja = typeof pausaBaja === 'function' ? pausaBaja : () => false;
+    this.esperaPausaMs = Math.max(1, Number(esperaPausaMs) || 2000);
   }
 
   get size() {
     return this.items.length + (this.actual ? 1 : 0);
   }
 
-  add(id, fn) {
+  /**
+   * Añade un trabajo. Opciones:
+   *  - `prioridad`: 'alta' | 'normal' | 'baja' (por defecto 'normal').
+   *  - `tiempoMaxMs`: watchdog propio del trabajo (por defecto MS_WATCHDOG);
+   *    los trabajos largos legítimos (validación por lotes, sync) lo amplían.
+   * FIFO estable dentro de la misma prioridad.
+   */
+  add(id, fn, { prioridad = 'normal', tiempoMaxMs = MS_WATCHDOG } = {}) {
     if (this.actual === id || this.items.some(x => x.id === id)) return false;
-    this.items.push({ id, fn });
+    const p = PRIORIDAD[String(prioridad || 'normal').toUpperCase()] ?? PRIORIDAD.NORMAL;
+    const job = { id, fn, p, tiempoMaxMs: Math.max(1, Number(tiempoMaxMs) || MS_WATCHDOG) };
+    // Inserta después del último trabajo con prioridad <= p (estable).
+    let i = this.items.length;
+    while (i > 0 && this.items[i - 1].p > p) i--;
+    this.items.splice(i, 0, job);
     this._run();
     return true;
   }
@@ -37,13 +58,21 @@ export class Cola {
     if (this.corriendo) return;
     this.corriendo = true;
     while (this.items.length) {
-      const job = this.items.shift();
+      const job = this.items[0];
+      // Trabajos BAJA pausados mientras haya actividad (mensajes entrantes o
+      // envíos en curso): se espera y se vuelve a mirar la cabeza de la cola,
+      // así un ALTA que llegue mientras tanto se atiende primero.
+      if (job.p === PRIORIDAD.BAJA && this.pausaBaja()) {
+        await dormir(this.esperaPausaMs);
+        continue;
+      }
+      this.items.shift();
       this.actual = job.id;
       try {
         // Watchdog: un cuelgue de Puppeteer/WhatsApp no puede dejar la cola
         // clavada para siempre. El job sigue en segundo plano, pero la cola
         // libera al siguiente y el estado queda visible en el log.
-        await conLimite(Promise.resolve().then(() => job.fn()), MS_WATCHDOG, `trabajo ${job.id}`);
+        await conLimite(Promise.resolve().then(() => job.fn()), job.tiempoMaxMs, `trabajo ${job.id}`);
       } catch (e) {
         this.log(`Error en trabajo ${job.id}: ${e.message}`);
       } finally {

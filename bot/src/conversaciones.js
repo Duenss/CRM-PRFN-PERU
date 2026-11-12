@@ -464,6 +464,10 @@ export function buscar({ limite = 80, offset = 0, q = '', filtro = 'todos' } = {
     wa: !!c.wa
   });
   let arr = Object.values(chats).filter(c => {
+    // "sinWhatsApp": modo revisión de la Bandeja — muestra SOLO los ocultos
+    // para poder restaurarlos desde el panel. En cualquier otro filtro los
+    // "sin WhatsApp" quedan ocultos.
+    if (filtro === 'sinWhatsApp') return c.sinWhatsApp === true;
     if (c.sinWhatsApp === true) return false;
     if (filtro === 'noLeidos' && !((c.noLeidos || 0) > 0)) return false;
     if (filtro === 'fijados' && !(c.fijado || c.pin)) return false;
@@ -471,7 +475,6 @@ export function buscar({ limite = 80, offset = 0, q = '', filtro = 'todos' } = {
     if (filtro === 'empresas' && c.tipo !== 'empresa') return false;
     // "Agregado" = el número está guardado en la agenda del WhatsApp.
     // Los números que no existen en WhatsApp no se muestran en la Bandeja.
-    if (c.sinWhatsApp === true) return false;
     if (filtro === 'agregados' && !esNombreAgregado(c.nombre)) return false;
     if (filtro === 'noAgregados' && esNombreAgregado(c.nombre)) return false;
     if (texto) {

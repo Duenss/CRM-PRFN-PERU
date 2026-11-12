@@ -196,6 +196,20 @@ Reglas de esta pantalla:
 - Riesgo asumido y reglas de consentimiento/BAJA.
 - Sin credenciales de Supabase ni claves de IA en el navegador.
 
+### 6.5 Revisar y restaurar "sin WhatsApp" (anti-bloqueo, 2026-11-12)
+
+- Los clientes marcados **sin WhatsApp (confirmado)** se ocultan de Clientes y de la
+  Bandeja, pero se pueden revisar:
+  - **Clientes**: botón "Sin WhatsApp: ocultos/visibles" en la barra de la pestaña.
+  - **Bandeja**: filtro "Sin WhatsApp" en la fila de filtros (`#in-filtros`).
+- Cada fila marcada muestra un botón **Restaurar** (y en la cabecera del chat,
+  "↩ Restaurar número"): quita la etiqueta `sin-wsp`, devuelve el estado a
+  `sin_verificar` y el bot lo re-verifica con su ritmo lento normal (4-10 s por
+  número, 2 fallos en momentos distintos para volver a confirmarlo).
+- El estado vive en las columnas de `clientes` (`wa_estado`, `wa_fallos`,
+  `wa_primer_fallo_en`, `wa_ultima_verificacion_en`; ver `sql/13_wa_estado_clientes.sql`).
+  La etiqueta `sin-wsp` es solo su reflejo visible.
+
 ## 7. Responsive
 
 | Ancho | Comportamiento |

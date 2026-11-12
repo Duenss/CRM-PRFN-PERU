@@ -124,7 +124,7 @@
         <div><h1>Bandeja de entrada</h1><p class="muted" id="in-sub">Conversaciones de WhatsApp en vivo.</p></div>
         <div class="bar" style="margin:0"><input id="in-q" type="search" placeholder="Buscar por nombre o número"><button class="ghost" id="in-notify" type="button" title="Activar sonido y notificaciones de derivaciones">Activar avisos</button><button class="ghost" id="in-sync" type="button">Sincronizar WhatsApp</button><button class="ghost" id="in-refresh" type="button">Actualizar</button><button class="ghost" id="in-pause" type="button" title="Pausar la IA en todos los chats">Pausar IA</button></div>
       </div>
-      <div class="in-filtros-row"><div class="seg" id="in-filtros" role="group" aria-label="Filtrar chats"><button type="button" data-inf="todos" class="on">Todos</button><button type="button" data-inf="agregados">Agregados</button><button type="button" data-inf="noAgregados">No agregados</button></div><span class="muted" id="in-filtro-info"></span></div>
+      <div class="in-filtros-row"><div class="seg" id="in-filtros" role="group" aria-label="Filtrar chats"><button type="button" data-inf="todos" class="on">Todos</button><button type="button" data-inf="agregados">Agregados</button><button type="button" data-inf="noAgregados">No agregados</button><button type="button" data-inf="sinWhatsApp">Sin WhatsApp</button></div><span class="muted" id="in-filtro-info"></span></div>
       <div class="inbox">
         <div class="in-list" id="in-list"><p class="empty" style="padding:1rem">Cargando…</p></div>
         <div class="in-chat">
@@ -143,6 +143,7 @@
             </div>
             <div class="in-tagsbar">
               <span class="in-tags" id="in-tags"></span>
+              <button class="ghost" id="in-restaurar-wa" type="button" title="Quitar la marca 'sin WhatsApp' y volver a verificarlo con calma" hidden>↩ Restaurar número</button>
               <button class="ghost" id="in-tag-add" type="button" title="Agregar o quitar etiquetas del cliente">＋ Etiquetas</button>
             </div>
             <div class="in-msgs" id="in-msgs"></div>
@@ -387,7 +388,7 @@
     </section>
 
     <section class="tab" id="t-clientes" hidden>
-      <div class="bar"><input id="cq" type="search" placeholder="Buscar por nombre, teléfono o etiqueta"><button id="c-new">Nuevo cliente</button><button class="ghost" id="c-sync" type="button">Recaudar contactos del WhatsApp</button><button class="ghost" id="c-imp">Importar CSV</button></div>
+      <div class="bar"><input id="cq" type="search" placeholder="Buscar por nombre, teléfono o etiqueta"><button id="c-new">Nuevo cliente</button><button class="ghost" id="c-sync" type="button">Recaudar contactos del WhatsApp</button><button class="ghost" id="c-imp">Importar CSV</button><button class="ghost" id="c-ver-sinwsp" type="button" title="Mostrar u ocultar los contactos marcados como sin WhatsApp">Sin WhatsApp: ocultos</button></div>
       <input type="file" id="c-file" accept=".csv,text/csv,.txt" hidden>
       <p class="muted" id="c-count"></p><div id="c-list"></div>
     </section>
