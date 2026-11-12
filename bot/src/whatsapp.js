@@ -49,22 +49,45 @@ export function clasificarDesconexion(motivo) {
 
 /* ---------------- webVersionCache con fallback local ---------------- */
 // whatsapp-web.js necesita el HTML de una versión concreta de WhatsApp Web.
-// Antes se bajaba SIEMPRE de raw.githubusercontent (dependencia de un tercero
-// en cada arranque). Ahora se guarda una copia local en bot/data y el remoto
-// solo se consulta para refrescarla (cada 7 días o si falta): si no hay red,
-// el bot arranca igual con la copia local.
+// OJO: la librería trata `webVersionCache.path` como DIRECTORIO y escribe
+// `<directorio>/<version>.html` (LocalWebCache). Aquí se guarda una copia local
+// en bot/data/web-version-cache/<WEB_VERSION_PIN>.html y el remoto solo se
+// consulta para refrescarla (cada 7 días o si falta). Si algo falla se cae a
+// `{ type: 'remote' }`: un error de caché NUNCA debe impedir conectar.
 const dataDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data');
-const WEB_VERSION_PIN = '2.3000.1053990023-alpha';
+export const WEB_VERSION_PIN = '2.3000.1053990023-alpha';
 export const WEB_VERSION_URL = `https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/${WEB_VERSION_PIN}.html`;
-export const WEB_VERSION_CACHE = path.join(dataDir, 'web-version-cache.html');
+// Directorio (no archivo): LocalWebCache hace mkdirSync(path) y escribe dentro.
+export const WEB_VERSION_CACHE_DIR = path.join(dataDir, 'web-version-cache');
+export const WEB_VERSION_CACHE_VIEJO = path.join(dataDir, 'web-version-cache.html');
+export const WEB_VERSION_FILE = path.join(WEB_VERSION_CACHE_DIR, `${WEB_VERSION_PIN}.html`);
 export const WEB_VERSION_TTL_MS = 7 * 24 * 3600 * 1000;
 
-function infoCacheWeb(ahoraMs = Date.now()) {
+/**
+ * Migración: antes el caché se guardaba como ARCHIVO bot/data/web-version-cache.html.
+ * Ahora es un DIRECTORIO. Si existe el archivo viejo se borra (nunca lanza).
+ */
+export function migrarCacheWebAntiguo({ archivoViejo = WEB_VERSION_CACHE_VIEJO, log = logFn } = {}) {
   try {
-    const st = fs.statSync(WEB_VERSION_CACHE);
-    if (st.isFile()) return { existe: true, edadMs: ahoraMs - st.mtimeMs, path: WEB_VERSION_CACHE };
+    if (!fs.existsSync(archivoViejo)) return false;
+    const st = fs.lstatSync(archivoViejo);
+    if (st.isFile() || st.isSymbolicLink()) {
+      fs.rmSync(archivoViejo, { force: true });
+      log('webVersionCache: archivo antiguo web-version-cache.html eliminado (el caché ahora es un directorio).');
+      return true;
+    }
+  } catch (e) {
+    try { log('webVersionCache: no se pudo migrar el archivo antiguo: ' + e.message); } catch { /* noop */ }
+  }
+  return false;
+}
+
+function infoCacheWeb(ahoraMs = Date.now(), { archivo = WEB_VERSION_FILE } = {}) {
+  try {
+    const st = fs.statSync(archivo);
+    if (st.isFile()) return { existe: true, edadMs: ahoraMs - st.mtimeMs, archivo };
   } catch { /* no existe */ }
-  return { existe: false, edadMs: Infinity, path: WEB_VERSION_CACHE };
+  return { existe: false, edadMs: Infinity, archivo };
 }
 
 async function descargarVersionWeb() {
@@ -80,23 +103,52 @@ async function descargarVersionWeb() {
   } catch { return null; }
 }
 
-/** Resuelve la opción de webVersionCache: local (copia en disco) o remoto (último recurso). */
-export async function resolverWebVersionCache(ahoraMs = Date.now()) {
-  const cache = infoCacheWeb(ahoraMs);
-  if (cache.existe && cache.edadMs < WEB_VERSION_TTL_MS) {
-    return { type: 'local', path: cache.path };
+/** Guarda la copia local (atómica). Nunca lanza: devuelve false si no pudo. */
+function guardarVersionWeb(html, { dir = WEB_VERSION_CACHE_DIR, archivo = WEB_VERSION_FILE, log = logFn } = {}) {
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    const ok = escribirAtomico(archivo, html);
+    if (!ok) log('webVersionCache: no se pudo guardar la copia local (se usará la existente o el remoto).');
+    return ok;
+  } catch (e) {
+    try { log('webVersionCache: no se pudo guardar la copia local: ' + e.message); } catch { /* noop */ }
+    return false;
   }
-  const html = await descargarVersionWeb();
-  if (html) {
-    escribirAtomico(cache.path, html);
-    return { type: 'local', path: cache.path };
+}
+
+/**
+ * Resuelve la opción de webVersionCache: local (DIRECTORIO con <pin>.html) o
+ * remoto (último recurso). Nunca lanza: ante cualquier error cae a remoto.
+ * Acepta opciones para tests (dir, archivo, archivoViejo, descargar, log).
+ */
+export async function resolverWebVersionCache(ahoraMs = Date.now(), opciones = {}) {
+  const dir = opciones.dir || WEB_VERSION_CACHE_DIR;
+  const archivo = opciones.archivo || path.join(dir, `${WEB_VERSION_PIN}.html`);
+  const archivoViejo = opciones.archivoViejo || WEB_VERSION_CACHE_VIEJO;
+  const log = opciones.log || logFn;
+  const descargar = opciones.descargar || descargarVersionWeb;
+  try {
+    migrarCacheWebAntiguo({ archivoViejo, log });
+    const cache = infoCacheWeb(ahoraMs, { archivo });
+    if (cache.existe && cache.edadMs < WEB_VERSION_TTL_MS) {
+      return { type: 'local', path: dir };
+    }
+    const html = await descargar();
+    if (html) {
+      const guardado = guardarVersionWeb(html, { dir, archivo, log });
+      if (guardado || cache.existe) return { type: 'local', path: dir };
+    }
+    if (cache.existe) {
+      log(`Versión web de WhatsApp: sin red; se usa la copia local (${Math.round(cache.edadMs / 3600000)} h de antigüedad).`);
+      return { type: 'local', path: dir };
+    }
+    log('Versión web de WhatsApp: sin copia local y sin red; se pedirá al repositorio remoto (último recurso).');
+    return { type: 'remote', remotePath: WEB_VERSION_URL };
+  } catch (e) {
+    // Robustez: cualquier fallo del caché se avisa y se cae al remoto.
+    try { log('webVersionCache: error inesperado (' + e.message + '); se usa el repositorio remoto.'); } catch { /* noop */ }
+    return { type: 'remote', remotePath: WEB_VERSION_URL };
   }
-  if (cache.existe) {
-    logFn(`Versión web de WhatsApp: sin red; se usa la copia local (${Math.round(cache.edadMs / 3600000)} h de antigüedad).`);
-    return { type: 'local', path: cache.path };
-  }
-  logFn('Versión web de WhatsApp: sin copia local y sin red; se pedirá al repositorio remoto (último recurso).');
-  return { type: 'remote', remotePath: WEB_VERSION_URL };
 }
 
 /** id -> { id, estado, conectado, qr, qrDataUrl, numero, error, client, reintentos } */
@@ -394,9 +446,20 @@ async function crearSesionSinLock(id, { onMensaje, onMensajePropio, onAck, log }
   await destruirCliente(s);
   if (s.cerrada) return;
 
-  const cacheWeb = await resolverWebVersionCache();
+  // Robustez: si el caché de versión falla por cualquier motivo, se arranca con
+  // el repositorio remoto. Nunca debe impedir conectar.
+  let cacheWeb;
+  try {
+    cacheWeb = await resolverWebVersionCache();
+  } catch (e) {
+    logFn('webVersionCache: no se pudo preparar el caché (' + e.message + '); se usa el remoto.');
+    cacheWeb = { type: 'remote', remotePath: WEB_VERSION_URL };
+  }
   const opcionesWa = {
     authStrategy: new LocalAuth({ clientId: `sesion-${id}`, dataPath: config.sessionPath }),
+    // La librería resuelve `<webVersionCache.path>/<webVersion>.html`: la
+    // versión pedida debe coincidir con el pin descargado (si no, no usa el HTML).
+    webVersion: WEB_VERSION_PIN,
     webVersionCache: cacheWeb,
     puppeteer: {
       headless: config.headless,
