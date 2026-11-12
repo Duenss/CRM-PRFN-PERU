@@ -6,7 +6,7 @@
 
 | Parte | Estado | Commit | Tests |
 |---|---|---|---|
-| 1 · Validación (sin tope, ventana horaria, pausas largas) | ✅ | _(pendiente de hash)_ | 167/168 (1 fallo CRLF preexistente) |
+| 1 · Validación (sin tope, ventana horaria, pausas largas) | ✅ | `0e1294b` | 167/168 (1 fallo CRLF preexistente) |
 | 2 · Bienvenida (cooldown, backfill, primer mensaje con consulta) | ⬜ | — | — |
 | 3 · Backups (retención por ruta, última copia, restore) | ⬜ | — | — |
 | 4 · IA (ejemplos curados, respaldo ante fallo, evaluación) | ⬜ | — | — |
