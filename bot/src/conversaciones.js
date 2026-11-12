@@ -432,6 +432,7 @@ export function listar(limite = 40) {
       archivado: c.archivado === true,
       propio: c.propio === true,
       sinWhatsApp: c.sinWhatsApp === true,
+      sinChat: c.sinChat === true,
       waId: c.waId || '',
       wa: !!c.wa
     }));
@@ -458,6 +459,7 @@ export function buscar({ limite = 80, offset = 0, q = '', filtro = 'todos' } = {
     archivado: c.archivado === true,
     propio: c.propio === true,
     sinWhatsApp: c.sinWhatsApp === true,
+    sinChat: c.sinChat === true,
     waId: c.waId || '',
     wa: !!c.wa
   });
@@ -547,6 +549,14 @@ export function marcarSinWhatsApp(telefono, valor = true) {
   guardar();
 }
 
+export function marcarSinChat(telefono, valor = true) {
+  const tel = limpiarTel(telefono);
+  const ch = chats[tel];
+  if (!ch) return;
+  ch.sinChat = valor === true;
+  guardar();
+}
+
 export function obtener(telefono) {
   const c = chats[limpiarTel(telefono)];
   if (!c) return null;
@@ -567,6 +577,7 @@ export function obtener(telefono) {
     archivado: c.archivado === true,
     propio: c.propio === true,
     sinWhatsApp: c.sinWhatsApp === true,
+    sinChat: c.sinChat === true,
     waId: c.waId || '',
     wa: !!c.wa,
     mensajes: c.mensajes.filter(m => String(m.texto || '').trim()).slice(-MAX_MENSAJES)

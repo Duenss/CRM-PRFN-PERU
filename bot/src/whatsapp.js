@@ -1066,6 +1066,11 @@ export async function historialWa(telefono, limite = 50, sesionId = null) {
       })
       .filter(Boolean);
   }, { chatId, limite }, 90000, 'historialWa');
+  if (msgs === null) {
+    const err = new Error('Este número no tiene conversación en WhatsApp');
+    err.codigo = 'SIN_CHAT';
+    throw err;
+  }
   return msgs || [];
 }
 
