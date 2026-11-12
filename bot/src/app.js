@@ -433,6 +433,9 @@ async function ejecutarSecuenciaBienvenida({ tel, nombre, clienteId, sesionId })
     }
   });
   if (!res.texto) throw new Error('La bienvenida (texto) no se pudo enviar.');
+  // Marcador persistente del cooldown: la secuencia completa no se repite
+  // antes de bienvenidaDiasCooldown días (por defecto 30).
+  bienvenida.marcarBienvenidaEnviada(tel);
   log(`Bienvenida enviada a +${tel} (PDF ${res.pdf ? '✓' : '—'} · video ${res.video ? '✓' : '—'} · foto ${res.foto ? '✓' : '—'}).`);
   return res;
 }
@@ -1641,6 +1644,11 @@ async function manejarMensaje(msg, sesionId = null) {
 
   const cliente = await getCliente(tel);
   const hist = await historial(tel, 12);
+  // "Chat sin historial": primer mensaje real de este número (ni Supabase ni la
+  // memoria local de la Bandeja tienen mensajes previos). Se calcula ANTES de
+  // registrar el mensaje entrante que viene abajo.
+  const chatAntes = obtener(tel);
+  const sinHistorial = hist.length === 0 && !((chatAntes?.mensajes || []).length);
   const nombreChat = msg._data?.notifyName || cliente?.nombre || `+${tel}`;
   await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'entrante', texto, origen: 'cliente' });
   registrar({ telefono: tel, texto, direccion: 'entrante', nombre: nombreChat, clienteId: cliente?.id, origen: 'cliente', waId });
@@ -1675,12 +1683,23 @@ async function manejarMensaje(msg, sesionId = null) {
   }
 
   // ---------------- Bienvenida determinista (sin IA) ----------------
-  // "hola"/"hola info"/saludos → secuencia completa (texto → PDF → video →
-  // foto) para clientes NUEVOS y CONOCIDOS, cada vez que saluden. Las
-  // consultas concretas ("cuánto cuesta X", "me pasas el catálogo") se
-  // responden DIRECTO con saludo, sin secuencia ni medios.
+  // Reglas (ver bot/src/bienvenida.js):
+  //  - Chat SIN historial → secuencia completa en el primer mensaje, aunque
+  //    traiga una consulta concreta; luego se responde la consulta con el
+  //    contexto "no saludes ni ofrezcas el catálogo".
+  //  - Saludo/"hola info" de un cliente conocido → secuencia completa como
+  //    máximo una vez cada bienvenidaDiasCooldown días (30 por defecto). Antes
+  //    del cooldown recibe respuesta normal, sin medios.
+  //  - Consulta concreta de un chat con historial → respuesta directa, sin
+  //    secuencia ni medios.
   let secuenciaEnviada = false;
-  if (bienvenida.esSaludoOInfo(texto)) {
+  const decisionBienvenida = bienvenida.decidirBienvenida({
+    texto,
+    sinHistorial,
+    telefono: tel,
+    ajustes: estadoAjustes()
+  });
+  if (decisionBienvenida.secuencia) {
     const sinWsp = !!(cliente && (Array.isArray(cliente.etiquetas) ? cliente.etiquetas : String(cliente.etiquetas || '').split(',')).includes('sin-wsp'));
     const puerta = bienvenida.puedeBienvenida({
       telefono: tel,
@@ -1692,18 +1711,24 @@ async function manejarMensaje(msg, sesionId = null) {
     });
     if (!puerta.ok) {
       log(`Bienvenida omitida para +${tel}: ${puerta.motivo}.`);
-      return;
+      if (decisionBienvenida.saludo) return;
+    } else {
+      try {
+        await ejecutarSecuenciaBienvenida({ tel, nombre: nombreChat, clienteId: cliente?.id, sesionId });
+        secuenciaEnviada = true;
+      } catch (e) { log('No se pudo enviar la bienvenida: ' + e.message); }
+      log(`Secuencia de bienvenida a +${tel} (${decisionBienvenida.motivo}).`);
+      if (decisionBienvenida.saludo) return;
+      // Primer mensaje con consulta concreta: se sigue el flujo normal para
+      // responderla, con el contexto "no saludes ni ofrezcas el catálogo".
     }
-    secuenciaEnviada = true;
-    try {
-      await ejecutarSecuenciaBienvenida({ tel, nombre: nombreChat, clienteId: cliente?.id, sesionId });
-    } catch (e) { log('No se pudo enviar la bienvenida: ' + e.message); }
-    log(`Secuencia de bienvenida a +${tel}.`);
-    return;
+  } else if (decisionBienvenida.saludo || decisionBienvenida.primera) {
+    log(`Bienvenida no enviada a +${tel}: ${decisionBienvenida.motivo}. Se responde normal, sin medios.`);
   }
 
   // Pedido explícito del catálogo: respuesta directa (saludo + PDF + video).
-  if (esTextoReal && pideCatalogo(texto)) {
+  // Si la secuencia de bienvenida acaba de enviarlo, no se repite.
+  if (esTextoReal && !secuenciaEnviada && pideCatalogo(texto)) {
     const s = saludoONada(tel, nombreChat);
     if (s) {
       try {
@@ -3070,6 +3095,22 @@ app.listen(config.port, () => {
   log(`Chromium: ${config.headless ? 'sin ventana (HEADLESS=true) · el QR se escanea desde el panel' : 'CON ventana (HEADLESS=false) · recomendado solo para depurar'}.`);
   if (config.autoRespuesta) log(`Auto-respuesta ${config.geminiKey || config.anthropicKey ? 'con IA' : 'sin IA (respuestas básicas)'}.`);
 });
+
+// Backfill ÚNICO de bienvenidas (marcador persistente en bot-data-v2): al
+// primer arranque se marcan todos los chats con historial como "bienvenida
+// enviada" con la fecha de su último mensaje, para no re-saludar a la base
+// existente. Se registra el conteo y no se repite en reinicios posteriores.
+setTimeout(() => {
+  try {
+    const r = bienvenida.backfillBienvenidas({
+      chats: buscar({ limite: 100000 }).items.filter(c => Number(c.total) > 0),
+      log
+    });
+    if (!r.hecho) log(`Bienvenida: ${r.motivo} (${r.marcados} marcados); no se repite.`);
+  } catch (e) {
+    log('Backfill de bienvenidas falló: ' + e.message);
+  }
+}, 2000).unref?.();
 
 iniciarWhatsApp({ onMensaje: manejarMensaje, onMensajePropio: manejarMensajePropio, onAck: manejarAck, log, sesionIds: config.sesiones }).catch(e => log('No se pudo iniciar WhatsApp: ' + e.message));
 

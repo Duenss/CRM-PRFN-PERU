@@ -1031,6 +1031,7 @@ async function cargarAjustes(){
     if($('#aj-video'))$('#aj-video').checked=!!a.enviarVideo;
     if($('#aj-foto'))$('#aj-foto').checked=a.enviarFoto!==false;
     if($('#aj-minutos'))$('#aj-minutos').value=a.preguntaMinutos??2;
+    if($('#aj-dias'))$('#aj-dias').value=a.bienvenidaDiasCooldown??30;
     if($('#aj-importar-chats'))$('#aj-importar-chats').checked=a.importarChats!==false;
     if($('#aj-limpieza'))$('#aj-limpieza').value=a.limpiezaAlDesconectar||'preguntar';
     const es=$('#aj-status');if(es)es.textContent=`Actualizado: ${fmtFechaHora(a.actualizado)}`;
@@ -1055,6 +1056,7 @@ $('#aj-save')?.addEventListener('click',async()=>{
       enviarVideo:!!$('#aj-video')?.checked,
       enviarFoto:!!$('#aj-foto')?.checked,
       preguntaMinutos:Math.min(10,Math.max(1,Number($('#aj-minutos')?.value)||2)),
+      bienvenidaDiasCooldown:(()=>{const v=Number($('#aj-dias')?.value);return Number.isFinite(v)?Math.min(365,Math.max(0,Math.round(v))):30;})(),
       importarChats:!!$('#aj-importar-chats')?.checked,
       limpiezaAlDesconectar:$('#aj-limpieza')?.value||'preguntar'
     };
@@ -2126,6 +2128,7 @@ async function cargarBienvenida(){
     if($('#bw-video'))$('#bw-video').checked=a.enviarVideo!==false;
     if($('#bw-foto'))$('#bw-foto').checked=a.enviarFoto!==false;
     if($('#bw-minutos'))$('#bw-minutos').value=a.preguntaMinutos??2;
+    if($('#bw-dias'))$('#bw-dias').value=a.bienvenidaDiasCooldown??30;
     actualizarContadorBienvenida();renderPreviewBienvenida();
     if($('#bw-status'))$('#bw-status').textContent='Última actualización: '+(a.actualizado?fmtFechaHora(a.actualizado):'—');
     cargarArchivosInfo();
@@ -2166,7 +2169,8 @@ $('#bw-save')?.addEventListener('click',async()=>{
       enviarCatalogo:!!$('#bw-pdf')?.checked,
       enviarVideo:!!$('#bw-video')?.checked,
       enviarFoto:!!$('#bw-foto')?.checked,
-      preguntaMinutos:Math.min(10,Math.max(1,Number($('#bw-minutos')?.value)||2))
+      preguntaMinutos:Math.min(10,Math.max(1,Number($('#bw-minutos')?.value)||2)),
+      bienvenidaDiasCooldown:(()=>{const v=Number($('#bw-dias')?.value);return Number.isFinite(v)?Math.min(365,Math.max(0,Math.round(v))):30;})()
     })});
     const a=r.ajustes||{};
     if($('#bw-texto'))$('#bw-texto').value=a.bienvenidaTexto??$('#bw-texto').value;
