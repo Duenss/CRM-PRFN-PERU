@@ -92,3 +92,15 @@
     es la lectura más pesada que queda. Si el número vuelve a mostrar señales de bloqueo, el
     siguiente paso natural es convertirla también a incremental (misma técnica que
     `listarChatsActivosWa`). Anotado, no implementado. (2026-11-12.)
+20. **Parte 6 / T4 (emisor de campaña no configurado)**: `bot/src/app.js` ahora marca la campaña
+    con `estado = 'error'` cuando su `numero_emisor` no está en `SESIONES`. Ese estado solo lo
+    acepta la restricción de `sql/11_arreglar_estado_campanas.sql` (`campanas_estado_valido` con
+    `'error'`); si la base todavía tiene la restricción vieja de `sql/00`/`sql/03` (sin `'error'`),
+    el update falla y la campaña queda en `programada` reintentando. No se cambió el esquema
+    (fuera de alcance): verificar que sql/11 esté aplicado en Supabase antes de desplegar.
+    (2026-11-12.)
+21. **Parte 6 / T7a (caché de `configuracion_tienda`)**: `supabase.invalidarConfiguracion()` quedó
+    expuesto, pero el repo no tiene ningún endpoint que actualice `configuracion_tienda` (se edita
+    directo en Supabase), así que no hay dónde llamarlo. Consecuencia: un cambio en esa tabla tarda
+    hasta 5 min en verse en la IA. Si algún día se agrega el endpoint de configuración, debe llamar
+    a `invalidarConfiguracion()`. (2026-11-12.)

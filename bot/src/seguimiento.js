@@ -45,6 +45,58 @@ function guardar() {
   }
 }
 
+/* ---------------- poda de chats antiguos (F-14) ---------------- */
+// `chats` solo crecía: cada chat con seguimiento activado se quedaba para
+// siempre. Se borran los que llevan más de 180 días sin actividad ni tareas.
+// La fecha de referencia es la más reciente entre `desde`/`actualizado` del chat
+// y las fechas de sus tareas (creado/enviadoEn/programadoEn), porque `chats` no
+// guarda "último uso" y las tareas sí.
+export const DIAS_PODA_CHATS = Math.max(30, Number(process.env.SEGUIMIENTO_DIAS_PODA) || 180);
+const MS_DIA = 24 * 60 * 60 * 1000;
+
+/** Fecha (ms) más reciente conocida de un chat: su estado + sus tareas. */
+function ultimaFechaChat(telefono, chat, tareas = []) {
+  const fechas = [chat?.actualizado, chat?.desde];
+  for (const t of tareas) {
+    if (String(t?.telefono || '') !== String(telefono)) continue;
+    fechas.push(t.enviadoEn, t.creado, t.programadoEn);
+  }
+  let max = 0;
+  for (const f of fechas) {
+    const ms = Date.parse(String(f || ''));
+    if (Number.isFinite(ms) && ms > max) max = ms;
+  }
+  return max;
+}
+
+/**
+ * Versión pura de la poda: devuelve { chats, borrados } sin tocar el estado.
+ * Un chat sin ninguna fecha válida se considera viejo y se borra.
+ */
+export function podarChatsDe(chats = {}, tareas = [], ahoraMs = Date.now(), dias = DIAS_PODA_CHATS) {
+  const corte = ahoraMs - Math.max(1, Number(dias) || DIAS_PODA_CHATS) * MS_DIA;
+  const salida = {};
+  let borrados = 0;
+  for (const [telefono, chat] of Object.entries(chats || {})) {
+    const ultima = ultimaFechaChat(telefono, chat, tareas);
+    if (!ultima || ultima < corte) {
+      borrados++;
+      continue;
+    }
+    salida[telefono] = chat;
+  }
+  return { chats: salida, borrados };
+}
+
+/** Poda y persiste `chats` (si borró algo). Devuelve { borrados }. */
+export function podarChats(ahoraMs = Date.now(), dias = DIAS_PODA_CHATS) {
+  const resultado = podarChatsDe(estado.chats, estado.tareas, ahoraMs, dias);
+  if (!resultado.borrados) return { borrados: 0 };
+  estado.chats = resultado.chats;
+  guardar();
+  return { borrados: resultado.borrados };
+}
+
 function siguienteId() {
   const n = estado.tareas.reduce((max, t) => {
     const m = String(t.id || '').match(/(\d+)/);
@@ -185,4 +237,4 @@ export function plantilla(tipo, pedido = {}) {
   return `Hola ${nombre} 👋 ¿Cómo va ${producto}? Si ya se te está acabando o quieres probar otra fragancia, tengo opciones parecidas y novedades. ¿Te paso el catálogo?`;
 }
 
-export default { estaActivo, activar, listar, resumen, programarPedido, pendientes, marcarEnviada, omitir, cancelarPedido, plantilla };
+export default { estaActivo, activar, listar, resumen, programarPedido, pendientes, marcarEnviada, omitir, cancelarPedido, plantilla, podarChats };

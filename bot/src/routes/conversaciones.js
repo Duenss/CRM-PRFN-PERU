@@ -1,4 +1,6 @@
 // Router de la bandeja de entrada: clientes, conversaciones y envío manual.
+import { idempotenciaEnvios } from '../idempotencia.js';
+
 export function registrarConversaciones(app, ctx) {
   const {
     auth, normalizar, listar, buscar, obtener, marcarLeido, estadoIA,
@@ -64,6 +66,19 @@ export function registrarConversaciones(app, ctx) {
     if (!config.modoPrueba && !sesionDisponible(req.body?.sesion || null)) {
       return res.status(503).json({ error: 'Ningún WhatsApp está conectado.' });
     }
+    // F-16: idempotencia del envío manual. Si el panel repite la misma
+    // `idempotencyKey` dentro de 15 s (doble clic o reintento de red), se
+    // devuelve la respuesta anterior y NO se vuelve a mandar el mensaje.
+    const clave = String(req.body?.idempotencyKey || '').trim().slice(0, 200);
+    if (clave) {
+      const previa = idempotenciaEnvios.obtener(clave);
+      if (previa) {
+        return res.status(previa.status || 200).json({ ...(previa.cuerpo || { ok: true }), duplicado: true });
+      }
+      // Reserva sincrónica (sin `await` de por medio): dos peticiones simultáneas
+      // con la misma clave no pueden pasar ambas la comprobación.
+      idempotenciaEnvios.recordar(clave, { status: 200, cuerpo: { ok: true }, estado: 'en_vuelo' });
+    }
     try {
       const cliente = await getCliente(tel);
       const chatLocal = obtener(tel);
@@ -80,8 +95,12 @@ export function registrarConversaciones(app, ctx) {
         waId: env?.waId || ''
       });
       log(`Mensaje manual a +${tel}: ${texto.slice(0, 80)}${texto.length > 80 ? '...' : ''}`);
+      // Se recuerda recién cuando el envío terminó bien.
+      if (clave) idempotenciaEnvios.recordar(clave, { status: 200, cuerpo: { ok: true }, estado: 'ok' });
       res.json({ ok: true });
     } catch (e) {
+      // Un envío fallido NO se cachea: un reintento con la misma clave debe enviar.
+      if (clave) idempotenciaEnvios.olvidar(clave);
       res.status(500).json({ error: e.message });
     }
   });
