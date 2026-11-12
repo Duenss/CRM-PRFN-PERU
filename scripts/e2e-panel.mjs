@@ -73,11 +73,12 @@ const BOT_BASE = `http://127.0.0.1:${BOT_PORT}`;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 function parseArgs(argv) {
-  const out = { selfTest: false, headed: false, help: false, idleMs: null };
+  const out = { selfTest: false, headed: false, help: false, idleMs: null, capturas: false };
   for (const a of argv) {
     if (a === '--self-test') out.selfTest = true;
     else if (a === '--headed') out.headed = true;
     else if (a === '--help' || a === '-h') out.help = true;
+    else if (a === '--capturas') out.capturas = true;
     else if (a.startsWith('--idle-ms=')) out.idleMs = Number(a.slice('--idle-ms='.length));
     else if (a === '--full') { /* compat: la corrida ya es completa */ }
     else console.warn(`[e2e] argumento ignorado: ${a}`);
@@ -2005,6 +2006,37 @@ async function runE2E() {
       assert(!trasLimpiar.q, `la búsqueda no se limpió del localStorage: ${JSON.stringify(trasLimpiar)}`);
       return `"Lucía" guardada, restaurada y limpiada · ${await contarItemsBandeja()} chats`;
     });
+
+    /* ---------- Capturas de diseño (Parte 7): 360 / 768 / 1280 px ---------- */
+    if (ARGS.capturas) {
+      const CAPTURAS_DIR = path.join(ROOT, 'docs', 'capturas');
+      ensureDir(CAPTURAS_DIR);
+      const pantallas = [
+        ['inicio', 'kpis-inicio'],
+        ['bandeja', 'bandeja'],
+        ['pedidos', 'pedidos'],
+        ['bot', 'ajustes'],
+        ['bienvenida', 'bienvenida'],
+      ];
+      const anchos = [360, 768, 1280];
+      for (const [tab, nombre] of pantallas) {
+        await page.click(`#tabs button[data-tab="${tab}"]`);
+        await sleep(650);
+        if (tab === 'bandeja') {
+          const it = await page.$('#in-list .in-item');
+          if (it) { await it.click(); await sleep(500); }
+        }
+        for (const ancho of anchos) {
+          await page.setViewport({ width: ancho, height: ancho < 500 ? 900 : 1000, deviceScaleFactor: 1 });
+          await sleep(420);
+          await page.screenshot({ path: path.join(CAPTURAS_DIR, `${nombre}-${ancho}.png`) });
+        }
+        console.log(`  capturas ${nombre}: 360/768/1280`);
+      }
+      await page.setViewport({ width: 1280, height: 1000 });
+      await page.click('#tabs button[data-tab="inicio"]');
+      await sleep(400);
+    }
 
     await runner.case('E2E-11', 'Cero errores de consola JS y cero pageerror en toda la corrida', async () => {
       // El assert real es "0 errores de consola JS y 0 pageerror". Los avisos de red
