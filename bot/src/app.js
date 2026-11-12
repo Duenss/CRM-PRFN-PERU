@@ -1654,6 +1654,12 @@ async function manejarMensaje(msg, sesionId = null) {
   // Refuerza el mapa teléfono→LID: los próximos mensajes propios/acks ya no
   // dependen de resolver el LID otra vez (menos fallos y cero duplicados).
   recordarDestinoWa(tel, chat);
+  // Guarda el id real del chat (@lid o @c.us): sirve para fusionar duplicados y
+  // para descargar la multimedia de mensajes antiguos por su chat correcto.
+  try {
+    const chatLocal = obtener(tel);
+    if (chatLocal && !chatLocal.waId && chat) registrarCabecera({ telefono: tel, waId: chat });
+  } catch { /* opcional */ }
 
   if (config.modoPrueba && !config.numerosPrueba.includes(tel)) {
     log(`[PRUEBA] Mensaje de +${tel} ignorado (no está en NUMEROS_PRUEBA).`);
