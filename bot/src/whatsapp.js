@@ -973,6 +973,47 @@ function nombreMostradoWa({ titulo = '', pushname = '', verifiedName = '', nombr
   return v || g || t || p || '';
 }
 
+/** Da forma final a los chats crudos (wrapper o lectura directa de página). */
+function formatearChatsWa(crudos, propioNumero) {
+  return (Array.isArray(crudos) ? crudos : [])
+    .map(c => {
+      // Si lo último es solo una reacción (sin mensaje real), no le damos fecha:
+      // así cae al fondo y no desplaza a las conversaciones reales.
+      const t = c.real === false ? 0 : (c.tsReal || c.ts);
+      const nombreWa = nombreMostradoWa({
+        titulo: c.nombre || '',
+        pushname: c.pushname || '',
+        verifiedName: c.verifiedName || '',
+        nombreGuardado: c.nombreGuardado || '',
+        esEmpresa: !!c.esEmpresa
+      });
+      const idSerial = String(c.id || '');
+      const telGrupo = c.esGrupo ? idSerial.split('@')[0].replace(/\D/g, '') : '';
+      return {
+        telefono: c.esGrupo ? telGrupo : telDe({ isGroup: false, number: c.tel }),
+        waiver: '',
+        grupo: !!c.esGrupo,
+        waId: idSerial,
+        nombre: nombreWa,
+        nombreWa,
+        nombreGuardado: String(c.nombreGuardado || '').trim(),
+        pushname: String(c.pushname || '').trim(),
+        verifiedName: String(c.verifiedName || '').trim(),
+        esEmpresa: !!c.esEmpresa,
+        tipo: c.esEmpresa ? 'empresa' : 'persona',
+        ultimoTexto: String(c.ultimoTexto || '').slice(0, 300),
+        ultimoEn: t ? new Date(t * 1000).toISOString() : null,
+        noLeidos: c.noLeidos || 0,
+        pin: !!c.pin,
+        archived: c.archived === true,
+        tieneMensajes: c.tieneMensajes !== false,
+        real: c.real !== false,
+        tsReal: c.tsReal || 0
+      };
+    })
+    .filter(c => !!c.telefono);
+}
+
 /** Todos los chats del WhatsApp vinculado (no solo los que vio el bot). */
 export async function listarChatsWa(sesionId = null) {
   const s = sesionParaEnviar(sesionId);
@@ -1158,6 +1199,7 @@ export async function listarChatsWa(sesionId = null) {
             }
 
             out.push({
+              id: String((c.id && c.id._serialized) || ''),
               tel,
               lid: server === 'lid' ? String((c.id && c.id.user) || '') : '',
               esGrupo,
@@ -1255,43 +1297,113 @@ export async function listarChatsWa(sesionId = null) {
   }
 
   const propio = normalizar(s.numero);
-  return crudos
-    .map(c => {
-      // Si lo último es solo una reacción (sin mensaje real), no le damos fecha:
-      // así cae al fondo y no desplaza a las conversaciones reales.
-      const t = c.real === false ? 0 : (c.tsReal || c.ts);
-      const nombreWa = nombreMostradoWa({
-        titulo: c.nombre || '',
-        pushname: c.pushname || '',
-        verifiedName: c.verifiedName || '',
-        nombreGuardado: c.nombreGuardado || '',
-        esEmpresa: !!c.esEmpresa
-      });
-      const idSerial = String(c.id || '');
-      const telGrupo = c.esGrupo ? idSerial.split('@')[0].replace(/\D/g, '') : '';
-      return {
-        telefono: c.esGrupo ? telGrupo : telDe({ isGroup: false, number: c.tel }),
-        waiver: '',
-        grupo: !!c.esGrupo,
-        waId: idSerial,
-        nombre: nombreWa,
-        nombreWa,
-        nombreGuardado: String(c.nombreGuardado || '').trim(),
-        pushname: String(c.pushname || '').trim(),
-        verifiedName: String(c.verifiedName || '').trim(),
-        esEmpresa: !!c.esEmpresa,
-        tipo: c.esEmpresa ? 'empresa' : 'persona',
-        ultimoTexto: String(c.ultimoTexto || '').slice(0, 300),
-        ultimoEn: t ? new Date(t * 1000).toISOString() : null,
-        noLeidos: c.noLeidos || 0,
-        pin: !!c.pin,
-        archived: c.archived === true,
-        tieneMensajes: c.tieneMensajes !== false,
-        real: c.real !== false,
-        tsReal: c.tsReal || 0
-      };
-    })
-    .filter(c => !!c.telefono);
+  return formatearChatsWa(crudos, propio);
+}
+
+/**
+ * Listado INCREMENTAL de chats: solo los que tienen actividad posterior a
+ * `desdeMs` (timestamp del chat o de su último mensaje). Lee directo de la
+ * página SIN bajar la lista completa ni serializar con `getChats()`: es la
+ * lectura barata que usa la sincronización periódica anti-bloqueo (15-30 min).
+ * Si la lectura ligera falla, cae al listado completo (más pesado, pero seguro).
+ */
+export async function listarChatsActivosWa(desdeMs = 0, sesionId = null) {
+  const s = sesionParaEnviar(sesionId);
+  if (!s) throw new Error('Ningún WhatsApp está conectado');
+  const corte = Math.max(0, Number(desdeMs) || 0);
+  if (!corte) return listarChatsWa(sesionId); // sin corte: lista completa
+  await esperarPagina(s);
+  try {
+    const crudos = await evalPagina(s, async ({ desdeTs }) => {
+      const out = [];
+      const W = window;
+      let widFactory;
+      try { widFactory = W.require('WAWebWidFactory'); } catch (e) {}
+      let col;
+      try { col = W.require('WAWebCollections'); } catch (e) { return out; }
+      const arr = (col.Chat && col.Chat.getModelsArray && col.Chat.getModelsArray()) || [];
+      for (const c of arr) {
+        try {
+          const t = (c.t || 0) || (c.lastMessage && (c.lastMessage.t || 0)) || 0;
+          if (!(t >= desdeTs)) continue; // solo actividad nueva
+          const server = c.id && c.id.server;
+          const esGrupo = server === 'g.us' || !!c.groupMetadata;
+          let nombre = '';
+          let nombreGuardado = '';
+          let pushname = '';
+          let verifiedName = '';
+          let esEmpresa = false;
+          try {
+            nombre = c.formattedTitle || c.name || (c.contact && (c.contact.pushname || c.contact.name)) || '';
+            nombreGuardado = (c.contact && (c.contact.name || c.contact.shortName)) || '';
+            pushname = (c.contact && c.contact.pushname) || '';
+            verifiedName = (c.contact && (c.contact.verifiedName || (c.contact.businessProfile && c.contact.businessProfile.name))) || '';
+            esEmpresa = !!(c.contact && (c.contact.isBusiness || c.contact.isEnterprise || c.contact.businessProfile));
+          } catch (e) {}
+          let ultimoTexto = '';
+          try {
+            const lm = c.lastMessage;
+            if (lm) {
+              ultimoTexto = String(lm.caption || '').trim();
+              if (!ultimoTexto && (!lm.type || lm.type === 'chat' || lm.type === 'text')) ultimoTexto = String(lm.body || '').trim();
+            }
+          } catch (e) {}
+          let tel = '';
+          if (!esGrupo) {
+            try {
+              const pn = c.contact && c.contact.phoneNumber;
+              if (pn && pn._serialized) tel = String(pn._serialized).split('@')[0];
+            } catch (e) {}
+            if (!tel && server === 'c.us' && c.id && c.id.user) tel = String(c.id.user);
+            if (!tel && server === 'lid' && widFactory) {
+              try {
+                const wid = widFactory.createWid((c.id && c.id._serialized) || '');
+                let phone = null;
+                try { phone = W.require('WAWebApiContact').getPhoneNumber(wid); } catch (e) {}
+                if (!phone && W.WWebJS && W.WWebJS.enforceLidAndPnRetrieval) {
+                  const r = await W.WWebJS.enforceLidAndPnRetrieval((c.id && c.id._serialized) || '');
+                  phone = r && r.phone;
+                }
+                if (phone && phone._serialized) tel = String(phone._serialized).split('@')[0];
+              } catch (e) {}
+            }
+          }
+          out.push({
+            id: String((c.id && c.id._serialized) || ''),
+            tel,
+            lid: server === 'lid' ? String((c.id && c.id.user) || '') : '',
+            esGrupo,
+            nombre: String(nombre || ''),
+            nombreWa: String(nombre || ''),
+            nombreGuardado: String(nombreGuardado || ''),
+            pushname: String(pushname || ''),
+            verifiedName: String(verifiedName || ''),
+            esEmpresa,
+            ultimoTexto: String(ultimoTexto || ''),
+            ts: t,
+            tsReal: t,
+            real: true,
+            tieneMensajes: true,
+            pin: !!(c.pin || c.pinned || c.isPinned),
+            archived: !!(c.archive || c.archived || c.isArchived),
+            noLeidos: c.unreadCount || 0
+          });
+        } catch (e) { /* chat problemático: se omite */ }
+      }
+      return out;
+    }, { desdeTs: corte / 1000 }, 90000, 'listar chats activos');
+
+    // Los @lid resueltos a teléfono se recuerdan en el mapa lid→teléfono
+    // (en contexto Node, no dentro de la página).
+    for (const c of crudos) {
+      if (c.tel && c.lid) recordarTelefonoDeLid(`${c.lid}@lid`, c.tel);
+    }
+    const propio = normalizar(s.numero);
+    return formatearChatsWa(crudos, propio);
+  } catch {
+    // Respaldo: si la lectura ligera falla, se cae al listado completo.
+    return listarChatsWa(sesionId);
+  }
 }
 
 /** Todos los contactos guardados/iniciados en el WhatsApp vinculado. */
@@ -1318,16 +1430,34 @@ export async function listarContactosWa(sesionId = null) {
 }
 
 /** Historial reciente de un chat, leído directo de WhatsApp. */
-/** Valida si un número (de cualquier país) existe en WhatsApp. */
-export async function verificarNumeroWa(telefono, sesionId = null) {
+/**
+ * Consulta tri-estado de un número (anti-bloqueo):
+ *  - `{ existe: true }`  → getNumberId devolvió un id limpio.
+ *  - `{ existe: false }` → getNumberId resolvió null LIMPIAMENTE (no existe).
+ *  - LANZA en timeout, sesión caída o red: el llamador debe tratarlo como
+ *    error de infraestructura y NUNCA como "sin WhatsApp".
+ */
+export async function consultarNumeroWa(telefono, sesionId = null) {
   const limpio = String(telefono || '').replace(/\D/g, '');
-  if (!limpio) return false;
+  if (!limpio) throw new Error('Número inválido para consultar');
   const s = sesionParaEnviar(sesionId);
   if (!s) throw new Error('Ningún WhatsApp está conectado');
+  const id = await conTimeout(s.client.getNumberId(limpio), 15000, 'consultarNumeroWa');
+  return { existe: !!id };
+}
+
+/**
+ * Valida si un número (de cualquier país) existe en WhatsApp (booleano).
+ * Mantiene la semántica histórica (false ante cualquier error) para los
+ * llamadores que solo necesitan sí/no; la validación anti-bloqueo usa
+ * `consultarNumeroWa` para distinguir "no existe" de "error".
+ */
+export async function verificarNumeroWa(telefono, sesionId = null) {
   try {
-    const id = await conTimeout(s.client.getNumberId(limpio), 15000, 'verificarNumeroWa');
-    return !!id;
-  } catch { return false; }
+    return (await consultarNumeroWa(telefono, sesionId)).existe;
+  } catch {
+    return false;
+  }
 }
 
 export async function historialWa(telefono, limite = 50, sesionId = null) {
@@ -1338,10 +1468,25 @@ export async function historialWa(telefono, limite = 50, sesionId = null) {
   let numId = null;
   try {
     numId = await conTimeout(s.client.getNumberId(limpio), 20000, 'getNumberId');
-  } catch (e) { numId = null; }
-  // Los chats @lid no resuelven a número: se lee directo con su identificador.
-  const chatId = numId?._serialized || (/^\d{12,16}$/.test(limpio) ? `${limpio}@lid` : '');
-  if (!chatId) throw new Error(`El número +${limpio} no tiene WhatsApp`);
+  } catch (e) {
+    // Timeout/sesión/red: NUNCA equivale a "no tiene WhatsApp". El llamador
+    // debe distinguirlo por código y no marcar el número como inexistente.
+    const err = new Error('No se pudo consultar el número en WhatsApp (error de sesión o red)');
+    err.codigo = 'ERROR_WA';
+    throw err;
+  }
+  // getNumberId resolvió limpio a null: el número no está registrado.
+  if (!numId) {
+    const err = new Error(`El número +${limpio} no tiene WhatsApp`);
+    err.codigo = 'SIN_WA';
+    throw err;
+  }
+  const chatId = numId._serialized;
+  if (!chatId) {
+    const err = new Error(`El número +${limpio} no tiene WhatsApp`);
+    err.codigo = 'SIN_WA';
+    throw err;
+  }
   // Se lee directo de la página y sin serializar: `getChatById`/`fetchMessages`
   // de whatsapp-web.js fallan ("r") al serializar chats en la versión actual.
   const msgs = await evalPagina(s, async ({ chatId, limite }) => {

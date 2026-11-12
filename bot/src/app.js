@@ -3,14 +3,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config, validarConfig, esNumeroPeru, normalizar } from './config.js';
-import { sb, getCliente, getClientes, getProductos, logMensaje, historial, marcarBaja, importarClientes } from './supabase.js';
-import { iniciarWhatsApp, enviar, enviarImagen, enviarVideo, enviarArchivo, estadoWa, cerrarSesion, reiniciarSesion, hayConexion, sesionDisponible, listarChatsWa, listarContactosWa, historialWa, verificarNumeroWa, resolverTelefonoWa, recordarDestinoWa, telefonoCanonico, estadoSalud, idMensaje, descargarMediaWa, conTimeout } from './whatsapp.js';
+import { sb, getCliente, getClientes, getProductos, logMensaje, historial, marcarBaja, importarClientes, estadoWaDe, hayColumnasWa, guardarEstadoWa } from './supabase.js';
+import { iniciarWhatsApp, enviar, enviarImagen, enviarVideo, enviarArchivo, estadoWa, cerrarSesion, reiniciarSesion, hayConexion, sesionDisponible, listarChatsWa, listarChatsActivosWa, listarContactosWa, historialWa, consultarNumeroWa, resolverTelefonoWa, recordarDestinoWa, telefonoCanonico, estadoSalud, idMensaje, descargarMediaWa, conTimeout } from './whatsapp.js';
 import { redactarRespuesta, transcribirAudio, redactarBorradores, redactarBienvenida, redactarAnuncio, productoPorId, productoMencionado } from './ai.js';
-import { Cola, dormir, esperaEntreEnvios } from './queue.js';
+import { Cola, dormir, esperaEntreEnvios, PRIORIDAD } from './queue.js';
+import { configValidacion, esperaValidacionMs, aplicarResultado, pausaTrasErrores, sinEtiqueta, conEtiqueta, ESTADOS_WA, enVentanaHoraria, msHastaApertura, proximaPausaLarga, esperaPausaLargaMs } from './validacion.js';
 import { estadoIA, actualizarIA, pausarIA, estaPausado, promptIA, resumenIA } from './ia.js';
 import { estadoAjustes, actualizarAjustes, esperaMasivaMs, esperaChatMs } from './ajustes.js';
 import { oculto, ocultar, limpiar as limpiarOcultos } from './ocultos.js';
-import { registrar, listar, buscar, chatsSinWhatsApp, marcarAgregados, aplicarContactos, aplicarNombresClientes, marcarSinWhatsApp, marcarSinChat, obtener, marcarLeido, respuestasIA, porDia, resumen as resumenChats, registrarCabecera, importarMensajes, yaExisteWa, actualizarAck, mensajesEntrantes, eliminar as eliminarConversacion, fijar as fijarChat, archivar as archivarChat, vaciar as vaciarConversaciones, flush as flushConversaciones } from './conversaciones.js';
+import { registrar, listar, buscar, marcarAgregados, aplicarContactos, aplicarNombresClientes, marcarSinWhatsApp, marcarSinChat, obtener, marcarLeido, respuestasIA, porDia, resumen as resumenChats, registrarCabecera, importarMensajes, yaExisteWa, actualizarAck, mensajesEntrantes, eliminar as eliminarConversacion, fijar as fijarChat, archivar as archivarChat, vaciar as vaciarConversaciones, flush as flushConversaciones } from './conversaciones.js';
 import * as pedidos from './pedidos.js';
 import * as anuncios from './anuncios.js';
 // (Las plantillas de pago se eliminaron: las billeteras digitales las verifica el admin.)
@@ -432,6 +433,9 @@ async function ejecutarSecuenciaBienvenida({ tel, nombre, clienteId, sesionId })
     }
   });
   if (!res.texto) throw new Error('La bienvenida (texto) no se pudo enviar.');
+  // Marcador persistente del cooldown: la secuencia completa no se repite
+  // antes de bienvenidaDiasCooldown días (por defecto 30).
+  bienvenida.marcarBienvenidaEnviada(tel);
   log(`Bienvenida enviada a +${tel} (PDF ${res.pdf ? '✓' : '—'} · video ${res.video ? '✓' : '—'} · foto ${res.foto ? '✓' : '—'}).`);
   return res;
 }
@@ -1117,7 +1121,27 @@ async function enviarAnuncio(id) {
 }
 
 /* ---------------- cola ---------------- */
-const cola = new Cola(log);
+// Momento del último mensaje ENTRANTE: la actividad de clientes pausa los
+// trabajos de prioridad baja (validación de contactos, sincronización).
+let ultimoInboundEn = 0;
+
+/**
+ * ¿Hay actividad que deba pausar la validación y la sincronización?
+ *  - mensaje entrante en los últimos 60 s (un cliente acaba de escribir),
+ *  - una respuesta de IA preparándose (cooldown/turno en curso),
+ *  - un envío en curso (trabajo activo en la cola),
+ *  - envíos normales/altos esperando en la cola.
+ * Los trabajos BAJA en espera (validación/sync) no cuentan como actividad.
+ */
+function hayActividadReciente(ahoraMs = Date.now()) {
+  if (ahoraMs - ultimoInboundEn < 60000) return true;
+  if (turnoEnCurso.size > 0) return true;
+  if (cola.actual) return true;
+  if (cola.items.some(j => j.p !== PRIORIDAD.BAJA)) return true;
+  return false;
+}
+
+const cola = new Cola(log, { pausaBaja: () => hayActividadReciente() });
 let revisando = false;
 
 async function revisarProgramadas(forzar = false) {
@@ -1445,6 +1469,20 @@ async function manejarMensajePropio(msg, sesionId = null) {
 /** Texto legible del estado de entrega/lectura de WhatsApp (palomitas). */
 const TEXTO_ACK = { 0: 'pendiente ⏳', 1: 'enviado ✓', 2: 'entregado ✓✓', 3: 'leído ✓✓', 4: 'reproducido ✓✓' };
 
+// Acks agrupados: WhatsApp emite ráfagas de `message_ack` (y repite estados);
+// en vez de una línea de log por evento, se acumulan 5 s y se vuelca UN
+// resumen legible por ventana.
+const acksPendientes = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0 };
+let ackVolcadoTimer = null;
+function volcarAcks() {
+  ackVolcadoTimer = null;
+  const partes = Object.entries(acksPendientes)
+    .filter(([, n]) => n > 0)
+    .map(([k, n]) => `${n} ${TEXTO_ACK[Number(k)] || ('estado ' + k)}`);
+  for (const k of Object.keys(acksPendientes)) acksPendientes[k] = 0;
+  if (partes.length) log(`Estados de entrega: ${partes.join(' · ')}.`);
+}
+
 /**
  * Estado de entrega/lectura de un mensaje saliente. WhatsApp lo emite por el
  * evento `message_ack`; aquí se refleja en la conversación para mostrar las
@@ -1464,7 +1502,9 @@ async function manejarAck(msg, ack, sesionId = null) {
     const waId = idMensaje(msg);
     if (!waId) return;
     if (actualizarAck(tel, waId, ack)) {
-      log(`Mensaje a +${tel} ${TEXTO_ACK[Number(ack)] || ('estado ' + ack)}.`);
+      const n = Number(ack);
+      if (Number.isFinite(n) && acksPendientes[n] !== undefined) acksPendientes[n]++;
+      if (!ackVolcadoTimer) ackVolcadoTimer = setTimeout(volcarAcks, 5000);
     }
   } catch (e) {
     log('Error al registrar el estado del mensaje: ' + e.message);
@@ -1525,6 +1565,8 @@ async function notificarDueno(texto, sesionId = null) {
 async function manejarMensaje(msg, sesionId = null) {
   if (msg.fromMe || msg.isStatus) return;
   if (String(msg.type || '') === 'reaction' || msg.isNotification) return;
+  // Actividad entrante: pausa la validación y la sincronización (prioridad de cola).
+  ultimoInboundEn = Date.now();
   const chat = String(msg.from || '');
   if (chat.endsWith('@g.us') || chat === 'status@broadcast') return;
   // Teléfono canónico: @c.us/@s.whatsapp.net/@lid normalizados a un único
@@ -1602,6 +1644,11 @@ async function manejarMensaje(msg, sesionId = null) {
 
   const cliente = await getCliente(tel);
   const hist = await historial(tel, 12);
+  // "Chat sin historial": primer mensaje real de este número (ni Supabase ni la
+  // memoria local de la Bandeja tienen mensajes previos). Se calcula ANTES de
+  // registrar el mensaje entrante que viene abajo.
+  const chatAntes = obtener(tel);
+  const sinHistorial = hist.length === 0 && !((chatAntes?.mensajes || []).length);
   const nombreChat = msg._data?.notifyName || cliente?.nombre || `+${tel}`;
   await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'entrante', texto, origen: 'cliente' });
   registrar({ telefono: tel, texto, direccion: 'entrante', nombre: nombreChat, clienteId: cliente?.id, origen: 'cliente', waId });
@@ -1636,12 +1683,23 @@ async function manejarMensaje(msg, sesionId = null) {
   }
 
   // ---------------- Bienvenida determinista (sin IA) ----------------
-  // "hola"/"hola info"/saludos → secuencia completa (texto → PDF → video →
-  // foto) para clientes NUEVOS y CONOCIDOS, cada vez que saluden. Las
-  // consultas concretas ("cuánto cuesta X", "me pasas el catálogo") se
-  // responden DIRECTO con saludo, sin secuencia ni medios.
+  // Reglas (ver bot/src/bienvenida.js):
+  //  - Chat SIN historial → secuencia completa en el primer mensaje, aunque
+  //    traiga una consulta concreta; luego se responde la consulta con el
+  //    contexto "no saludes ni ofrezcas el catálogo".
+  //  - Saludo/"hola info" de un cliente conocido → secuencia completa como
+  //    máximo una vez cada bienvenidaDiasCooldown días (30 por defecto). Antes
+  //    del cooldown recibe respuesta normal, sin medios.
+  //  - Consulta concreta de un chat con historial → respuesta directa, sin
+  //    secuencia ni medios.
   let secuenciaEnviada = false;
-  if (bienvenida.esSaludoOInfo(texto)) {
+  const decisionBienvenida = bienvenida.decidirBienvenida({
+    texto,
+    sinHistorial,
+    telefono: tel,
+    ajustes: estadoAjustes()
+  });
+  if (decisionBienvenida.secuencia) {
     const sinWsp = !!(cliente && (Array.isArray(cliente.etiquetas) ? cliente.etiquetas : String(cliente.etiquetas || '').split(',')).includes('sin-wsp'));
     const puerta = bienvenida.puedeBienvenida({
       telefono: tel,
@@ -1653,18 +1711,24 @@ async function manejarMensaje(msg, sesionId = null) {
     });
     if (!puerta.ok) {
       log(`Bienvenida omitida para +${tel}: ${puerta.motivo}.`);
-      return;
+      if (decisionBienvenida.saludo) return;
+    } else {
+      try {
+        await ejecutarSecuenciaBienvenida({ tel, nombre: nombreChat, clienteId: cliente?.id, sesionId });
+        secuenciaEnviada = true;
+      } catch (e) { log('No se pudo enviar la bienvenida: ' + e.message); }
+      log(`Secuencia de bienvenida a +${tel} (${decisionBienvenida.motivo}).`);
+      if (decisionBienvenida.saludo) return;
+      // Primer mensaje con consulta concreta: se sigue el flujo normal para
+      // responderla, con el contexto "no saludes ni ofrezcas el catálogo".
     }
-    secuenciaEnviada = true;
-    try {
-      await ejecutarSecuenciaBienvenida({ tel, nombre: nombreChat, clienteId: cliente?.id, sesionId });
-    } catch (e) { log('No se pudo enviar la bienvenida: ' + e.message); }
-    log(`Secuencia de bienvenida a +${tel}.`);
-    return;
+  } else if (decisionBienvenida.saludo || decisionBienvenida.primera) {
+    log(`Bienvenida no enviada a +${tel}: ${decisionBienvenida.motivo}. Se responde normal, sin medios.`);
   }
 
   // Pedido explícito del catálogo: respuesta directa (saludo + PDF + video).
-  if (esTextoReal && pideCatalogo(texto)) {
+  // Si la secuencia de bienvenida acaba de enviarlo, no se repite.
+  if (esTextoReal && !secuenciaEnviada && pideCatalogo(texto)) {
     const s = saludoONada(tel, nombreChat);
     if (s) {
       try {
@@ -2337,26 +2401,27 @@ app.get('/api/estadisticas', auth, (req, res) => {
  * con lo que pasó mientras el bot estaba apagado, sin borrar mensajes locales.
  * Devuelve { lista, chats } para que el llamador loguee/emita el evento.
  */
-/** Marca al cliente con la etiqueta "sin-wsp" cuando su número no existe en WhatsApp. */
-async function etiquetarClienteSinWa(tel) {
-  try {
-    if (!sb) return;
-    const cl = await getCliente(tel);
-    if (!cl || !cl.id) return;
-    const ets = Array.isArray(cl.etiquetas) ? cl.etiquetas : [];
-    if (ets.includes('sin-wsp')) return;
-    await sb.from('clientes').update({ etiquetas: [...ets, 'sin-wsp'] }).eq('id', cl.id);
-    log(`Cliente +${tel} marcado como sin WhatsApp.`);
-  } catch (e) { log('No se pudo etiquetar sin WhatsApp: ' + e.message); }
-}
-
-async function sincronizarChatsDesdeWhatsApp(sesionId = null) {
+/**
+ * Trae la lista de chats de WhatsApp y actualiza las cabeceras de la Bandeja
+ * (último mensaje, no leídos, pin, nombre). Así el panel se pone al día con lo
+ * que pasó mientras el bot estaba apagado, sin borrar mensajes locales.
+ * Con `{ desdeMs }` usa el listado INCREMENTAL (solo chats con actividad
+ * posterior al corte; lectura barata para la sincronización periódica).
+ * Devuelve { lista, chats, incremental } para que el llamador loguee/emita.
+ */
+async function sincronizarChatsDesdeWhatsApp(sesionId = null, opciones = {}) {
   // El dueño puede desactivar la importación de chats: la Bandeja queda solo
   // con conversaciones nuevas (los mensajes en vivo sí se registran igual).
   if (estadoAjustes().importarChats === false) {
-    return { lista: [], chats: 0, grupos: 0, sinNumero: 0, omitido: true };
+    return { lista: [], chats: 0, grupos: 0, sinNumero: 0, omitido: true, incremental: false };
   }
-  const lista = await conTimeout(listarChatsWa(sesionId), 240000, 'listar chats de WhatsApp');
+  const desdeMs = Math.max(0, Number(opciones.desdeMs) || 0);
+  const incremental = desdeMs > 0;
+  const lista = await conTimeout(
+    incremental ? listarChatsActivosWa(desdeMs, sesionId) : listarChatsWa(sesionId),
+    240000,
+    incremental ? 'listar chats activos de WhatsApp' : 'listar chats de WhatsApp'
+  );
   const propios = estadoWa().map(s => String(s.numero || '')).filter(Boolean);
   let chats = 0, grupos = 0, sinNumero = 0, archivados = 0, sinConversacion = 0;
   for (const c of lista) {
@@ -2392,41 +2457,174 @@ async function sincronizarChatsDesdeWhatsApp(sesionId = null) {
   if (grupos || sinNumero) {
     log(`Sincronización de chats: ${chats} importados de ${lista.length} (${grupos} grupos, ${archivados} archivados, ${sinNumero} sin número, ${sinConversacion} sin conversación).`);
   }
-  return { lista, chats, grupos, sinNumero, archivados, sinConversacion };
+  return { lista, chats, grupos, sinNumero, archivados, sinConversacion, incremental };
 }
 
 let sincronizacionEnCurso = false;
-let validacionContactosEnCurso = false;
-app.post('/api/validar-contactos', auth, (_req, res) => {
-  if (validacionContactosEnCurso) return res.json({ ok: true, enCurso: true });
-  validacionContactosEnCurso = true;
-  res.json({ ok: true, enCurso: true });
-  (async () => {
-    try {
-      const clientes = await getClientes();
-      let revisados = 0;
-      let invalidos = 0;
-      for (const cl of clientes) {
-        const ets = Array.isArray(cl.etiquetas) ? cl.etiquetas : [];
-        if (ets.includes('sin-wsp')) continue;
-        revisados++;
-        try {
-          const ok = await verificarNumeroWa(cl.telefono);
-          if (!ok) {
-            await sb.from('clientes').update({ etiquetas: [...ets, 'sin-wsp'] }).eq('id', cl.id);
-            invalidos++;
-          }
-        } catch (e) { log('Validación interrumpida: ' + e.message); break; }
-        if (revisados % 100 === 0) log(`Validación de contactos: ${revisados}/${clientes.length} · ${invalidos} sin WhatsApp.`);
-        await dormir(80);
-      }
-      log(`Validación de contactos terminada: ${revisados} revisados · ${invalidos} sin WhatsApp.`);
-    } catch (e) {
-      log('Error validando contactos: ' + e.message);
-    } finally {
-      validacionContactosEnCurso = false;
+
+/* ---------------- validación anti-bloqueo de contactos ---------------- */
+// Ritmo lento y aleatorio (4-10 s por número), lotes pequeños por día, pausa
+// automática ante errores de infraestructura y estados separados en Supabase
+// (sql/13): sin_verificar → verificado → sin_whatsapp (confirmado tras 2 fallos
+// limpios en momentos distintos). Un timeout o una sesión caída NUNCA marca.
+// Corre como trabajo de prioridad BAJA en la cola: atender a un cliente que
+// acaba de escribir va antes que cualquier validación.
+let validacionEnCurso = false;
+let valDia = { fecha: '', n: 0 };
+const VALIDACION_LOTE = Math.max(1, Math.min(25, Number(process.env.VALIDACION_LOTE) || 10));
+
+function validacionHechosHoy() {
+  const hoy = fechaLima(partesLima());
+  if (valDia.fecha !== hoy) valDia = { fecha: hoy, n: 0 };
+  return valDia;
+}
+
+/** Reúne los candidatos (alcance) y devuelve el estado del trabajo, o null. */
+async function prepararValidacion() {
+  const cfg = configValidacion();
+  const clientes = await getClientes();
+  if (!clientes.length) { log('Validación: sin clientes en Supabase.'); return null; }
+  if (!hayColumnasWa(clientes[0])) {
+    log('Validación omitida: faltan las columnas de estado (ejecutar sql/13_wa_estado_clientes.sql).');
+    return null;
+  }
+  // Alcance: destinatarios de campaña (con fila en envios) o contactos nuevos
+  // (nunca verificados). No se re-valida toda la base a ciegas en cada pasada.
+  const enCampanas = new Set();
+  try {
+    const { data, error } = await sb.from('envios').select('cliente_id');
+    if (error) throw error;
+    for (const e of data || []) if (e.cliente_id) enCampanas.add(String(e.cliente_id));
+  } catch (e) {
+    log(`Validación: no se pudo leer los destinatarios de campaña (${e.message}); solo contactos nuevos.`);
+  }
+  const candidatos = clientes.filter(cl => {
+    if (!cl || !cl.id || !cl.telefono || !/^\d{8,15}$/.test(String(cl.telefono))) return false;
+    const st = estadoWaDe(cl);
+    if (st.estado === ESTADOS_WA.VERIFICADO || st.estado === ESTADOS_WA.SIN_WHATSAPP) return false;
+    return enCampanas.has(String(cl.id)) || !st.ultimaVerificacionEn;
+  });
+  if (!candidatos.length) {
+    log('Validación: sin candidatos pendientes (destinatarios de campaña o contactos nuevos).');
+    return null;
+  }
+  const cuota = cfg.porDia > 0 ? `cuota diaria ${cfg.porDia}` : 'sin tope diario';
+  log(`Validación iniciada: ${candidatos.length} candidatos · ${cuota} · ventana ${pad(cfg.horaInicio)}:00-${pad(cfg.horaFin)}:00 Lima · ritmo ${Math.round(cfg.minMs / 1000)}-${Math.round(cfg.maxMs / 1000)} s por número · pausa larga cada ${cfg.loteMin}-${cfg.loteMax} números · lotes de ${VALIDACION_LOTE}.`);
+  return {
+    candidatos,
+    desde: 0,
+    revisados: 0,
+    verificados: 0,
+    fallosExistencia: 0,
+    confirmados: 0,
+    infra: 0,
+    infraSeguidos: 0,
+    consultados: 0,
+    pausaLargaEn: proximaPausaLarga(cfg),
+    secuencia: 1
+  };
+}
+
+function terminarValidacion(estado) {
+  validacionEnCurso = false;
+  log(`Validación terminada: ${estado.revisados} revisados · ${estado.verificados} verificados · ${estado.fallosExistencia} fallos · ${estado.confirmados} sin WhatsApp (confirmados) · ${estado.infra} errores de infra.`);
+}
+
+/** Un lote (hasta VALIDACION_LOTE números). El siguiente lote se encola aparte. */
+async function ejecutarLoteValidacion(estado) {
+  const cfg = configValidacion();
+  let hechos = 0;
+  let pausaPendiente = 0;
+  /** Encola el siguiente lote (lo usan el fin del lote, la ventana y las pausas). */
+  const programar = () => {
+    if (!hayConexion() || (cfg.porDia > 0 && validacionHechosHoy().n >= cfg.porDia)) { terminarValidacion(estado); return; }
+    cola.add(`validar-contactos-${estado.secuencia++}`, () => ejecutarLoteValidacion(estado), { prioridad: 'baja', tiempoMaxMs: 10 * 60 * 1000 });
+  };
+  while (hechos < VALIDACION_LOTE && estado.desde < estado.candidatos.length) {
+    if (!hayConexion()) { log('Validación pausada: WhatsApp desconectado; el resto queda pendiente.'); terminarValidacion(estado); return; }
+    // Sin tope diario cuando VALIDACION_POR_DIA=0 (valor por defecto).
+    if (cfg.porDia > 0 && validacionHechosHoy().n >= cfg.porDia) { log(`Validación: cuota diaria de ${cfg.porDia} alcanzada; continúa mañana.`); terminarValidacion(estado); return; }
+    // Fuera de la ventana horaria de Lima no se consulta: se retoma al abrir.
+    const partes = partesLima();
+    if (!enVentanaHoraria(cfg, partes)) {
+      const ms = msHastaApertura(cfg, partes);
+      log(`Validación pausada: fuera de la ventana ${pad(cfg.horaInicio)}:00-${pad(cfg.horaFin)}:00 (Lima); retoma en ~${Math.max(1, Math.round(ms / 60000))} min.`);
+      setTimeout(programar, ms).unref?.();
+      return;
     }
-  })();
+    const cl = estado.candidatos[estado.desde++];
+    try {
+      const r = await consultarNumeroWa(cl.telefono);
+      const prev = estadoWaDe(cl);
+      const dec = aplicarResultado(prev, { existe: r.existe }, cfg);
+      const cambios = {
+        wa_estado: dec.estado,
+        wa_fallos: dec.fallos,
+        wa_primer_fallo_en: dec.primerFalloEn,
+        wa_ultima_verificacion_en: new Date().toISOString()
+      };
+      if (dec.verificado) {
+        estado.verificados++;
+        cambios.etiquetas = sinEtiqueta(cl.etiquetas);
+        marcarSinWhatsApp(cl.telefono, false);
+      } else if (dec.confirmado) {
+        estado.confirmados++;
+        cambios.etiquetas = conEtiqueta(cl.etiquetas);
+        marcarSinWhatsApp(cl.telefono, true);
+        log(`+${cl.telefono} confirmado sin WhatsApp (2 fallos en momentos distintos).`);
+      } else {
+        estado.fallosExistencia++;
+      }
+      await guardarEstadoWa(cl.id, cambios);
+      estado.infraSeguidos = 0;
+    } catch (e) {
+      // Timeout / sesión caída / red: NUNCA cuenta como "sin WhatsApp".
+      estado.infra++;
+      estado.infraSeguidos++;
+      if (pausaTrasErrores(estado.infraSeguidos, cfg.erroresPausa)) {
+        const minutos = Math.round(cfg.pausaMs / 60000);
+        log(`Validación: ${estado.infraSeguidos} errores de infraestructura seguidos (${e.message}) → pausa automática de ${minutos} min.`);
+        pausaPendiente = cfg.pausaMs;
+        estado.infraSeguidos = 0;
+        break; // el lote se retoma después de la pausa, como trabajo nuevo
+      }
+    }
+    hechos++;
+    estado.consultados = (Number(estado.consultados) || 0) + 1;
+    validacionHechosHoy().n++;
+    await dormir(esperaValidacionMs(cfg));
+  }
+  estado.revisados += hechos;
+  if (estado.desde >= estado.candidatos.length) { terminarValidacion(estado); return; }
+  if (pausaPendiente > 0) { setTimeout(programar, pausaPendiente).unref?.(); return; }
+  // Pausa larga anti-bloqueo: cada 80-120 números consultados, 3-6 minutos.
+  const objetivoPausa = Number(estado.pausaLargaEn) || proximaPausaLarga(cfg);
+  if ((Number(estado.consultados) || 0) >= objetivoPausa) {
+    estado.consultados = 0;
+    estado.pausaLargaEn = proximaPausaLarga(cfg);
+    const ms = esperaPausaLargaMs(cfg);
+    log(`Validación: pausa larga anti-bloqueo de ${Math.round(ms / 60000)} min tras ${objetivoPausa} números consultados.`);
+    setTimeout(programar, ms).unref?.();
+    return;
+  }
+  programar();
+}
+
+app.post('/api/validar-contactos', auth, (_req, res) => {
+  if (validacionEnCurso) return res.json({ ok: true, enCurso: true });
+  if (!sb) return res.status(503).json({ error: 'Falta SUPABASE_SERVICE_ROLE_KEY en el bot.' });
+  if (!config.modoPrueba && !hayConexion()) return res.status(503).json({ error: 'Ningún WhatsApp está conectado.' });
+  validacionEnCurso = true;
+  res.json({ ok: true, enCurso: true });
+  prepararValidacion()
+    .then(estado => {
+      if (!estado) { validacionEnCurso = false; return; }
+      cola.add('validar-contactos-0', () => ejecutarLoteValidacion(estado), { prioridad: 'baja', tiempoMaxMs: 10 * 60 * 1000 });
+    })
+    .catch(e => {
+      validacionEnCurso = false;
+      log('Error al preparar la validación: ' + e.message);
+    });
 });
 
 app.post('/api/sincronizar', auth, async (req, res) => {
@@ -2453,7 +2651,9 @@ app.post('/api/sincronizar', auth, async (req, res) => {
       salida.sinNumero = r.sinNumero || 0;
       salida.archivados = r.archivados || 0;
       salida.sinConversacion = r.sinConversacion || 0;
-      for (const tel of chatsSinWhatsApp()) etiquetarClienteSinWa(tel).catch(() => {});
+      // Nota: los "sin WhatsApp" ya no se re-etiquetan aquí: ese estado vive en
+      // las columnas de sql/13 y solo lo confirma la validación anti-bloqueo
+      // (2 fallos limpios en momentos distintos).
       if (req.body?.diagnostico) {
         salida.detalle = r.lista.map(c => ({
           telefono: c.telefono,
@@ -2503,12 +2703,18 @@ app.post('/api/sincronizar', auth, async (req, res) => {
         salida.clientesTotal = todosClientes.length;
       } catch (e) { log('No se pudieron aplicar nombres de clientes: ' + e.message); }
       // Solo se guardan contactos que WhatsApp confirme que existen (cualquier país).
+      // Un error de sesión/red NO descarta el contacto: fail-safe (sin falsos
+      // "sin WhatsApp" por un fallo temporal de la consulta).
       const validos = [];
       for (const n of nuevos) {
         try {
-          if (await verificarNumeroWa(n.telefono, req.body?.sesion || null)) validos.push(n);
+          const r = await consultarNumeroWa(n.telefono, req.body?.sesion || null);
+          if (r.existe) validos.push(n);
           else log('Contacto omitido (no tiene WhatsApp): +' + n.telefono);
-        } catch { validos.push(n); }
+        } catch (e) {
+          log(`Contacto +${n.telefono} no se pudo verificar (${e.message}); se importa igual.`);
+          validos.push(n);
+        }
       }
       const r = await importarClientes(validos);
       salida.contactosNuevos = r.insertados;
@@ -2538,18 +2744,58 @@ app.post('/api/conversaciones/:telefono/importar', auth, async (req, res) => {
   } catch (e) {
     const mensaje = String(e?.message || e);
     const sinChat = e?.codigo === 'SIN_CHAT' || /no tiene conversación/i.test(mensaje);
-    const noWa = /no tiene WhatsApp|no está registrado|not registered/i.test(mensaje);
+    const sinWa = e?.codigo === 'SIN_WA' || /no tiene WhatsApp|no está registrado|not registered/i.test(mensaje);
+    // Regla anti-bloqueo: importar historial NUNCA marca "sin WhatsApp"
+    // (antes un fallo de sesión aquí podía marcar el número por error).
+    // Solo "sin conversación" queda como estado local del chat.
     if (sinChat) marcarSinChat(tel, true);
-    if (noWa) { marcarSinWhatsApp(tel, true); etiquetarClienteSinWa(tel).catch(() => {}); }
     log('Error al importar historial de +' + tel + ': ' + mensaje);
     // Nunca se devuelve error duro al panel: el chat sigue visible y se puede
     // revisar; solo se avisa que ese número no tiene historial accesible.
     const aviso = sinChat
       ? 'Este número no tiene conversación en WhatsApp (no hay historial que importar).'
-      : noWa
+      : sinWa
         ? 'Este número no tiene WhatsApp (no se puede importar su historial).'
         : 'No se pudo leer el historial en este momento.';
     res.json({ ok: true, leidos: 0, nuevos: 0, aviso });
+  }
+});
+
+/**
+ * Restaura un cliente marcado "sin WhatsApp" desde el panel: vuelve a
+ * 'sin_verificar' (con fallos en cero) y se le quita la etiqueta 'sin-wsp'.
+ * La nueva validación anti-bloqueo lo re-verificará con su ritmo normal.
+ */
+app.post('/api/clientes/restaurar-wa', auth, async (req, res) => {
+  const tel = normalizar(String(req.body?.telefono || ''));
+  if (!/^\d{8,15}$/.test(tel)) return res.status(400).json({ error: 'Teléfono inválido.' });
+  try {
+    if (sb) {
+      const cl = await getCliente(tel);
+      if (cl?.id) {
+        try {
+          await guardarEstadoWa(cl.id, {
+            wa_estado: ESTADOS_WA.SIN_VERIFICAR,
+            wa_fallos: 0,
+            wa_primer_fallo_en: null,
+            wa_ultima_verificacion_en: null,
+            etiquetas: sinEtiqueta(cl.etiquetas)
+          });
+        } catch (e) {
+          if (hayColumnasWa(cl)) throw e;
+          // Sin las columnas de sql/13, al menos se quita la etiqueta.
+          await sb.from('clientes').update({ etiquetas: sinEtiqueta(cl.etiquetas) }).eq('id', cl.id);
+          log(`Columnas de estado ausentes (sql/13); se quitó solo la etiqueta de +${tel}.`);
+        }
+      }
+    }
+    marcarSinWhatsApp(tel, false);
+    emitir('sync', { motivo: 'wa_restaurado', telefono: tel });
+    log(`+${tel} restaurado a "sin verificar" desde el panel.`);
+    res.json({ ok: true });
+  } catch (e) {
+    log('No se pudo restaurar +' + tel + ': ' + e.message);
+    res.status(500).json({ error: e.message });
   }
 });
 
@@ -2850,6 +3096,22 @@ app.listen(config.port, () => {
   if (config.autoRespuesta) log(`Auto-respuesta ${config.geminiKey || config.anthropicKey ? 'con IA' : 'sin IA (respuestas básicas)'}.`);
 });
 
+// Backfill ÚNICO de bienvenidas (marcador persistente en bot-data-v2): al
+// primer arranque se marcan todos los chats con historial como "bienvenida
+// enviada" con la fecha de su último mensaje, para no re-saludar a la base
+// existente. Se registra el conteo y no se repite en reinicios posteriores.
+setTimeout(() => {
+  try {
+    const r = bienvenida.backfillBienvenidas({
+      chats: buscar({ limite: 100000 }).items.filter(c => Number(c.total) > 0),
+      log
+    });
+    if (!r.hecho) log(`Bienvenida: ${r.motivo} (${r.marcados} marcados); no se repite.`);
+  } catch (e) {
+    log('Backfill de bienvenidas falló: ' + e.message);
+  }
+}, 2000).unref?.();
+
 iniciarWhatsApp({ onMensaje: manejarMensaje, onMensajePropio: manejarMensajePropio, onAck: manejarAck, log, sesionIds: config.sesiones }).catch(e => log('No se pudo iniciar WhatsApp: ' + e.message));
 
 // Respaldo diario de bot/data a Supabase Storage (03:00 hora del bot).
@@ -2903,22 +3165,55 @@ setInterval(refrescarProgramadas, 30 * 1000);
 // WhatsApp para que el panel no se quede con lo que había la última vez que se
 // abrió: últimos mensajes, no leídos, nombres y chats nuevos. Los eventos en
 // vivo siguen actualizando el resto mientras el bot está conectado.
+// Periódicamente (cada 15-30 min, aleatorio) corre una sincronización
+// INCREMENTAL (solo chats con actividad nueva) como trabajo de prioridad BAJA:
+// se pausa mientras haya mensajes entrantes o envíos en curso.
 let syncAutoEnCurso = false;
 let syncInicialHecho = false;
 let ultimoEstadoConexion = false;
+let ultimaSyncExitosaEn = 0;
+let proximoSyncTimer = null;
+
+/** Encola el sync automático (baja prioridad). Devuelve false si no se encoló. */
+function encolarSyncAuto(motivo) {
+  if (config.modoPrueba || !hayConexion() || syncAutoEnCurso) return false;
+  syncAutoEnCurso = true;
+  cola.add('sync-auto', async () => {
+    try { await sincronizarAuto(motivo); }
+    finally {
+      syncAutoEnCurso = false;
+      if (motivo === 'periodica') programarProximaSync();
+    }
+  }, { prioridad: 'baja', tiempoMaxMs: 15 * 60 * 1000 });
+  return true;
+}
+
+/** Programa el próximo refresco periódico (15-30 min aleatorios). */
+function programarProximaSync() {
+  if (proximoSyncTimer) { clearTimeout(proximoSyncTimer); proximoSyncTimer = null; }
+  const minMs = Math.max(60000, Number(process.env.SYNC_MIN_MS) || 15 * 60 * 1000);
+  const maxMs = Math.max(minMs, Number(process.env.SYNC_MAX_MS) || 30 * 60 * 1000);
+  const espera = Math.round(minMs + Math.random() * (maxMs - minMs));
+  proximoSyncTimer = setTimeout(() => {
+    proximoSyncTimer = null;
+    if (!encolarSyncAuto('periodica')) programarProximaSync(); // reintenta si había otro sync
+  }, espera);
+  proximoSyncTimer.unref?.();
+}
 
 async function sincronizarAuto(motivo) {
-  if (config.modoPrueba || syncAutoEnCurso || !hayConexion()) return;
-  syncAutoEnCurso = true;
+  if (config.modoPrueba || !hayConexion()) return;
   try {
-    const { chats, lista } = await sincronizarChatsDesdeWhatsApp(null);
+    // Incremental desde la última sincronización exitosa, con 1 min de margen
+    // para no perder chats que quedaron justo al borde del corte.
+    const desde = ultimaSyncExitosaEn ? Math.max(0, ultimaSyncExitosaEn - 60000) : 0;
+    const { chats, lista, incremental } = await sincronizarChatsDesdeWhatsApp(null, { desdeMs: desde });
+    ultimaSyncExitosaEn = Date.now();
     syncInicialHecho = true;
-    log(`Sincronización automática (${motivo}): ${chats}/${lista.length} chats actualizados en la Bandeja.`);
+    log(`Sincronización automática (${motivo}${incremental ? ', incremental' : ''}): ${chats}/${lista.length} chats actualizados en la Bandeja.`);
     emitir('sync', { motivo, chats, total: lista.length });
   } catch (e) {
     log(`No se pudo sincronizar la Bandeja (${motivo}): ${e.message}`);
-  } finally {
-    syncAutoEnCurso = false;
   }
 }
 
@@ -2928,7 +3223,7 @@ setInterval(() => {
     ultimoEstadoConexion = true;
     // Pequeña espera para que WhatsApp Web termine de cargar los chats.
     setTimeout(() => {
-      sincronizarAuto(syncInicialHecho ? 'reconexion' : 'inicio');
+      encolarSyncAuto(syncInicialHecho ? 'reconexion' : 'inicio');
       // Después de la cabecera, trae los mensajes recientes de los chats ya
       // conocidos (cubre lo que pasó mientras el bot estaba apagado).
       setTimeout(() => { if (!historialesHechos) actualizarHistorialesConocidos(); }, 8000);
@@ -2938,9 +3233,8 @@ setInterval(() => {
     historialesHechos = false;
   }
 }, 5000);
-// Refresco periódico suave (los mensajes en vivo llegan por eventos; esto cubre
-// huecos si el evento se perdió).
-setInterval(() => { if (!config.modoPrueba && hayConexion()) sincronizarAuto('periodica'); }, 5 * 60 * 1000);
+// Refresco periódico incremental (15-30 min aleatorios), pausado con actividad.
+setTimeout(() => programarProximaSync(), 15000);
 
 /**
  * Puesta al día de los historiales de los chats ya conocidos. La lista de chats

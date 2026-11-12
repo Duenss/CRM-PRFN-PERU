@@ -10,14 +10,17 @@ import path from 'node:path';
 const raiz = path.join(import.meta.dirname, '..');
 const dataDir = path.join(raiz, 'data');
 const sFile = path.join(dataDir, 'bienvenida-seguimiento.json');
+const eFile = path.join(dataDir, 'bienvenida-enviadas.json');
 const mediaDir = path.join(raiz, 'media');
 const foto = path.join(mediaDir, 'bienvenida-foto.jpg');
 const fotoBak = path.join(mediaDir, 'bienvenida-foto.jpg.bak-test');
 
 // Estado limpio antes de importar el módulo (como ajustes.test.mjs).
 const respaldo = fs.existsSync(sFile) ? fs.readFileSync(sFile, 'utf8') : null;
+const respaldoE = fs.existsSync(eFile) ? fs.readFileSync(eFile, 'utf8') : null;
 fs.mkdirSync(dataDir, { recursive: true });
 fs.rmSync(sFile, { force: true });
+fs.rmSync(eFile, { force: true });
 
 const bw = await import('../src/bienvenida.js');
 
@@ -26,9 +29,15 @@ test.after(() => {
     if (respaldo === null) fs.rmSync(sFile, { force: true });
     else fs.writeFileSync(sFile, respaldo, 'utf8');
     fs.rmSync(sFile + '.tmp', { force: true });
+    if (respaldoE === null) fs.rmSync(eFile, { force: true });
+    else fs.writeFileSync(eFile, respaldoE, 'utf8');
+    fs.rmSync(eFile + '.tmp', { force: true });
     if (fs.existsSync(fotoBak)) fs.renameSync(fotoBak, foto);
   } catch { /* best-effort */ }
 });
+
+const MS_DIA = 24 * 60 * 60 * 1000;
+const limpiarEnviadas = () => { fs.rmSync(eFile, { force: true }); bw.recargar(); };
 
 const AJUSTES_TODO = { enviarCatalogo: true, enviarVideo: true, enviarFoto: true };
 
@@ -82,6 +91,97 @@ test('exclusiones: grupo, difusión, dueño, prueba, baja y sin-wsp', () => {
   assert.equal(bw.puedeBienvenida({ telefono: '51911111111', sinWhatsApp: true }).ok, false);
   assert.equal(bw.puedeBienvenida({ telefono: '51911111111' }).ok, true);
   assert.equal(bw.puedeBienvenida({ telefono: 'abc' }).ok, false);
+});
+
+/* ---------------- cooldown por chat (secuencia cada N días) ---------------- */
+
+test('cooldown: un cliente conocido que saluda antes del cooldown NO repite', () => {
+  limpiarEnviadas();
+  const tel = '51900000101';
+  const t0 = Date.parse('2026-11-12T12:00:00Z');
+  assert.equal(bw.marcarBienvenidaEnviada(tel, { ahoraMs: t0 }), true);
+  const ajustes = { bienvenidaDiasCooldown: 30 };
+  assert.equal(bw.tocaBienvenida(tel, { ajustes, ahoraMs: t0 + 1000 }).ok, false);
+  assert.equal(bw.tocaBienvenida(tel, { ajustes, ahoraMs: t0 + 10 * MS_DIA }).ok, false);
+  const d = bw.decidirBienvenida({ texto: 'Hola!', sinHistorial: false, telefono: tel, ajustes, ahoraMs: t0 + 5 * MS_DIA });
+  assert.equal(d.secuencia, false);
+  assert.match(d.motivo, /cooldown/);
+  // El marcador es persistente (sobrevive a recargar desde disco).
+  bw.recargar();
+  assert.ok(bw.marcadorBienvenida(tel));
+});
+
+test('cooldown vencido: la secuencia se repite', () => {
+  limpiarEnviadas();
+  const tel = '51900000102';
+  const t0 = Date.parse('2026-11-12T12:00:00Z');
+  bw.marcarBienvenidaEnviada(tel, { ahoraMs: t0 });
+  const ajustes = { bienvenidaDiasCooldown: 30 };
+  const vencido = bw.tocaBienvenida(tel, { ajustes, ahoraMs: t0 + 31 * MS_DIA });
+  assert.equal(vencido.ok, true);
+  assert.equal(vencido.motivo, 'cooldown vencido');
+  const d = bw.decidirBienvenida({ texto: 'buenas tardes', sinHistorial: false, telefono: tel, ajustes, ahoraMs: t0 + 31 * MS_DIA });
+  assert.equal(d.secuencia, true);
+});
+
+test('cooldown: 0 días lo desactiva (siempre repetible)', () => {
+  limpiarEnviadas();
+  const tel = '51900000103';
+  const t0 = Date.now();
+  bw.marcarBienvenidaEnviada(tel, { ahoraMs: t0 });
+  assert.equal(bw.tocaBienvenida(tel, { ajustes: { bienvenidaDiasCooldown: 0 }, ahoraMs: t0 + 1000 }).ok, true);
+  assert.equal(bw.diasCooldown({}), bw.DIAS_COOLDOWN_DEFECTO);
+  assert.equal(bw.diasCooldown({ bienvenidaDiasCooldown: 15 }), 15);
+});
+
+test('primer mensaje de un chat SIN historial: secuencia completa aunque traiga consulta concreta', () => {
+  limpiarEnviadas();
+  const tel = '51900000104';
+  const texto = 'Hola, cuánto cuesta el Árabe Blanco?';
+  assert.equal(bw.esSaludoOInfo(texto), false, 'es una consulta concreta, no un saludo');
+  const d = bw.decidirBienvenida({ texto, sinHistorial: true, telefono: tel, ajustes: { bienvenidaDiasCooldown: 30 } });
+  assert.equal(d.secuencia, true, 'el primer mensaje sin historial sí dispara la secuencia');
+  assert.equal(d.primera, true);
+  assert.equal(d.saludo, false);
+  // Un chat CON historial con la misma consulta se responde directo, sin medios.
+  const normal = bw.decidirBienvenida({ texto, sinHistorial: false, telefono: '51900000105', ajustes: { bienvenidaDiasCooldown: 30 } });
+  assert.equal(normal.secuencia, false);
+  assert.match(normal.motivo, /consulta concreta/);
+});
+
+test('primer mensaje sin historial con cooldown vigente no repite la secuencia', () => {
+  limpiarEnviadas();
+  const tel = '51900000106';
+  const t0 = Date.parse('2026-11-12T12:00:00Z');
+  bw.marcarBienvenidaEnviada(tel, { ahoraMs: t0 });
+  const d = bw.decidirBienvenida({ texto: 'hola', sinHistorial: true, telefono: tel, ajustes: { bienvenidaDiasCooldown: 30 }, ahoraMs: t0 + MS_DIA });
+  assert.equal(d.secuencia, false);
+});
+
+test('backfill: marca una sola vez los chats con historial usando la fecha de su último mensaje', () => {
+  limpiarEnviadas();
+  const t0 = Date.parse('2026-11-12T12:00:00Z');
+  const chats = [
+    { telefono: '51900000201', ultimoEn: new Date(t0 - 40 * MS_DIA).toISOString(), total: 3 }, // inactivo > 30 días
+    { telefono: '51900000202', ultimoEn: new Date(t0 - 5 * MS_DIA).toISOString(), total: 2 },   // reciente
+    { telefono: '51900000203', total: 0 },                                                      // sin historial
+    { telefono: '51900000204' }                                                                 // sin fecha
+  ];
+  const logs = [];
+  const r = bw.backfillBienvenidas({ chats, ahoraMs: t0, log: (m) => logs.push(m) });
+  assert.equal(r.hecho, true);
+  assert.equal(r.marcados, 2, 'solo los 2 con historial y fecha válida');
+  assert.ok(logs.some(l => /backfill inicial único de 2/.test(l)), 'se registra el conteo en el log');
+  const ajustes = { bienvenidaDiasCooldown: 30 };
+  assert.equal(bw.tocaBienvenida('51900000201', { ajustes, ahoraMs: t0 }).ok, true, 'inactivo > N días puede recibirla');
+  assert.equal(bw.tocaBienvenida('51900000202', { ajustes, ahoraMs: t0 }).ok, false, 'activo hace 5 días no la repite');
+  assert.equal(bw.marcadorBienvenida('51900000203'), null, 'sin historial no se marca');
+  assert.equal(fs.existsSync(eFile + '.tmp'), false, 'escritura atómica: no queda .tmp');
+  // Segundo arranque: no se repite ni marca chats nuevos.
+  const r2 = bw.backfillBienvenidas({ chats: [...chats, { telefono: '51900000205', ultimoEn: new Date(t0 - 2 * MS_DIA).toISOString() }], ahoraMs: t0 + MS_DIA, log: () => {} });
+  assert.equal(r2.hecho, false);
+  assert.equal(r2.marcados, 0);
+  assert.equal(bw.marcadorBienvenida('51900000205'), null, 'el backfill no se repite');
 });
 
 /* ---------------- pregunta diferida (¿te ayudo a elegir?) ---------------- */

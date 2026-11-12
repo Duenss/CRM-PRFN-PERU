@@ -1,10 +1,19 @@
 // Bienvenida determinista (SIN IA) para chats de clientes.
 //
 // Regla de negocio (confirmada por el dueño, 2026-11-12):
-//  - "hola"/"hola info"/saludos → secuencia completa: texto → PDF → video →
-//    foto, para clientes NUEVOS y CONOCIDOS, cada vez que saluden.
-//  - Consultas concretas ("cuánto cuesta X", "me pasas el catálogo") se
-//    responden DIRECTO con saludo, sin secuencia ni medios (app.js).
+//  - Primera vez de un chat SIN historial → secuencia completa (texto → PDF →
+//    video → foto) AUNQUE traiga una consulta concreta; después se responde la
+//    consulta con el contexto "no saludes ni ofrezcas el catálogo" (app.js).
+//  - Saludos/"hola info" de clientes conocidos → secuencia completa, pero como
+//    máximo una vez cada `bienvenidaDiasCooldown` días (marcador persistente
+//    data/bienvenida-enviadas.json). Si el cooldown está vigente, el cliente
+//    recibe una respuesta normal, sin medios.
+//  - Backfill único al primer arranque: todos los chats con historial quedan
+//    marcados como "bienvenida enviada" con la fecha de su último mensaje, para
+//    no re-saludar a la base existente. Los inactivos más de N días sí pueden
+//    recibirla (su cooldown ya venció).
+//  - Consultas concretas de chats con historial se responden DIRECTO, sin
+//    secuencia ni medios (app.js).
 //
 // Secuencia: pausas cortas aleatorias (2-4 s) y UN reintento por medio. Si un
 // medio falla se registra y se sigue con los demás. Al final se programa la
@@ -24,6 +33,7 @@ export const mediaDir = path.join(srcDir, '..', 'media');
 export const archivosDir = path.join(srcDir, '..', 'data', 'archivos');
 const dataDir = path.join(srcDir, '..', 'data');
 const seguimientoFile = path.join(dataDir, 'bienvenida-seguimiento.json');
+const enviadasFile = path.join(dataDir, 'bienvenida-enviadas.json');
 
 const MEDIOS_DEFECTO = {
   pdf: 'catalogo-navidad-2026.pdf',
@@ -57,6 +67,145 @@ function limpiarTexto(texto) {
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .replace(/[¡!¿?.,;:/\\\-]+/g, ' ')
     .replace(/\s+/g, ' ').trim();
+}
+
+/* ---------------- cooldown por chat: secuencia completa cada N días ---------------- */
+
+export const DIAS_COOLDOWN_DEFECTO = 30;
+const MS_DIA = 24 * 60 * 60 * 1000;
+
+// data/bienvenida-enviadas.json (volumen bot-data-v2):
+//   { chats: { "519...": { enviadaEn, origen } }, backfillHecho, backfillEn }
+let enviadas = null;
+function cargarEnviadas() {
+  if (!enviadas) {
+    const j = leerJson(enviadasFile, {});
+    const chats = j && typeof j.chats === 'object' && j.chats ? j.chats : {};
+    enviadas = {
+      chats,
+      backfillHecho: j?.backfillHecho === true,
+      backfillEn: j?.backfillEn || ''
+    };
+  }
+  return enviadas;
+}
+
+/** Días de cooldown configurados (Ajustes → Bienvenida). 0 = desactivado. */
+export function diasCooldown(ajustes = {}) {
+  const n = Number(ajustes?.bienvenidaDiasCooldown);
+  if (!Number.isFinite(n)) return DIAS_COOLDOWN_DEFECTO;
+  return Math.min(365, Math.max(0, Math.round(n)));
+}
+
+/** Marcador guardado de un chat (o null si nunca se saludó). */
+export function marcadorBienvenida(telefono) {
+  const tel = limpiarTel(telefono);
+  if (!tel) return null;
+  return cargarEnviadas().chats[tel] || null;
+}
+
+/**
+ * ¿Toca enviar la secuencia completa? Devuelve { ok, motivo, ultimaEn, venceEn }.
+ * - Sin marcador (o cooldown 0) → sí.
+ * - Marcador dentro del cooldown → no (el cliente recibe respuesta normal).
+ * - Marcador vencido → sí (se repite la secuencia).
+ */
+export function tocaBienvenida(telefono, { ajustes = {}, ahoraMs = Date.now() } = {}) {
+  const tel = limpiarTel(telefono);
+  if (!tel) return { ok: false, motivo: 'número inválido', ultimaEn: null, venceEn: null };
+  const dias = diasCooldown(ajustes);
+  const ultima = marcadorBienvenida(tel);
+  if (!ultima) return { ok: true, motivo: 'sin marcador previo', ultimaEn: null, venceEn: null, dias };
+  if (dias <= 0) return { ok: true, motivo: 'cooldown desactivado', ultimaEn: ultima.enviadaEn || null, venceEn: null, dias };
+  const ultimaMs = Date.parse(ultima.enviadaEn || '');
+  if (!Number.isFinite(ultimaMs)) return { ok: true, motivo: 'marcador inválido', ultimaEn: null, venceEn: null, dias };
+  const venceMs = ultimaMs + dias * MS_DIA;
+  if (ahoraMs < venceMs) {
+    return {
+      ok: false,
+      motivo: `cooldown de ${dias} días vigente desde ${ultima.enviadaEn}`,
+      ultimaEn: ultima.enviadaEn,
+      venceEn: new Date(venceMs).toISOString(),
+      dias
+    };
+  }
+  return { ok: true, motivo: 'cooldown vencido', ultimaEn: ultima.enviadaEn, venceEn: new Date(venceMs).toISOString(), dias };
+}
+
+/** Guarda el marcador persistente (escritura atómica). */
+export function marcarBienvenidaEnviada(telefono, { ahoraMs = Date.now(), origen = 'secuencia' } = {}) {
+  const tel = limpiarTel(telefono);
+  if (!tel) return false;
+  const e = cargarEnviadas();
+  e.chats[tel] = {
+    enviadaEn: new Date(Number(ahoraMs) || Date.now()).toISOString(),
+    origen: String(origen || 'secuencia').slice(0, 40)
+  };
+  escribirAtomico(enviadasFile, e);
+  return true;
+}
+
+/**
+ * Backfill único al primer arranque: marca TODOS los chats con historial como
+ * "bienvenida enviada" con la fecha de su último mensaje (así los inactivos
+ * más de N días ya tienen el cooldown vencido y sí pueden recibirla).
+ * La marca `backfillHecho` evita que se repita en reinicios posteriores.
+ */
+export function backfillBienvenidas({ chats = [], ahoraMs = Date.now(), log = () => {} } = {}) {
+  const e = cargarEnviadas();
+  if (e.backfillHecho) {
+    return { hecho: false, motivo: 'el backfill ya se hizo antes', marcados: 0, total: 0 };
+  }
+  let marcados = 0;
+  let total = 0;
+  for (const c of Array.isArray(chats) ? chats : []) {
+    const tel = limpiarTel(c?.telefono);
+    if (!tel) continue;
+    total++;
+    if (e.chats[tel]) continue; // no pisar un marcador real
+    const en = Date.parse(c?.ultimoEn || '');
+    if (!Number.isFinite(en) || en <= 0) continue;
+    e.chats[tel] = {
+      enviadaEn: new Date(en).toISOString(),
+      origen: 'backfill',
+      marcadoEn: new Date(Number(ahoraMs) || Date.now()).toISOString()
+    };
+    marcados++;
+  }
+  e.backfillHecho = true;
+  e.backfillEn = new Date(Number(ahoraMs) || Date.now()).toISOString();
+  escribirAtomico(enviadasFile, e);
+  log(`Bienvenida: backfill inicial único de ${marcados} chats con historial (marcados como ya saludados con la fecha de su último mensaje).`);
+  return { hecho: true, marcados, total };
+}
+
+/** ¿El backfill inicial ya se ejecutó? (lo usa /api/estado si hace falta). */
+export function backfillEstado() {
+  const e = cargarEnviadas();
+  return { hecho: e.backfillHecho, en: e.backfillEn, chats: Object.keys(e.chats).length };
+}
+
+/**
+ * Decide si corresponde la secuencia completa para este mensaje:
+ *  - primer mensaje de un chat SIN historial → sí, aunque sea consulta concreta;
+ *  - saludo/"info" de un chat conocido → sí si el cooldown venció;
+ *  - consulta concreta de un chat con historial → no (se responde directo).
+ */
+export function decidirBienvenida({ texto = '', sinHistorial = false, telefono = '', ajustes = {}, ahoraMs = Date.now() } = {}) {
+  const primera = sinHistorial === true;
+  const saludo = esSaludoOInfo(texto);
+  if (!primera && !saludo) return { secuencia: false, motivo: 'consulta concreta (se responde directo)', primera: false, saludo: false, cooldown: null };
+  const cooldown = tocaBienvenida(telefono, { ajustes, ahoraMs });
+  if (!cooldown.ok) {
+    return { secuencia: false, motivo: cooldown.motivo, primera, saludo, cooldown };
+  }
+  return {
+    secuencia: true,
+    motivo: primera ? 'primer mensaje de un chat sin historial' : 'saludo con cooldown vencido',
+    primera,
+    saludo,
+    cooldown
+  };
 }
 
 /* ---------------- estado: pregunta diferida (¿te ayudo a elegir?) ---------------- */
@@ -294,12 +443,16 @@ export async function ejecutarSecuencia({ telefono, nombre = '', clienteId = nul
 /** Recarga el estado desde disco (simula un reinicio; útil en tests). */
 export function recargar() {
   seguimiento = null;
+  enviadas = null;
   cargarSeguimiento();
+  cargarEnviadas();
 }
 
 export default {
   mediaDir, archivosDir, rutaMedia, validarMedios,
   esSaludoOInfo, puedeBienvenida,
   programarPregunta, cancelarPregunta, preguntasPendientes, marcarPreguntaEnviada, vencerPreguntas, textoPregunta,
-  ejecutarSecuencia, recargar
+  ejecutarSecuencia, recargar,
+  DIAS_COOLDOWN_DEFECTO, diasCooldown, marcadorBienvenida, tocaBienvenida,
+  marcarBienvenidaEnviada, backfillBienvenidas, backfillEstado, decidirBienvenida
 };
