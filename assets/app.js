@@ -1339,6 +1339,57 @@ $('#wa-chip')?.addEventListener('click',()=>irTab('bot'));
 
 /* ---------- bandeja de entrada ---------- */
 let inChats=[],inTel=null,inPausados=new Set(),inIAactiva=true,bandejaCargada=false,inFiltro='todos',inTotal=0,inHasMore=false,inBuscando=false;
+/* Filtros extra de la Bandeja (etiqueta, rango de fechas) y persistencia de la
+   búsqueda. "Sin responder" y "con pedido" se aplican sobre lo ya cargado. */
+const BANDEJA_FILTROS_KEY='pf_bandeja_filtros_v1';
+let inFiltroEtiqueta='',inFiltroDesde='',inFiltroHasta='';
+function leerJsonLocal(clave,defecto){try{const v=JSON.parse(localStorage.getItem(clave)||'null');return v&&typeof v==='object'?v:defecto}catch{return defecto}}
+function guardarFiltrosBandeja(){try{localStorage.setItem(BANDEJA_FILTROS_KEY,JSON.stringify({q:$('#in-q')?.value||'',etiqueta:inFiltroEtiqueta,desde:inFiltroDesde,hasta:inFiltroHasta}))}catch{}}
+function restaurarFiltrosBandeja(){
+  const f=leerJsonLocal(BANDEJA_FILTROS_KEY,{});
+  if($('#in-q')&&f.q)$('#in-q').value=f.q;
+  if($('#in-e')&&f.etiqueta){$('#in-e').value=f.etiqueta;inFiltroEtiqueta=f.etiqueta;}
+  if($('#in-fd')&&f.desde){$('#in-fd').value=f.desde;inFiltroDesde=f.desde;}
+  if($('#in-fh')&&f.hasta){$('#in-fh').value=f.hasta;inFiltroHasta=f.hasta;}
+  if($('#in-filtro-info')&&!f.q&&!f.etiqueta&&!f.desde&&!f.hasta)$('#in-filtro-info').textContent='';
+}
+function telefonosConPedido(){
+  const set=new Set();
+  for(const p of [...(pedidosCache||[]),...leerPedidosLocales()]){const t=String(p?.telefono||'').replace(/\D/g,'');if(t)set.add(t)}
+  return set;
+}
+function fechaDeChatEnRango(iso){
+  if(!inFiltroDesde&&!inFiltroHasta)return true;
+  const ms=Date.parse(iso||'');if(!Number.isFinite(ms))return false;
+  if(inFiltroDesde){const d=Date.parse(inFiltroDesde+'T00:00:00');if(Number.isFinite(d)&&ms<d)return false}
+  if(inFiltroHasta){const h=Date.parse(inFiltroHasta+'T23:59:59.999');if(Number.isFinite(h)&&ms>h)return false}
+  return true;
+}
+function etiquetaDeChat(c){return (c?.etiquetas||[]).map(e=>typeof e==='string'?e:(e?.texto||'')).filter(Boolean)}
+function chatPasaFiltrosExtra(c){
+  if(inFiltro==='sinResponder'&&String(c.ultimaDireccion||'')!=='entrante')return false;
+  if(inFiltro==='conPedido'&&!telefonosConPedido().has(String(c.telefono)))return false;
+  if(inFiltroEtiqueta&&!etiquetaDeChat(c).includes(inFiltroEtiqueta))return false;
+  return fechaDeChatEnRango(c.ultimoEn);
+}
+function actualizarOpcionesEtiquetas(){
+  const sel=$('#in-e');if(!sel)return;
+  const actual=sel.value;
+  const ets=[...new Set(inChats.flatMap(etiquetaDeChat))].sort((a,b)=>a.localeCompare(b,'es'));
+  sel.innerHTML='<option value="">Todas</option>'+ets.map(e=>`<option value="${esc(e)}">${esc(e)}</option>`).join('');
+  sel.value=ets.includes(actual)?actual:'';
+  inFiltroEtiqueta=sel.value;
+}
+function actualizarInfoFiltros(visibles){
+  const info=$('#in-filtro-info');if(!info)return;
+  const partes=[];
+  if(inFiltroEtiqueta)partes.push('etiqueta: '+inFiltroEtiqueta);
+  if(inFiltroDesde||inFiltroHasta)partes.push('fechas: '+(inFiltroDesde||'…')+' → '+(inFiltroHasta||'…'));
+  if(inFiltro==='sinResponder')partes.push('sin responder');
+  if(inFiltro==='conPedido')partes.push('con pedido');
+  const q=($('#in-q')?.value||'').trim();if(q)partes.push('búsqueda: '+q);
+  info.textContent=(partes.length?partes.join(' · ')+' · ':'')+visibles+' de '+inChats.length+' chats';
+}
 function actualizarBadge(n){
   const b=$('#unread-badge');if(!b)return;
   b.hidden=!n;b.textContent=n>99?'99+':n;
@@ -1371,6 +1422,7 @@ async function cargarBandeja({reset=false,append=false}={}){
       if(hayNuevo)sonidoEntrante();
     }
     bandejaCargada=true;
+    actualizarOpcionesEtiquetas();
     pintarLista();actualizarPausa();actualizarBadge(j.resumen?.noLeidos||0);
     limpiarStale($('#in-sub'),`${j.resumen?.chats||0} conversaciones · ${j.resumen?.mensajesHoy||0} mensajes hoy`);
   }catch(e){
@@ -1416,7 +1468,8 @@ function pintarLista(){
     inFiltro==='empresas'?(c.tipo==='empresa'):
     inFiltro==='sinWhatsApp'?c.sinWhatsApp===true:
     true;
-  const l=inChats.filter(c=>pasaFiltro(c)&&(!q||[c.nombreWa,c.nombre,c.telefono,c.ultimoTexto].join(' ').toLowerCase().includes(q)));
+  const l=inChats.filter(c=>pasaFiltro(c)&&chatPasaFiltrosExtra(c)&&(!q||[c.nombreWa,c.nombre,c.telefono,c.ultimoTexto].join(' ').toLowerCase().includes(q)));
+  actualizarInfoFiltros(l.length);
   const fijados=l.filter(c=>c.fijado&&!c.archivado);
   const archivados=l.filter(c=>c.archivado);
   const normales=l.filter(c=>!c.fijado&&!c.archivado);
@@ -1698,6 +1751,19 @@ $('#in-filtros')?.addEventListener('click',e=>{
   $('#in-filtros').querySelectorAll('[data-inf]').forEach(x=>x.classList.toggle('on',x===b));
   cargarBandeja({reset:true});
 });
+/* Filtros extra: etiqueta y rango de fechas (se guardan en el navegador). */
+$('#in-e')?.addEventListener('change',()=>{inFiltroEtiqueta=$('#in-e')?.value||'';guardarFiltrosBandeja();pintarLista();});
+$('#in-fd')?.addEventListener('change',()=>{inFiltroDesde=$('#in-fd')?.value||'';guardarFiltrosBandeja();pintarLista();});
+$('#in-fh')?.addEventListener('change',()=>{inFiltroHasta=$('#in-fh')?.value||'';guardarFiltrosBandeja();pintarLista();});
+$('#in-flimpiar')?.addEventListener('click',()=>{
+  inFiltro='todos';inFiltroEtiqueta='';inFiltroDesde='';inFiltroHasta='';
+  if($('#in-q'))$('#in-q').value='';
+  if($('#in-e'))$('#in-e').value='';
+  if($('#in-fd'))$('#in-fd').value='';
+  if($('#in-fh'))$('#in-fh').value='';
+  $('#in-filtros')?.querySelectorAll('[data-inf]').forEach(x=>x.classList.toggle('on',x.dataset.inf==='todos'));
+  guardarFiltrosBandeja();cargarBandeja({reset:true});
+});
 $('#in-list')?.addEventListener('click',async e=>{
   const pin=e.target.closest('[data-pin]');
   if(pin){
@@ -1732,6 +1798,7 @@ $('#in-list')?.addEventListener('click',async e=>{
 });
 let inQTimer=null;
 $('#in-q')?.addEventListener('input',()=>{
+  guardarFiltrosBandeja();
   pintarLista();
   clearTimeout(inQTimer);
   inQTimer=setTimeout(()=>cargarBandeja({reset:true}),450);
@@ -1781,6 +1848,59 @@ $('#in-quick')?.addEventListener('click',e=>{
 
 /* ---------- pedidos, plantillas de pago y seguimiento ---------- */
 let pedidosCache=[],inSegActivo=false,alertasNuevas=0,evUltimo=null;
+/* Filtros de Pedidos: estado, entrega y rango de fechas + búsqueda persistente. */
+const PEDIDOS_FILTROS_KEY='pf_pedidos_filtros_v1';
+let peFiltroEstado='',peFiltroEntrega='',peFiltroDesde='',peFiltroHasta='',peUltimoJ=null;
+function guardarFiltrosPedidos(){try{localStorage.setItem(PEDIDOS_FILTROS_KEY,JSON.stringify({q:$('#pe-q')?.value||'',estado:peFiltroEstado,entrega:peFiltroEntrega,desde:peFiltroDesde,hasta:peFiltroHasta}))}catch{}}
+function restaurarFiltrosPedidos(){
+  const f=leerJsonLocal(PEDIDOS_FILTROS_KEY,{});
+  if($('#pe-q')&&f.q)$('#pe-q').value=f.q;
+  if($('#pe-f-estado')&&f.estado){$('#pe-f-estado').value=f.estado;peFiltroEstado=f.estado;}
+  if($('#pe-f-entrega')&&f.entrega){$('#pe-f-entrega').value=f.entrega;peFiltroEntrega=f.entrega;}
+  if($('#pe-f-desde')&&f.desde){$('#pe-f-desde').value=f.desde;peFiltroDesde=f.desde;}
+  if($('#pe-f-hasta')&&f.hasta){$('#pe-f-hasta').value=f.hasta;peFiltroHasta=f.hasta;}
+}
+function actualizarOpcionesEstadoPedidos(estados){
+  const sel=$('#pe-f-estado');if(!sel)return;
+  const lista=Array.isArray(estados)&&estados.length?estados:Object.keys(ESTADO_TXT);
+  const actual=sel.value||peFiltroEstado;
+  sel.innerHTML='<option value="">Todos</option>'+lista.map(e=>`<option value="${esc(e)}">${esc(ESTADO_TXT[e]||e)}</option>`).join('');
+  sel.value=lista.includes(actual)?actual:'';
+  peFiltroEstado=sel.value;
+}
+/** Fecha del pedido para el filtro: entrega si existe; si no, creación/actualización. */
+function fechaPedidoParaFiltro(p){return p?.fechaEntrega||p?.creadoEn||p?.actualizado||''}
+/**
+ * ms de la fecha del pedido para comparar rangos. Una fecha "YYYY-MM-DD"
+ * (fechaEntrega) es LOCAL: Date.parse la interpretaría como UTC y en Lima
+ * (UTC-5) se saldría del día elegido.
+ */
+function msFechaPedido(p){
+  const f=String(fechaPedidoParaFiltro(p)||'');
+  if(!f)return NaN;
+  if(/^\d{4}-\d{2}-\d{2}$/.test(f))return Date.parse(f+'T00:00:00');
+  return Date.parse(f);
+}
+function pedidoPasaFiltros(p){
+  if(peFiltroEstado&&String(p?.estado||'')!==peFiltroEstado)return false;
+  if(peFiltroEntrega){
+    const ent=String(p?.entrega||'');
+    if(peFiltroEntrega==='sin'){if(ent)return false}
+    else if(ent!==peFiltroEntrega)return false;
+  }
+  if(peFiltroDesde||peFiltroHasta){
+    const ms=msFechaPedido(p);
+    if(!Number.isFinite(ms))return false;
+    if(peFiltroDesde){const d=Date.parse(peFiltroDesde+'T00:00:00');if(Number.isFinite(d)&&ms<d)return false}
+    if(peFiltroHasta){const h=Date.parse(peFiltroHasta+'T23:59:59.999');if(Number.isFinite(h)&&ms>h)return false}
+  }
+  const q=($('#pe-q')?.value||'').toLowerCase().trim();
+  if(q){
+    const blob=[p?.id,p?.nombre,p?.telefono,p?.notas,p?.estacion,(p?.items||[]).map(i=>i?.nombre).join(' ')].join(' ').toLowerCase();
+    if(!blob.includes(q))return false;
+  }
+  return true;
+}
 /* Pedidos guardados en el navegador cuando el bot está apagado. Se suben solos
    cuando el bot vuelve a responder. */
 const PEDIDOS_LOCAL_KEY='pf_pedidos_offline_v1';
@@ -1817,7 +1937,7 @@ async function cargarPedidos(){
       const subidos=await sincronizarPedidosLocales();
       if(subidos>0)j=await botFetch('/api/pedidos?limite=200');
     }
-    pedidosCache=j.pedidos||[];guardarUltimo('pedidos',j);renderPedidos(j);actualizarBadgePedidos();
+    pedidosCache=j.pedidos||[];peUltimoJ=j;actualizarOpcionesEstadoPedidos(j.estados);guardarUltimo('pedidos',j);renderPedidos(j);actualizarBadgePedidos();
     if(tabActual==='calendario')renderCalendario();
   }catch(e){
     // Sin bot: se muestran los pedidos guardados en este navegador.
@@ -1827,8 +1947,9 @@ async function cargarPedidos(){
 }
 function renderPedidos(j){
   const locales=leerPedidosLocales().map(p=>({...p,local:true}));
-  const ps=[...locales,...pedidosCache];
-  if($('#pe-count'))$('#pe-count').textContent=`${ps.length} pedidos${locales.length?' ('+locales.length+' local(es))':''} · ${j?.resumen?.abiertos||0} abiertos`;
+  const todos=[...locales,...pedidosCache];
+  const ps=todos.filter(pedidoPasaFiltros);
+  if($('#pe-count'))$('#pe-count').textContent=`${ps.length} de ${todos.length} pedidos${locales.length?' ('+locales.length+' local(es))':''} · ${j?.resumen?.abiertos||0} abiertos`;
   if($('#pe-sub'))$('#pe-sub').textContent=`${j?.resumen?.abiertos||0} pedidos abiertos · S/ ${j?.resumen?.ventasEntregadas||0} entregados en total.`;
   const estados=j?.estados||Object.keys(ESTADO_TXT);
   $('#pe-list').innerHTML=ps.map(p=>{
@@ -2273,6 +2394,21 @@ $('#in-seg')?.addEventListener('click',toggleSeguimiento);
 $('#in-neworder')?.addEventListener('click',()=>{if(!inTel)return toast('Elige un chat primero.','error');irTab('pedidos');setTimeout(()=>abrirFormPedido(inTel,$('#in-name').textContent),180)});
 $('#pe-refresh')?.addEventListener('click',cargarPedidos);
 $('#pe-new')?.addEventListener('click',()=>abrirFormPedido());
+/* Filtros de Pedidos: estado, entrega, fechas y búsqueda (persistentes). */
+$('#pe-f-estado')?.addEventListener('change',()=>{peFiltroEstado=$('#pe-f-estado')?.value||'';guardarFiltrosPedidos();renderPedidos(peUltimoJ||{})});
+$('#pe-f-entrega')?.addEventListener('change',()=>{peFiltroEntrega=$('#pe-f-entrega')?.value||'';guardarFiltrosPedidos();renderPedidos(peUltimoJ||{})});
+$('#pe-f-desde')?.addEventListener('change',()=>{peFiltroDesde=$('#pe-f-desde')?.value||'';guardarFiltrosPedidos();renderPedidos(peUltimoJ||{})});
+$('#pe-f-hasta')?.addEventListener('change',()=>{peFiltroHasta=$('#pe-f-hasta')?.value||'';guardarFiltrosPedidos();renderPedidos(peUltimoJ||{})});
+$('#pe-q')?.addEventListener('input',()=>{guardarFiltrosPedidos();renderPedidos(peUltimoJ||{})});
+$('#pe-flimpiar')?.addEventListener('click',()=>{
+  peFiltroEstado='';peFiltroEntrega='';peFiltroDesde='';peFiltroHasta='';
+  if($('#pe-q'))$('#pe-q').value='';
+  if($('#pe-f-estado'))$('#pe-f-estado').value='';
+  if($('#pe-f-entrega'))$('#pe-f-entrega').value='';
+  if($('#pe-f-desde'))$('#pe-f-desde').value='';
+  if($('#pe-f-hasta'))$('#pe-f-hasta').value='';
+  guardarFiltrosPedidos();renderPedidos(peUltimoJ||{});
+});
 $('#pe-close')?.addEventListener('click',()=>{$('#pe-form').hidden=true});
 $('#pe-cancel')?.addEventListener('click',()=>{$('#pe-form').hidden=true});
 $('#pe-save')?.addEventListener('click',guardarPedido);
@@ -2565,6 +2701,7 @@ async function cargarIA(){
     if($('#ia-auto'))$('#ia-auto').checked=!!j.autoRespuesta;
     if($('#ia-max'))$('#ia-max').value=(j.maxPorConversacion??0);
     if($('#ia-prompt'))$('#ia-prompt').value=j.prompt||'';
+    try{const aj=await botFetch('/api/ajustes');if($('#ia-ejemplos'))$('#ia-ejemplos').checked=!!aj.ajustes?.ejemplosIAActivos;}catch{}
     actualizarOrbe();
     const c=await botFetch('/api/conversaciones?limite=30');
     const pausados=new Set((j.pausados||[]).map(p=>p.telefono));
@@ -2596,6 +2733,13 @@ $('#ia-save')?.addEventListener('click',async()=>{try{await guardarIA();actualiz
 $('#ia-reload')?.addEventListener('click',cargarIA);
 $('#ia-activa')?.addEventListener('change',async()=>{try{await guardarIA();actualizarOrbe();toast('Cambio guardado')}catch(e){toast('Error: '+e.message)}});
 $('#ia-auto')?.addEventListener('change',async()=>{try{await guardarIA();actualizarOrbe();toast('Cambio guardado')}catch(e){toast('Error: '+e.message)}});
+$('#ia-ejemplos')?.addEventListener('change',async()=>{
+  const on=!!$('#ia-ejemplos')?.checked;
+  try{
+    await botFetch('/api/ajustes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ejemplosIAActivos:on})});
+    toast(on?'Ejemplos curados activados':'Ejemplos curados desactivados');
+  }catch(e){toast('No se guardó: '+e.message,'error');if($('#ia-ejemplos'))$('#ia-ejemplos').checked=!on;}
+});
 $('#ia-chats')?.addEventListener('click',async e=>{
   const b=e.target.closest('[data-ia-tel]');if(!b)return;
   const tel=b.dataset.iaTel,pausado=b.dataset.p==='1';b.disabled=true;
@@ -2604,6 +2748,9 @@ $('#ia-chats')?.addEventListener('click',async e=>{
 });
 
 iniciarScheduler();
+// Restaura los filtros y la búsqueda guardados ANTES de la primera carga.
+restaurarFiltrosBandeja();
+restaurarFiltrosPedidos();
 boot();
 
 

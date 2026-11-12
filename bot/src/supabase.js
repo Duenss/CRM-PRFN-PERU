@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { config } from './config.js';
+import { crearCacheTtl, TTL_CONFIGURACION_MS } from './cache-ttl.js';
 
 export const sb = config.supabaseKey
   ? createClient(config.supabaseUrl, config.supabaseKey, {
@@ -7,10 +8,32 @@ export const sb = config.supabaseKey
     })
   : null;
 
+// Caché de la configuración de la tienda (F-12): antes se consultaba en CADA
+// respuesta de IA. 5 minutos de TTL; si Supabase falla se mantiene el último
+// valor bueno en vez de romper la respuesta (degradación silenciosa, como antes).
+const cacheConfiguracion = crearCacheTtl({ ttlMs: TTL_CONFIGURACION_MS });
+
 export async function getConfiguracion() {
   if (!sb) return {};
-  const { data } = await sb.from('configuracion_tienda').select('*').limit(1);
-  return data?.[0] || {};
+  try {
+    return await cacheConfiguracion.obtener(async () => {
+      const { data, error } = await sb.from('configuracion_tienda').select('*').limit(1);
+      if (error) throw new Error(error.message || String(error));
+      return data?.[0] || {};
+    });
+  } catch {
+    // Se devuelve el último valor cacheado (aunque haya vencido) o {}.
+    return cacheConfiguracion.ultimo() || {};
+  }
+}
+
+/**
+ * Invalida la caché de `configuracion_tienda`. Llamar desde cualquier endpoint
+ * que actualice esa tabla para que el cambio se vea al instante (si no, tarda
+ * como máximo 5 minutos).
+ */
+export function invalidarConfiguracion() {
+  cacheConfiguracion.invalidar();
 }
 
 export async function getCliente(telefono) {

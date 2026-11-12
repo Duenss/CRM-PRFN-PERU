@@ -73,11 +73,12 @@ const BOT_BASE = `http://127.0.0.1:${BOT_PORT}`;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 function parseArgs(argv) {
-  const out = { selfTest: false, headed: false, help: false, idleMs: null };
+  const out = { selfTest: false, headed: false, help: false, idleMs: null, capturas: false };
   for (const a of argv) {
     if (a === '--self-test') out.selfTest = true;
     else if (a === '--headed') out.headed = true;
     else if (a === '--help' || a === '-h') out.help = true;
+    else if (a === '--capturas') out.capturas = true;
     else if (a.startsWith('--idle-ms=')) out.idleMs = Number(a.slice('--idle-ms='.length));
     else if (a === '--full') { /* compat: la corrida ya es completa */ }
     else console.warn(`[e2e] argumento ignorado: ${a}`);
@@ -316,6 +317,27 @@ function createBotMock() {
       seguimiento: { activo: false, items: [] },
       etiquetas: [],
     },
+    {
+      // Chat antiguo: permite probar el filtro por rango de fechas.
+      telefono: '51966677788',
+      nombre: 'Cliente Antiguo',
+      nombreWa: 'Cliente Antiguo',
+      nombreGuardado: 'Cliente Antiguo',
+      esEmpresa: false,
+      tipo: 'persona',
+      clienteId: null,
+      noLeidos: 0,
+      ultimoTexto: 'Gracias por la info',
+      ultimoEn: isoAgo(40 * 24 * 60),
+      pin: false,
+      wa: true,
+      mensajes: [
+        { id: 'a-1', waId: 'wamid.A.1', direccion: 'entrante', texto: '¿Tienen algo parecido a Sauvage?', origen: 'cliente', estado: 'ok', en: isoAgo(40 * 24 * 60 + 5) },
+        { id: 'a-2', waId: 'wamid.A.2', direccion: 'saliente', texto: 'Gracias por la info', origen: 'bot', estado: 'ok', en: isoAgo(40 * 24 * 60), ack: 3 },
+      ],
+      seguimiento: { activo: false, items: [] },
+      etiquetas: [],
+    },
   ];
 
   const findChat = tel => chats.find(c => c.telefono === String(tel));
@@ -350,6 +372,7 @@ function createBotMock() {
         noLeidos: c.noLeidos,
         ultimoTexto: c.ultimoTexto,
         ultimoEn: c.ultimoEn,
+        ultimaDireccion: (c.mensajes[c.mensajes.length - 1] || {}).direccion || '',
         total: c.mensajes.length,
         pin: c.pin,
         wa: c.wa,
@@ -561,9 +584,23 @@ function createBotMock() {
 
     /* pedidos */
     if (p === '/api/pedidos') {
+      const hoyISO = new Date(nowMs).toISOString().slice(0, 10);
       return json(res, 200, {
-        pedidos: [],
-        resumen: { abiertos: 0, ventasEntregadas: 0 },
+        pedidos: [
+          {
+            id: 'P-0001', telefono: '51987654321', nombre: 'Carlos Ramos', estado: 'por_entregar',
+            entrega: 'estacion', estacion: 'Estación Central', fechaEntrega: hoyISO,
+            items: [{ cantidad: 1, nombre: 'Noche de Damasco', ml: 100, precio: 70 }],
+            total: 70, saldo: 70, metodo: 'efectivo', actualizado: new Date(nowMs - 3600e3).toISOString(),
+          },
+          {
+            id: 'P-0002', telefono: '51955512345', nombre: 'Lucía Torres', estado: 'comprobante_recibido',
+            entrega: 'delivery', fechaEntrega: '',
+            items: [{ cantidad: 1, nombre: 'Árabe Blanco', ml: 50, precio: 45 }],
+            total: 45, saldo: 0, metodo: 'yape', actualizado: new Date(nowMs - 2 * 3600e3).toISOString(),
+          },
+        ],
+        resumen: { abiertos: 2, ventasEntregadas: 0 },
         estados: ['borrador', 'esperando_pago', 'comprobante_recibido', 'por_entregar', 'entregado', 'cancelado'],
         metodos: ['yape', 'plin', 'transferencia', 'efectivo', 'otro'],
       });
@@ -1820,6 +1857,186 @@ async function runE2E() {
       assert(restDelta === 0, `TOKEN_REFRESHED disparó ${restDelta} GET REST (load() completo)`);
       return `${after.authEvents.map(e => e.ev).join(', ')} · 0 GET REST · ${after.items} items intactos`;
     });
+
+    /* ---------- Filtros de Bandeja y Pedidos (Parte 5) ---------- */
+    const hoyFiltro = new Date().toISOString().slice(0, 10);
+    const mananaFiltro = (() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10); })();
+    const contarItemsBandeja = () => page.evaluate(() => document.querySelectorAll('#in-list .in-item').length);
+    const contarFilasPedidos = () => page.evaluate(() => document.querySelectorAll('#pe-list .lrow').length);
+    const setValor = (sel, valor) => page.evaluate((s, v) => {
+      const el = document.querySelector(s);
+      if (!el) throw new Error('no existe ' + s);
+      el.value = v;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    }, sel, valor);
+    const limpiarFiltrosBandeja = async () => {
+      await page.click('#in-flimpiar');
+      await sleep(400);
+      // Si había una carga en vuelo, el panel puede no repintar: refrescar una vez.
+      if ((await contarItemsBandeja()) < 4) await page.click('#in-refresh');
+      await waitFor(async () => (await contarItemsBandeja()) >= 4, 10000, 'la bandeja no volvió a 4 chats tras limpiar filtros');
+    };
+
+    await runner.case('E2E-12', 'Filtro Bandeja "No leídos": solo chats con mensajes sin leer', async () => {
+      await page.click('#tabs button[data-tab="bandeja"]');
+      await waitFor(async () => (await contarItemsBandeja()) >= 4, 8000, 'la bandeja no pintó los 4 chats del mock');
+      await page.click('#in-filtros button[data-inf="noLeidos"]');
+      await waitFor(async () => (await contarItemsBandeja()) === 2, 8000, 'el filtro "No leídos" no dejó 2 chats');
+      const tels = await page.evaluate(() => [...document.querySelectorAll('#in-list .in-item')].map(x => x.dataset.tel));
+      assert(tels.includes('51910418951') && tels.includes('51955512345'), `chats inesperados en "No leídos": ${tels.join(',')}`);
+      await limpiarFiltrosBandeja();
+      return `2 chats no leídos (${tels.join(', ')}) · limpiado`;
+    });
+
+    await runner.case('E2E-13', 'Filtro Bandeja "Sin responder": último mensaje del cliente', async () => {
+      await limpiarFiltrosBandeja();
+      await page.click('#in-filtros button[data-inf="sinResponder"]');
+      await waitFor(async () => {
+        const n = await contarItemsBandeja();
+        return n >= 1 && n <= 2;
+      }, 8000, 'el filtro "Sin responder" no dejó los chats con último mensaje entrante');
+      const tels = await page.evaluate(() => [...document.querySelectorAll('#in-list .in-item')].map(x => x.dataset.tel));
+      assert(tels.includes('51955512345'), `"Sin responder" no incluyó a Lucía (último mensaje entrante): ${tels.join(',')}`);
+      assert(!tels.includes('51987654321') && !tels.includes('51966677788'), `"Sin responder" incluyó chats ya respondidos: ${tels.join(',')}`);
+      await limpiarFiltrosBandeja();
+      return `${tels.length} chat(s) sin responder: ${tels.join(', ')}`;
+    });
+
+    await runner.case('E2E-14', 'Filtro Bandeja "Con pedido": chats con pedido registrado', async () => {
+      // Garantiza que el panel ya cargó los pedidos del bot antes de filtrar.
+      await page.click('#tabs button[data-tab="pedidos"]');
+      await waitFor(async () => (await page.evaluate(() => (typeof pedidosCache !== 'undefined' ? pedidosCache.length : 0))) >= 2, 10000, 'el panel no cargó los pedidos del mock');
+      await page.click('#tabs button[data-tab="bandeja"]');
+      await limpiarFiltrosBandeja();
+      await page.click('#in-filtros button[data-inf="conPedido"]');
+      await waitFor(async () => (await contarItemsBandeja()) === 2, 8000, 'el filtro "Con pedido" no dejó 2 chats');
+      const tels = await page.evaluate(() => [...document.querySelectorAll('#in-list .in-item')].map(x => x.dataset.tel));
+      assert(tels.includes('51987654321') && tels.includes('51955512345'), `chats inesperados en "Con pedido": ${tels.join(',')}`);
+      await limpiarFiltrosBandeja();
+      return `2 chats con pedido (${tels.join(', ')})`;
+    });
+
+    await runner.case('E2E-15', 'Filtro Bandeja por etiqueta: solo los chats con esa etiqueta', async () => {
+      await limpiarFiltrosBandeja();
+      const opciones = await page.evaluate(() => [...document.querySelectorAll('#in-e option')].map(o => o.value));
+      assert(opciones.includes('vip'), `el selector de etiquetas no tiene "vip": ${opciones.join(',')}`);
+      await setValor('#in-e', 'vip');
+      await waitFor(async () => (await contarItemsBandeja()) === 1, 8000, 'el filtro por etiqueta no dejó 1 chat');
+      const tel = await page.evaluate(() => document.querySelector('#in-list .in-item')?.dataset.tel);
+      assert(tel === '51910418951', `etiqueta "vip" mostró ${tel} (se esperaba 51910418951)`);
+      await limpiarFiltrosBandeja();
+      return `etiqueta vip → 1 chat (${tel})`;
+    });
+
+    await runner.case('E2E-16', 'Filtro Bandeja por rango de fechas: hoy incluye recientes y excluye el antiguo', async () => {
+      await limpiarFiltrosBandeja();
+      await setValor('#in-fd', hoyFiltro);
+      await setValor('#in-fh', hoyFiltro);
+      await waitFor(async () => (await contarItemsBandeja()) === 3, 8000, `el rango de hoy no dejó 3 chats (chat antiguo debería quedar fuera)`);
+      await setValor('#in-fd', mananaFiltro);
+      await waitFor(async () => (await contarItemsBandeja()) === 0, 8000, 'un rango futuro no dejó la lista vacía');
+      const vacio = await page.evaluate(() => /Sin chats con este filtro/i.test(document.querySelector('#in-list')?.textContent || ''));
+      assert(vacio, 'no se mostró el estado vacío de la bandeja');
+      await limpiarFiltrosBandeja();
+      return `hoy → 3 chats · futuro → 0 con estado vacío`;
+    });
+
+    await runner.case('E2E-17', 'Filtro Pedidos por estado: solo los pedidos de ese estado', async () => {
+      await page.click('#tabs button[data-tab="pedidos"]');
+      await waitFor(async () => (await contarFilasPedidos()) === 2, 10000, 'la lista de pedidos no pintó los 2 pedidos del mock');
+      await page.select('#pe-f-estado', 'por_entregar');
+      await waitFor(async () => (await contarFilasPedidos()) === 1, 8000, 'el filtro por estado no dejó 1 pedido');
+      const txt = await page.evaluate(() => document.querySelector('#pe-list .lrow')?.textContent || '');
+      assert(/P-0001/.test(txt), `el pedido filtrado no es P-0001: ${txt.slice(0, 80)}`);
+      await page.select('#pe-f-estado', '');
+      await waitFor(async () => (await contarFilasPedidos()) === 2, 8000, 'no se restauraron los 2 pedidos');
+      return `estado por_entregar → 1 pedido (P-0001)`;
+    });
+
+    await runner.case('E2E-18', 'Filtro Pedidos por entrega: recojo en estación vs delivery', async () => {
+      await page.select('#pe-f-entrega', 'estacion');
+      await waitFor(async () => (await contarFilasPedidos()) === 1, 8000, 'el filtro por entrega no dejó 1 pedido');
+      const txt = await page.evaluate(() => document.querySelector('#pe-list .lrow')?.textContent || '');
+      assert(/P-0001/.test(txt) && /Recojo/i.test(txt), `el filtro "estación" no mostró el recojo: ${txt.slice(0, 100)}`);
+      await page.select('#pe-f-entrega', 'delivery');
+      await waitFor(async () => (await contarFilasPedidos()) === 1, 8000, 'el filtro delivery no dejó 1 pedido');
+      const txt2 = await page.evaluate(() => document.querySelector('#pe-list .lrow')?.textContent || '');
+      assert(/P-0002/.test(txt2), `el filtro delivery no mostró P-0002: ${txt2.slice(0, 100)}`);
+      await page.select('#pe-f-entrega', '');
+      await waitFor(async () => (await contarFilasPedidos()) === 2, 8000, 'no se restauraron los 2 pedidos');
+      return `estación → P-0001 · delivery → P-0002`;
+    });
+
+    await runner.case('E2E-19', 'Filtro Pedidos por rango de fechas: hoy incluye, futuro vacía', async () => {
+      await page.click('#pe-flimpiar');
+      await waitFor(async () => (await contarFilasPedidos()) === 2, 8000, 'no se restauraron los 2 pedidos tras limpiar');
+      await setValor('#pe-f-desde', hoyFiltro);
+      await setValor('#pe-f-hasta', hoyFiltro);
+      await waitFor(async () => (await contarFilasPedidos()) === 2, 8000, 'el rango de hoy no dejó los 2 pedidos');
+      await setValor('#pe-f-desde', mananaFiltro);
+      await waitFor(async () => (await contarFilasPedidos()) === 0, 8000, 'un rango futuro no dejó la lista de pedidos vacía');
+      const vacio = await page.evaluate(() => /Aún no hay pedidos/i.test(document.querySelector('#pe-list')?.textContent || ''));
+      assert(vacio, 'no se mostró el estado vacío de pedidos');
+      await page.click('#pe-flimpiar');
+      await waitFor(async () => (await contarFilasPedidos()) === 2, 8000, 'no se restauraron los 2 pedidos tras limpiar');
+      return `hoy → 2 pedidos · futuro → 0 con estado vacío`;
+    });
+
+    await runner.case('E2E-20', 'Búsqueda persistente: se guarda y se restaura al recargar la vista', async () => {
+      await page.click('#tabs button[data-tab="bandeja"]');
+      await limpiarFiltrosBandeja();
+      await page.type('#in-q', 'Lucía');
+      await waitFor(async () => (await contarItemsBandeja()) === 1, 8000, 'la búsqueda "Lucía" no dejó 1 chat');
+      const guardado = await page.evaluate(() => {
+        try { return JSON.parse(localStorage.getItem('pf_bandeja_filtros_v1') || '{}'); } catch { return {}; }
+      });
+      assert(guardado.q === 'Lucía', `la búsqueda no se guardó en localStorage: ${JSON.stringify(guardado)}`);
+      const restaurado = await page.evaluate(() => {
+        const input = document.querySelector('#in-q');
+        input.value = '';
+        restaurarFiltrosBandeja();
+        return input.value;
+      });
+      assert(restaurado === 'Lucía', `la búsqueda no se restauró: "${restaurado}"`);
+      await limpiarFiltrosBandeja();
+      const trasLimpiar = await page.evaluate(() => {
+        try { return JSON.parse(localStorage.getItem('pf_bandeja_filtros_v1') || '{}'); } catch { return {}; }
+      });
+      assert(!trasLimpiar.q, `la búsqueda no se limpió del localStorage: ${JSON.stringify(trasLimpiar)}`);
+      return `"Lucía" guardada, restaurada y limpiada · ${await contarItemsBandeja()} chats`;
+    });
+
+    /* ---------- Capturas de diseño (Parte 7): 360 / 768 / 1280 px ---------- */
+    if (ARGS.capturas) {
+      const CAPTURAS_DIR = path.join(ROOT, 'docs', 'capturas');
+      ensureDir(CAPTURAS_DIR);
+      const pantallas = [
+        ['inicio', 'kpis-inicio'],
+        ['bandeja', 'bandeja'],
+        ['pedidos', 'pedidos'],
+        ['bot', 'ajustes'],
+        ['bienvenida', 'bienvenida'],
+      ];
+      const anchos = [360, 768, 1280];
+      for (const [tab, nombre] of pantallas) {
+        await page.click(`#tabs button[data-tab="${tab}"]`);
+        await sleep(650);
+        if (tab === 'bandeja') {
+          const it = await page.$('#in-list .in-item');
+          if (it) { await it.click(); await sleep(500); }
+        }
+        for (const ancho of anchos) {
+          await page.setViewport({ width: ancho, height: ancho < 500 ? 900 : 1000, deviceScaleFactor: 1 });
+          await sleep(420);
+          await page.screenshot({ path: path.join(CAPTURAS_DIR, `${nombre}-${ancho}.png`) });
+        }
+        console.log(`  capturas ${nombre}: 360/768/1280`);
+      }
+      await page.setViewport({ width: 1280, height: 1000 });
+      await page.click('#tabs button[data-tab="inicio"]');
+      await sleep(400);
+    }
 
     await runner.case('E2E-11', 'Cero errores de consola JS y cero pageerror en toda la corrida', async () => {
       // El assert real es "0 errores de consola JS y 0 pageerror". Los avisos de red

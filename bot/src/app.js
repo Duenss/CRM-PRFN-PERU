@@ -8,7 +8,7 @@ import { iniciarWhatsApp, enviar, enviarImagen, enviarVideo, enviarArchivo, esta
 import { redactarRespuesta, transcribirAudio, redactarBorradores, redactarBienvenida, redactarAnuncio, productoPorId, productoMencionado } from './ai.js';
 import { Cola, dormir, esperaEntreEnvios, PRIORIDAD } from './queue.js';
 import { configValidacion, esperaValidacionMs, aplicarResultado, pausaTrasErrores, sinEtiqueta, conEtiqueta, ESTADOS_WA, enVentanaHoraria, msHastaApertura, proximaPausaLarga, esperaPausaLargaMs } from './validacion.js';
-import { estadoIA, actualizarIA, pausarIA, estaPausado, promptIA, resumenIA } from './ia.js';
+import { estadoIA, actualizarIA, pausarIA, estaPausado, promptIA, resumenIA, podarPausados } from './ia.js';
 import { estadoAjustes, actualizarAjustes, esperaMasivaMs, esperaChatMs } from './ajustes.js';
 import { oculto, ocultar, limpiar as limpiarOcultos } from './ocultos.js';
 import { registrar, listar, buscar, marcarAgregados, aplicarContactos, aplicarNombresClientes, marcarSinWhatsApp, marcarSinChat, obtener, marcarLeido, respuestasIA, porDia, resumen as resumenChats, registrarCabecera, importarMensajes, yaExisteWa, actualizarAck, mensajesEntrantes, eliminar as eliminarConversacion, fijar as fijarChat, archivar as archivarChat, vaciar as vaciarConversaciones, flush as flushConversaciones } from './conversaciones.js';
@@ -30,6 +30,9 @@ import { registrarConversaciones } from './routes/conversaciones.js';
 import { emitir, desde as eventosDesde, ultimoId as ultimoEventoId, suscribir, lineaSSE } from './eventos.js';
 import { reclamarEnvioCon, marcarEnvioCon, cerrarCampanaSiCompleta, barrerEnviosColgados, verificarMigracionEnviosCon, esErrorDeMigracion, mensajeErrorMigracion } from './campanas.js';
 import { esEfectivo, decidirEstadoPedidoIA, debeDerivarPago, textoAvisoPagoDigital, corregirEstadoPedidoIA } from './politicas.js';
+import { crearContador } from './contador.js';
+import { crearMapaTtl } from './mapa-ttl.js';
+import { guardaRevision, guardaSincronizacion, decidirEmisorCampana } from './guardas.js';
 
 const panelPath = fileURLToPath(new URL('./panel.html', import.meta.url));
 const app = express();
@@ -97,18 +100,21 @@ function proximaAperturaISO() {
   return base.toISOString();
 }
 
-let dia = { fecha: fechaLima(partesLima()), n: 0 };
+// Contador diario PERSISTIDO en bot/data/contador.json (F-15): sobrevive a los
+// reinicios y se reinicia solo al cambiar el día de Lima. La lógica pura está
+// en contador.js para poder probarla sin arrancar el bot.
+const contador = crearContador({
+  archivo: path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data', 'contador.json'),
+  fechaHoy: () => fechaLima(partesLima()),
+  avisar: mensaje => log(mensaje)
+});
 function contarEnvio() {
-  const hoy = fechaLima(partesLima());
-  if (dia.fecha !== hoy) dia = { fecha: hoy, n: 0 };
-  dia.n++;
+  contador.contar();
 }
 function limiteAlcanzado() {
   // Sin límite diario configurado: solo manda el intervalo entre mensajes.
   if (!config.maxPorDia) return false;
-  const hoy = fechaLima(partesLima());
-  if (dia.fecha !== hoy) dia = { fecha: hoy, n: 0 };
-  return dia.n >= config.maxPorDia;
+  return contador.limiteAlcanzado(config.maxPorDia);
 }
 const primerNombre = n => String(n || '').trim().split(/\s+/)[0] || 'cliente';
 /** Saludo según la hora de Lima (no la del servidor). */
@@ -1145,10 +1151,12 @@ const cola = new Cola(log, { pausaBaja: () => hayActividadReciente() });
 let revisando = false;
 
 async function revisarProgramadas(forzar = false) {
-  if (!sb) return;
-  if (!config.modoPrueba && !hayConexion()) return;
-  if (revisando) return;
-  if (!forzar && !dentroHorario()) return;
+  if (!sb) return { revisado: false, motivo: 'Supabase no configurado' };
+  if (!config.modoPrueba && !hayConexion()) return { revisado: false, motivo: 'Ningún WhatsApp conectado' };
+  // F-17: si ya hay una revisión en curso se avisa al panel (409 en /api/revisar)
+  // en vez de responder "ok" sin haber hecho nada.
+  if (revisando) return { revisado: false, enCurso: true };
+  if (!forzar && !dentroHorario()) return { revisado: false, motivo: 'Fuera de horario' };
   revisando = true;
   try {
     const { data, error } = await sb
@@ -1159,11 +1167,17 @@ async function revisarProgramadas(forzar = false) {
       .order('fecha_programada', { ascending: true })
       .limit(5);
     if (error) throw error;
+    let encoladas = 0;
     for (const c of data || []) {
-      if (cola.add('camp:' + c.id, () => enviarCampana(c.id))) log(`Campaña en cola: ${c.titulo}`);
+      if (cola.add('camp:' + c.id, () => enviarCampana(c.id))) {
+        encoladas++;
+        log(`Campaña en cola: ${c.titulo}`);
+      }
     }
+    return { revisado: true, encoladas };
   } catch (e) {
     log('Error al revisar campañas: ' + e.message);
+    return { revisado: false, error: e.message };
   } finally {
     revisando = false;
   }
@@ -1180,6 +1194,21 @@ async function reprogramar(campana, minutos) {
     return;
   }
   log(`Campaña "${campana.titulo}" reprogramada para ${new Date(fecha).toLocaleString('es-PE', { timeZone: config.zona })}`);
+}
+
+/**
+ * Marca una campaña en 'error' visible en el panel (F-17). Se usa cuando el
+ * número emisor configurado no existe en SESIONES: antes la campaña se
+ * reprogramaba cada 15 minutos para siempre y el dueño no veía la causa.
+ * El motivo real queda en el log; el estado 'error' lo pinta la tabla de campañas.
+ */
+async function marcarCampanaError(campana, motivo) {
+  try {
+    must(await sb.from('campanas').update({ estado: 'error' }).eq('id', campana.id), `marcar campaña ${campana.id} en error`);
+  } catch (e) {
+    log(`No se pudo marcar en error la campaña "${campana.titulo}" (${campana.id}): ${e.message}`);
+  }
+  emitirProgresoCampana(campana, { enviados: 0, total: 0, errores: 0, estado: 'error', motivo: String(motivo).slice(0, 300) });
 }
 
 /** Update de una fila de `envios` revisando el { error } de Supabase (F-13). */
@@ -1259,8 +1288,19 @@ async function enviarCampana(id) {
     }
 
     const emisor = campana.numero_emisor ? String(campana.numero_emisor) : null;
-    if (!sesionDisponible(emisor)) {
-      log(`Campaña "${campana.titulo}": el número ${emisor || 'asignado'} no está conectado. Se reintentará en 15 minutos.`);
+    const decisionEmisor = decidirEmisorCampana({
+      emisor,
+      sesionesConfiguradas: config.sesiones,
+      conectada: sesionDisponible(emisor)
+    });
+    if (decisionEmisor.accion === 'error') {
+      // F-17: emisor inexistente en SESIONES → campaña en 'error' visible.
+      log(`Campaña "${campana.titulo}" (${campana.id}) en error: ${decisionEmisor.motivo}`);
+      await marcarCampanaError(campana, decisionEmisor.motivo);
+      return;
+    }
+    if (decisionEmisor.accion === 'reprogramar') {
+      log(`Campaña "${campana.titulo}": ${decisionEmisor.motivo}`);
       await reprogramar(campana, 15);
       return;
     }
@@ -1360,7 +1400,7 @@ async function enviarCampana(id) {
         contarEnvio();
         enviados++;
         errores = 0;
-        log(`Enviado a ${c.nombre} (+${c.telefono}) · ${dia.n}/${config.maxPorDia} hoy.`);
+        log(`Enviado a ${c.nombre} (+${c.telefono}) · ${contador.valor().n}/${config.maxPorDia} hoy.`);
         emitirProgresoCampana(campana, { enviados, total, errores });
       } catch (err) {
         errores++;
@@ -1404,7 +1444,8 @@ const yaRespondidos = new Set();
 // Último producto mostrado por chat, para cerrar compras sin volver a pedir el nombre.
 const ultimoProducto = new Map();
 // Última respuesta por teléfono: frena ráfagas sin bloquear (cooldown corto).
-const cooldown = new Map();
+// Acotado: TTL 15 min y tope 5.000 entradas para que no crezca sin límite (F-14).
+const cooldown = crearMapaTtl({ ttlMs: 15 * 60 * 1000, max: 5000 });
 // Último mensaje entrante por chat y aviso de que ya hay una respuesta en curso.
 const ultimoEntrante = new Map();
 const turnoEnCurso = new Set();
@@ -1562,6 +1603,26 @@ async function notificarDueno(texto, sesionId = null) {
   }
 }
 
+// Fallo total del LLM: el cliente ya recibió el mensaje de respaldo (nunca queda
+// en visto) y el dueño se entera para revisar/derivar. Máx. 1 aviso cada 30 min
+// por chat para no convertirlo en spam.
+const avisosFalloIA = new Map();
+async function avisarFalloIA(tel, nombre, motivo, sesionId = null) {
+  const ahora = Date.now();
+  if (ahora - (avisosFalloIA.get(tel) || 0) < 30 * 60 * 1000) return;
+  avisosFalloIA.set(tel, ahora);
+  if (avisosFalloIA.size > 500) avisosFalloIA.delete(avisosFalloIA.keys().next().value);
+  emitir('derivacion', { telefono: tel, nombre, motivo: 'fallo de IA', mensaje: String(motivo || '').slice(0, 300) });
+  try {
+    await notificarDueno(
+      `⚠️ *IA sin respuesta*\n\nNo se pudo generar la respuesta para +${tel} (${nombre}). El cliente recibió un mensaje de respaldo.\nMotivo: ${String(motivo || 'sin detalle').slice(0, 200)}\n\nRevísalo en la pestaña *Bandeja*.`,
+      sesionId
+    );
+  } catch (e) {
+    log('No se pudo avisar al dueño del fallo de IA: ' + e.message);
+  }
+}
+
 async function manejarMensaje(msg, sesionId = null) {
   if (msg.fromMe || msg.isStatus) return;
   if (String(msg.type || '') === 'reaction' || msg.isNotification) return;
@@ -1642,8 +1703,9 @@ async function manejarMensaje(msg, sesionId = null) {
     }
   }
 
-  const cliente = await getCliente(tel);
-  const hist = await historial(tel, 12);
+  // Cliente e historial son consultas independientes: en paralelo (F-12), menos
+  // latencia antes de llamar a la IA. Ninguna depende de la otra.
+  const [cliente, hist] = await Promise.all([getCliente(tel), historial(tel, 12)]);
   // "Chat sin historial": primer mensaje real de este número (ni Supabase ni la
   // memoria local de la Bandeja tienen mensajes previos). Se calcula ANTES de
   // registrar el mensaje entrante que viene abajo.
@@ -2009,6 +2071,9 @@ ${String(texto).slice(0, 300)}
 
     if (ai.respaldo) {
       log(`Respuesta de respaldo a +${tel}${ai.motivoFallo ? ' (falló la IA: ' + ai.motivoFallo + ')' : ''}: ${ai.texto.slice(0, 90)}`);
+      // Fallo del LLM (no "IA no configurada"): se avisa/deriva al administrador
+      // para que revise la conversación; el cliente ya recibió el respaldo.
+      if (ai.motivoFallo) await avisarFalloIA(tel, nombreChat, ai.motivoFallo, sesionId);
     } else {
       log(`Respuesta IA a +${tel}: ${ai.texto.slice(0, 90)}${ai.texto.length > 90 ? '...' : ''}`);
     }
@@ -2189,7 +2254,7 @@ app.get('/api/estado', auth, (_req, res) => {
     conectado: sesiones.some(s => s.conectado),
     cola: cola.size,
     programadas,
-    enviadosHoy: dia.n,
+    enviadosHoy: contador.valor().n,
     maxPorDia: config.maxPorDia,
     autoRespuesta: config.autoRespuesta,
     modoPrueba: config.modoPrueba,
@@ -2386,7 +2451,7 @@ app.get('/api/estadisticas', auth, (req, res) => {
     totalSalientes,
     chats: resumenChats(),
     ia: resumenIA(),
-    enviadosHoy: dia.n,
+    enviadosHoy: contador.valor().n,
     maxPorDia: config.maxPorDia,
     programadas: null
   });
@@ -2631,7 +2696,9 @@ app.post('/api/sincronizar', auth, async (req, res) => {
   if (!config.modoPrueba && !sesionDisponible(req.body?.sesion || null)) {
     return res.status(503).json({ error: 'Ningún WhatsApp está conectado.' });
   }
-  if (sincronizacionEnCurso) return res.json({ ok: true, enCurso: true });
+  // F-11: un segundo clic/panel recibe 409 en vez de lanzar otro scrape.
+  const bloqueo = guardaSincronizacion(sincronizacionEnCurso);
+  if (bloqueo) return res.status(bloqueo.status).json(bloqueo.cuerpo);
   const hacerChats = req.body?.chats !== false;
   const hacerContactos = req.body?.contactos !== false;
   // Cuentas grandes (miles de chats/contactos) pueden tardar más que el proxy:
@@ -2672,7 +2739,8 @@ app.post('/api/sincronizar', auth, async (req, res) => {
       }
     }
     if (hacerContactos) {
-      if (!sb) return res.status(503).json({ error: 'Falta SUPABASE_SERVICE_ROLE_KEY en el bot.' });
+      // La respuesta 200 ya salió: un fallo debe ir al log, no intentar responder.
+      if (!sb) throw new Error('Falta SUPABASE_SERVICE_ROLE_KEY en el bot.');
       const contactos = await conTimeout(listarContactosWa(req.body?.sesion || null), 300000, 'listar contactos de WhatsApp');
       salida.contactos = contactos.length;
       // Caché local con TODOS los contactos (nombres para la Bandeja y búsquedas),
@@ -2942,7 +3010,15 @@ app.post('/api/archivos/:tipo', auth, (req, res) => {
 });
 
 app.post('/api/revisar', auth, async (_req, res) => {
-  await revisarProgramadas(true);
+  // F-17: si ya hay una revisión en curso se responde 409 (antes 200 "ok" sin
+  // haber hecho nada). Se comprueba antes y después de entrar al trabajo por si
+  // otra petición tomó el lock en el medio.
+  const bloqueo = guardaRevision(revisando);
+  if (bloqueo) return res.status(bloqueo.status).json({ ...bloqueo.cuerpo, cola: cola.size });
+  const resultado = await revisarProgramadas(true);
+  if (resultado && resultado.enCurso) {
+    return res.status(409).json({ error: 'Revisión en curso', cola: cola.size });
+  }
   res.json({ ok: true, cola: cola.size });
 });
 
@@ -3159,6 +3235,27 @@ async function mantenimientoArranque() {
 }
 setTimeout(() => { mantenimientoArranque().catch(e => log('Mantenimiento de arranque: ' + e.message)); }, 3000);
 setInterval(refrescarProgramadas, 30 * 1000);
+
+/* ---------------- mantenimiento de estado en disco (F-14) ---------------- */
+// Poda periódica de entradas que antes solo crecían con el tiempo:
+//  - chats con la IA pausada hace más de 90 días,
+//  - chats de seguimiento post-venta sin actividad ni tareas en 180 días.
+function mantenimientoEstado() {
+  try {
+    const r = podarPausados();
+    if (r.borrados) log(`Mantenimiento: ${r.borrados} chat(s) con IA pausada hace más de 90 días eliminados.`);
+  } catch (e) {
+    log('No se pudo podar la IA pausada: ' + e.message);
+  }
+  try {
+    const r = seguimiento.podarChats();
+    if (r.borrados) log(`Mantenimiento: ${r.borrados} chat(s) de seguimiento sin actividad en más de 180 días eliminados.`);
+  } catch (e) {
+    log('No se pudo podar el seguimiento: ' + e.message);
+  }
+}
+setTimeout(mantenimientoEstado, 60 * 1000).unref?.();
+setInterval(mantenimientoEstado, 24 * 60 * 60 * 1000).unref?.();
 
 /* ---------------- sincronización automática de la Bandeja ---------------- */
 // Al conectar (y al reconectar) el bot trae la lista completa de chats de

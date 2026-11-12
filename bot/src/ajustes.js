@@ -45,6 +45,9 @@ const base = () => ({
   preguntaMinutos: 2,
   // Días mínimos entre secuencias completas de bienvenida por chat (0 = sin cooldown).
   bienvenidaDiasCooldown: 30,
+  // Few-shot con ejemplos curados del dueño (bot/data/ejemplos-ia.json).
+  // Por defecto APAGADO: el dueño revisa y aprueba los ejemplos antes de activarlo.
+  ejemplosIAActivos: false,
   // Si es false, al sincronizar no se importan chats existentes: la Bandeja
   // solo muestra conversaciones nuevas (el dueño la quiere limpia).
   importarChats: true,
@@ -83,6 +86,7 @@ function normalizar(a = {}) {
     enviarFoto: a.enviarFoto !== false,
     preguntaMinutos: clamp(a.preguntaMinutos, 1, 10),
     bienvenidaDiasCooldown: Math.min(365, Math.max(0, Math.round(num(a.bienvenidaDiasCooldown, 30)))),
+    ejemplosIAActivos: a.ejemplosIAActivos === true,
     importarChats: a.importarChats !== false,
     limpiezaAlDesconectar: ['preguntar', 'chats', 'todo', 'nada'].includes(String(a.limpiezaAlDesconectar || '')) ? String(a.limpiezaAlDesconectar) : 'preguntar',
     catalogoArchivo: nombreSeguro(a.catalogoArchivo),

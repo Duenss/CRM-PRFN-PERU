@@ -1,8 +1,8 @@
 {
   "kind": "e2e",
-  "ts": "2026-11-10T05:54:52.839Z",
-  "startedAt": "2026-11-10T05:54:12.593Z",
-  "durationMs": 40246,
+  "ts": "2026-11-12T09:54:39.308Z",
+  "startedAt": "2026-11-12T09:53:54.084Z",
+  "durationMs": 45224,
   "environment": {
     "node": "v24.16.0",
     "platform": "win32/x64",
@@ -14,9 +14,9 @@
   },
   "index": {
     "path": "C:\\Users\\Juan Pablo\\Documents\\WEB PROJECTS\\Crm Perfumeriafina\\index.html",
-    "bytes": 168570,
-    "sha256": "71924f89457f3b1e2e71f1dc8104f238a1ba9d54f182d3384078c35320048a70",
-    "mtime": "2026-11-10T05:51:51.697Z"
+    "bytes": 54163,
+    "sha256": "7d295c1d72bd8bb285c2f32b23428e6b8db129bb2805b0e239d9d880d093e6a8",
+    "mtime": "2026-11-12T09:50:06.742Z"
   },
   "supabaseScript": {
     "source": "bot/node_modules (offline)",
@@ -27,25 +27,25 @@
       "id": "E2E-01",
       "name": "Arranque limpio: login oculto, app visible, sesión Supabase aceptada",
       "status": "PASS",
-      "detail": "sesión=qa.e2e@perfumeriafina.test · 4 de 4 clientes · 2 pueden recibir promociones · captura 01-inicio.png"
+      "detail": "sesión=qa.e2e@perfumeriafina.test · 4 de 4 clientes · 3 activos · captura 01-inicio.png"
     },
     {
       "id": "E2E-02",
       "name": "Todas las pestañas abren sin excepciones",
       "status": "PASS",
-      "detail": "11 pestañas: inicio, bandeja, pedidos, analiticas, campanas, anuncios, clientes, catalogo, calendario, ia, bot"
+      "detail": "12 pestañas: inicio, bandeja, pedidos, analiticas, campanas, anuncios, clientes, catalogo, calendario, ia, bienvenida, bot"
     },
     {
       "id": "E2E-03",
       "name": "Bandeja: lista pintada y chat abierto",
       "status": "PASS",
-      "detail": "3 chats · hilo 30 mensajes · captura 02-bandeja.png"
+      "detail": "4 chats · hilo 30 mensajes · captura 02-bandeja.png"
     },
     {
       "id": "E2E-04",
       "name": "SSE conectado: el panel abre /api/stream y recibe eventos",
       "status": "PASS",
-      "detail": "url=http://127.0.0.1:3199/api/stream?token= · clientes=1 · peticiones stream=1"
+      "detail": "url=http://127.0.0.1:3199/api/stream · clientes=1 · peticiones stream=1"
     },
     {
       "id": "E2E-05",
@@ -75,13 +75,67 @@
       "id": "E2E-09",
       "name": "Fallo de red del bot NO borra la lista ya pintada",
       "status": "PASS",
-      "detail": "3 items intactos · aviso \"⚠ Sin conexión con el bot · datos de 12:54 a. m.\" · recuperada y asentada"
+      "detail": "4 items intactos · aviso \"⚠ Sin conexión con el bot · datos de 04:54 a. m.\" · recuperada y asentada"
     },
     {
       "id": "E2E-10",
       "name": "TOKEN_REFRESHED de Supabase NO recarga la app ni repite GET REST",
       "status": "PASS",
-      "detail": "INITIAL_SESSION, TOKEN_REFRESHED · 0 GET REST · 3 items intactos"
+      "detail": "INITIAL_SESSION, TOKEN_REFRESHED · 0 GET REST · 4 items intactos"
+    },
+    {
+      "id": "E2E-12",
+      "name": "Filtro Bandeja \"No leídos\": solo chats con mensajes sin leer",
+      "status": "PASS",
+      "detail": "2 chats no leídos (51910418951, 51955512345) · limpiado"
+    },
+    {
+      "id": "E2E-13",
+      "name": "Filtro Bandeja \"Sin responder\": último mensaje del cliente",
+      "status": "PASS",
+      "detail": "2 chat(s) sin responder: 51910418951, 51955512345"
+    },
+    {
+      "id": "E2E-14",
+      "name": "Filtro Bandeja \"Con pedido\": chats con pedido registrado",
+      "status": "PASS",
+      "detail": "2 chats con pedido (51955512345, 51987654321)"
+    },
+    {
+      "id": "E2E-15",
+      "name": "Filtro Bandeja por etiqueta: solo los chats con esa etiqueta",
+      "status": "PASS",
+      "detail": "etiqueta vip → 1 chat (51910418951)"
+    },
+    {
+      "id": "E2E-16",
+      "name": "Filtro Bandeja por rango de fechas: hoy incluye recientes y excluye el antiguo",
+      "status": "PASS",
+      "detail": "hoy → 3 chats · futuro → 0 con estado vacío"
+    },
+    {
+      "id": "E2E-17",
+      "name": "Filtro Pedidos por estado: solo los pedidos de ese estado",
+      "status": "PASS",
+      "detail": "estado por_entregar → 1 pedido (P-0001)"
+    },
+    {
+      "id": "E2E-18",
+      "name": "Filtro Pedidos por entrega: recojo en estación vs delivery",
+      "status": "PASS",
+      "detail": "estación → P-0001 · delivery → P-0002"
+    },
+    {
+      "id": "E2E-19",
+      "name": "Filtro Pedidos por rango de fechas: hoy incluye, futuro vacía",
+      "status": "PASS",
+      "detail": "hoy → 2 pedidos · futuro → 0 con estado vacío"
+    },
+    {
+      "id": "E2E-20",
+      "name": "Búsqueda persistente: se guarda y se restaura al recargar la vista",
+      "status": "PASS",
+      "detail": "\"Lucía\" guardada, restaurada y limpiada · 4 chats"
     },
     {
       "id": "E2E-11",
@@ -91,8 +145,8 @@
     }
   ],
   "totals": {
-    "total": 11,
-    "pass": 11,
+    "total": 20,
+    "pass": 20,
     "fail": 0,
     "skip": 0
   },
@@ -101,17 +155,17 @@
     "pageErrors": [],
     "netErrors": [
       {
-        "ts": 1794290086796,
+        "ts": 1794477267239,
         "type": "error",
         "text": "Failed to load resource: net::ERR_EMPTY_RESPONSE",
-        "url": "http://127.0.0.1:3199/api/conversaciones?limite=80"
+        "url": "http://127.0.0.1:3199/api/conversaciones?limite=80&offset=0&filtro=todos&q="
       }
     ],
     "requestFailures": [
       {
-        "ts": 1794290086795,
-        "url": "http://127.0.0.1:3199/api/conversaciones?limite=80",
-        "method": "GET",
+        "ts": 1794477267229,
+        "url": "http://127.0.0.1:3199/api/conversaciones?limite=80&offset=0&filtro=todos&q=",
+        "method": "OPTIONS",
         "error": "net::ERR_EMPTY_RESPONSE"
       }
     ],
@@ -120,20 +174,21 @@
   "requests": {
     "botByPath": {
       "/api/estadisticas": 3,
-      "/api/conversaciones": 11,
-      "/api/estado": 5,
+      "/api/conversaciones": 27,
+      "/api/estado": 6,
       "/api/stream": 1,
-      "/api/pedidos": 3,
+      "/api/pedidos": 5,
       "/api/analiticas": 1,
       "/api/anuncios": 1,
       "/api/ia": 1,
+      "/api/ajustes": 3,
+      "/api/archivos": 3,
       "/api/logs": 1,
-      "/api/ajustes": 1,
       "/api/conversaciones/51910418951": 4,
       "/api/conversaciones/51910418951/leido": 1,
       "/api/conversaciones/51910418951/importar": 1
     },
-    "total": 34
+    "total": 58
   },
   "supabase": {
     "restRequests": 4,
