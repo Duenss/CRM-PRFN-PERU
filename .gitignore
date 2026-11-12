@@ -51,3 +51,10 @@ docs/catalogo/preview-*.png
 
 # respaldos locales del bot
 backups/
+
+# Higiene del repo (auditoría H-21): respaldos y archivos de operación
+# del servidor no se versionan; las claves públicas de Coolify tampoco.
+*.bak.html
+*.bak
+deploy/backup-http/
+deploy/coolify-public-key.txt

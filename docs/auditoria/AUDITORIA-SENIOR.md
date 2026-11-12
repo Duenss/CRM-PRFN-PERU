@@ -618,3 +618,28 @@ Implementado y probado en esta sesión (detalle de entrega en [`ENTREGA-2026-11-
 **Pendiente inmediato (bloqueante para campañas reales):** aplicar `sql/07_envios_claim.sql` en Supabase y probar el flujo completo con un número de WhatsApp real. El resto del plan (F-07 cola sin `sleep` en el job, F-08 IA serializada, H-01 DDL versionado, H-03 RLS por usuario, migrar mensajes a Supabase) queda para los siguientes sprints y sigue documentado arriba.
 
 **Pruebas de esta implementación:** `43/43` unitarias en `bot/test`; `11/11` casos del arnés e2e del panel real (`scripts/e2e-panel.mjs`, Chromium headless contra bot simulado y Supabase interceptada, 0 errores de consola); humo del bot en `MODO_PRUEBA` con backup/restore de `bot/data`. Detalle en [`ENTREGA-2026-11-08.md`](./ENTREGA-2026-11-08.md) y [`E2E-PANEL.md`](./E2E-PANEL.md).
+
+---
+
+## 12. Estado de implementación (2026-11-11)
+
+Sesión del 2026-11-11 — **alcance reducido por decisión del dueño: solo datos e higiene**.
+El plan de sprints de §6 quedó **aparcado** y no se tocó `bot/src/*`, `index.html` ni `assets/*`:
+F-07 (cola por pasos), F-08 (IA serializada), F-11 (mutex de sincronización), F-12 (cachés),
+F-14 (TTL/podas), F-15 (contador persistido), F-16 (idempotencia), F-17 (409/emisor) y
+H-03 (RLS por usuario) siguen pendientes tal como se describen en este documento.
+
+| Hallazgo | Estado | Dónde |
+| --- | --- | --- |
+| H-09 índices `campanas(creado_en)` y `clientes(nombre)` | **Hecho** (pendiente de aplicar en Supabase) | `sql/14_indices_rendimiento.sql` |
+| H-05 contradicción 05/06 de testimonios | **Hecho** (decisión del dueño: aprobación manual; elimina `web_inserta_auto`) | `sql/15_testimonios_sin_auto.sql` |
+| H-01 DDL versionado | **Parcial** (verificación de contrato; falta el `pg_dump --schema-only` real) | `sql/99_verificar_contrato.sql` |
+| H-21 `.gitignore` (`*.bak.html`, `*.bak`, respaldos y claves de servidor) | **Hecho** | `.gitignore` |
+
+Notas operativas:
+
+- **No se ejecutó ningún SQL en Supabase.** `14` y `15` son idempotentes y deben aplicarse
+  a mano en el SQL Editor; `99` solo comprueba y avisa (no cambia nada).
+- Los 88 tests unitarios del bot (`cd bot && npm test`) siguen verdes: esta sesión no
+  modificó código del backend ni del panel.
+- Los cambios quedan en la rama `auditoria/lote3-sql-higiene` (sin merge).

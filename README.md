@@ -17,7 +17,10 @@ Panel de ventas + bot de WhatsApp con IA para Perfumería Fina Perú.
 
 1. **Base de datos**: ejecuta en Supabase → SQL Editor los archivos de `sql/` en orden:
    `00_instalar_todo.sql` (o `01`…`02`), `03_seguridad_rls.sql`, `07_envios_claim.sql`,
-   `10_permisos_panel.sql` y `11_arreglar_estado_campanas.sql`. Crea el usuario del dueño en **Authentication → Users**.
+   `10_permisos_panel.sql`, `11_arreglar_estado_campanas.sql`, `12_campanas_fecha_hora.sql`,
+   `14_indices_rendimiento.sql` y `15_testimonios_sin_auto.sql` (testimonios con aprobación
+   manual). Opcional: `99_verificar_contrato.sql` (solo comprueba que el esquema cumpla lo
+   que la app usa; no cambia nada). Crea el usuario del dueño en **Authentication → Users**.
 2. **Bot local**:
    ```bash
    cd bot
@@ -53,7 +56,7 @@ Plantilla completa: `bot/.env.production.example`.
 
 ```bash
 cd bot
-npm test                 # unitarias (69)
+npm test                 # unitarias (88)
 node ../scripts/e2e-panel.mjs   # e2e del panel (11)
 ```
 
