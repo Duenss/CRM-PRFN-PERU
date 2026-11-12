@@ -1,4 +1,11 @@
 # ─────────────────────────────────────────────────────────────
+# OBSOLETO — NO USAR ESTE DOCKERFILE
+# El despliegue real es `bot/Dockerfile` (contexto `./bot`, ver
+# docker-compose.yml y docs/DESPLIEGUE-COOLIFY-CONTABO.md).
+# Este archivo se conserva solo como referencia histórica: su
+# HEALTHCHECK golpea /api/estado (requiere token) y el layout de
+# carpetas (/app/bot) ya no coincide con el compose actual.
+# ─────────────────────────────────────────────────────────────
 # Perfumería Fina · Bot WhatsApp (producción)
 # Node 22 + Chromium para whatsapp-web.js / Puppeteer
 # ─────────────────────────────────────────────────────────────

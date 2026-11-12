@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config, validarConfig, esNumeroPeru, normalizar } from './config.js';
 import { sb, getCliente, getClientes, getProductos, logMensaje, historial, marcarBaja, importarClientes } from './supabase.js';
-import { iniciarWhatsApp, enviar, enviarImagen, enviarVideo, enviarArchivo, estadoWa, cerrarSesion, reiniciarSesion, hayConexion, sesionDisponible, listarChatsWa, listarContactosWa, historialWa, verificarNumeroWa, resolverTelefonoWa, recordarDestinoWa, idMensaje, descargarMediaWa, conTimeout } from './whatsapp.js';
+import { iniciarWhatsApp, enviar, enviarImagen, enviarVideo, enviarArchivo, estadoWa, cerrarSesion, reiniciarSesion, hayConexion, sesionDisponible, listarChatsWa, listarContactosWa, historialWa, verificarNumeroWa, resolverTelefonoWa, recordarDestinoWa, telefonoCanonico, estadoSalud, idMensaje, descargarMediaWa, conTimeout } from './whatsapp.js';
 import { redactarRespuesta, transcribirAudio, redactarBorradores, redactarBienvenida, redactarAnuncio, productoPorId, productoMencionado } from './ai.js';
 import { Cola, dormir, esperaEntreEnvios } from './queue.js';
 import { estadoIA, actualizarIA, pausarIA, estaPausado, promptIA, resumenIA } from './ia.js';
@@ -20,6 +20,8 @@ import { crearAuth, crearAuthPanel, crearLimitador } from './auth.js';
 import { registrarAjustes } from './routes/ajustes.js';
 import { esBaja, marcarBajaLocal } from './bajas.js';
 import { revisarEsquema } from './diagnostico.js';
+import { programarBackups } from './backups.js';
+import { escribirAtomico } from './almacen.js';
 import { registrarPedidos } from './routes/pedidos.js';
 import { registrarSeguimiento } from './routes/seguimiento.js';
 import { registrarAnuncios } from './routes/anuncios.js';
@@ -142,7 +144,9 @@ function guardarComprobante(pedidoId, media = {}) {
     : 'bin';
   const nombre = `${String(pedidoId || 'pedido')}-${Date.now()}.${ext}`;
   fs.mkdirSync(comprobantesDir, { recursive: true });
-  fs.writeFileSync(path.join(comprobantesDir, nombre), Buffer.from(String(media.data || ''), 'base64'));
+  if (!escribirAtomico(path.join(comprobantesDir, nombre), Buffer.from(String(media.data || ''), 'base64'))) {
+    throw new Error('No se pudo guardar el comprobante en disco.');
+  }
   return nombre;
 }
 
@@ -1523,12 +1527,15 @@ async function manejarMensaje(msg, sesionId = null) {
   if (String(msg.type || '') === 'reaction' || msg.isNotification) return;
   const chat = String(msg.from || '');
   if (chat.endsWith('@g.us') || chat === 'status@broadcast') return;
-  let tel = normalizar(chat.split('@')[0]);
-  if (!chat.endsWith('@c.us')) {
-    if (chat.endsWith('@lid')) recordarDestinoWa(tel, chat);
-    if (chat.endsWith('@lid') && !tel) {
+  // Teléfono canónico: @c.us/@s.whatsapp.net/@lid normalizados a un único
+  // teléfono (un @lid solo se fusiona si el mapa lo resolvió con certeza).
+  let tel = telefonoCanonico(chat);
+  if (chat.endsWith('@lid')) {
+    if (/^\d{8,15}$/.test(tel)) {
+      recordarDestinoWa(tel, chat);
+    } else {
       const real = await resolverTelefonoWa(chat, sesionId);
-      if (real) tel = real;
+      if (real) tel = telefonoCanonico(real);
     }
   }
   if (!/^\d{8,15}$/.test(tel)) return;
@@ -1949,10 +1956,11 @@ ${String(texto).slice(0, 300)}
 /* ---------------- API ---------------- */
 // Falla cerrado: sin BOT_TOKEN configurado en modo real, el bot no atiende
 // peticiones (solo /api/health). Con token, comparación en tiempo constante.
-// Healthcheck público (para Docker/Coolify y monitoreo).
+// Healthcheck público (Docker/Coolify y monitoreo): SIEMPRE 200 y solo
+// { ok, zombi }. Nada de teléfonos ni sesiones: el detalle va en /api/estado
+// (con token). zombi=true = sesión conectada >10 min sin mensajes recibidos.
 app.get('/api/health', (_req, res) => {
-  const s = (estadoWa().find(x => String(x.id) === '1')) || {};
-  res.json({ ok: true, uptime: Math.round(process.uptime()), estado: s.estado || 'iniciando' });
+  res.json({ ok: true, zombi: estadoSalud().zombi });
 });
 
 const auth = crearAuth({
@@ -2096,8 +2104,24 @@ app.get('/api/estado', auth, (_req, res) => {
   if (cacheEstado.cuerpo && ahora - cacheEstado.t < 2000) return res.json(cacheEstado.cuerpo);
   // Sin QR en el payload: /api/qr lo entrega binario y con su propio cacheo.
   const sesiones = estadoWa().map(({ qr, ...s } = {}) => s);
+  // Detalle de salud (sesión + último mensaje recibido + sesión zombi).
+  const salud = estadoSalud(ahora);
+  const problemas = [...problemasEsquema, ...problemasMedios];
+  // Sesión zombi: conectada pero sin mensajes hace más del umbral. Solo se
+  // avisa en el panel (rojo); NO se reinicia nada automáticamente.
+  if (salud.zombi) {
+    const zombis = salud.sesiones.filter(s => s.zombi);
+    const ids = zombis.map(s => `#${s.id}`).join(', ');
+    const min = Math.max(1, Math.round((zombis[0]?.segundosSinMensaje ?? salud.umbralSegundos) / 60));
+    problemas.push({
+      codigo: 'sesion_zombi',
+      mensaje: `Sesión de WhatsApp ${ids} conectada pero sin mensajes recibidos hace ~${min} min (posible sesión zombi).`,
+      solucion: 'Revisa el log del bot; si persiste, reinicia la sesión desde Ajustes → Conectar WhatsApp.'
+    });
+  }
   const cuerpo = {
     sesiones,
+    salud,
     conectado: sesiones.some(s => s.conectado),
     cola: cola.size,
     programadas,
@@ -2110,7 +2134,7 @@ app.get('/api/estado', auth, (_req, res) => {
     delay: { min: config.delayMin, max: config.delayMax },
     ia: resumenIA(),
     chats: resumenChats(),
-    problemas: [...problemasEsquema, ...problemasMedios],
+    problemas,
     version: '1.0.0'
   };
   cacheEstado = { t: ahora, cuerpo };
@@ -2827,6 +2851,13 @@ app.listen(config.port, () => {
 });
 
 iniciarWhatsApp({ onMensaje: manejarMensaje, onMensajePropio: manejarMensajePropio, onAck: manejarAck, log, sesionIds: config.sesiones }).catch(e => log('No se pudo iniciar WhatsApp: ' + e.message));
+
+// Respaldo diario de bot/data a Supabase Storage (03:00 hora del bot).
+try {
+  programarBackups({ log });
+} catch (e) {
+  log('No se pudieron programar los backups: ' + e.message);
+}
 
 setInterval(() => revisarProgramadas(false), 60 * 1000);
 setTimeout(() => revisarProgramadas(false), 8000);

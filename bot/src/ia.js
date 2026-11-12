@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config } from './config.js';
+import { escribirAtomico } from './almacen.js';
 
 const dataDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data');
 const archivo = path.join(dataDir, 'ia.json');
@@ -28,11 +29,8 @@ function cargar() {
 let estado = cargar();
 
 function guardar() {
-  try {
-    fs.mkdirSync(dataDir, { recursive: true });
-    fs.writeFileSync(archivo, JSON.stringify(estado, null, 2), 'utf8');
-  } catch (e) {
-    console.warn('[ia] no se pudo guardar el estado:', e.message);
+  if (!escribirAtomico(archivo, JSON.stringify(estado, null, 2))) {
+    console.warn('[ia] no se pudo guardar el estado (escritura atómica falló).');
   }
 }
 

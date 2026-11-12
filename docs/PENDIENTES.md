@@ -59,3 +59,19 @@
     catálogo único actual (`bot/media/catalogo-navidad-2026.pdf`). Requeriría un cambio de
     esquema en Ajustes (lista de catálogos en vez de `catalogoArchivo` único) y en la
     secuencia de bienvenida. NO implementado: quedó fuera del alcance de esta tarea.
+
+## Estabilidad conexión/despliegue (rama estabilidad/conexion-despliegue)
+
+14. **Migrar a chromium del sistema (pedido explícito del dueño, 2026-11-12)**: hoy la imagen
+    usa el **Chrome for Testing** que descarga puppeteer 24.38.0 al construir (`~/.cache/puppeteer`).
+    Migrar al paquete `chromium` de apt en `bot/Dockerfile` (+ `PUPPETEER_SKIP_DOWNLOAD=1`) se
+    dejó FUERA de esta tarea a propósito: **requiere prueba aparte porque puede invalidar la
+    sesión del volumen `bot-auth-v3`** (el perfil de usuario es del Chrome actual). Probar en
+    un deploy de ensayo antes de aplicarlo en producción.
+15. `bot/src/anuncios.js`, `bot/src/ocultos.js`, `bot/src/bajas.js`: guardan todavía con
+    `writeFileSync` directo (sin tmp+rename). La tarea pedía escritura atómica solo en
+    ajustes, seguimiento, ia, pedidos y pagos (hecha); estos tres quedan como endurecimiento
+    futuro. (2026-11-12.)
+16. `Dockerfile` de la raíz: marcado **OBSOLETO** con banner (usar `bot/Dockerfile`). Si algún
+    flujo externo lo referencia (p. ej. documentación vieja), apuntarlo a `bot/Dockerfile`;
+    se conserva el archivo solo como referencia histórica. (2026-11-12.)

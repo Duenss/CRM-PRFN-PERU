@@ -1,8 +1,10 @@
 import pkg from 'whatsapp-web.js';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import QRCode from 'qrcode';
 import { config, normalizar } from './config.js';
+import { escribirAtomico } from './almacen.js';
 
 const { Client, LocalAuth, MessageMedia } = pkg;
 
@@ -19,6 +21,82 @@ export function conTimeout(promesa, ms, etiqueta = 'operación de WhatsApp') {
     timer.unref?.();
   });
   return Promise.race([promesa, reloj]).finally(() => clearTimeout(timer));
+}
+
+/* ---------------- reconexión (backoff exponencial infinito) ---------------- */
+// Solo para caídas de red/WhatsApp: 15 s → 30 s → 60 s → … hasta un tope de
+// 5 min, con un ±20 % de ruido para no golpear siempre en el mismo instante.
+// Los desvinculados por LOGOUT o los fallos de autenticación NO usan este
+// bucle: se borra la sesión local y se genera un único QR (ver manejadores).
+export const RECONEXION_BASE_MS = 15000;
+export const RECONEXION_MAX_MS = 5 * 60 * 1000;
+
+export function esperaReintentoMs(intento, { jitter = 0.2 } = {}) {
+  const n = Math.max(1, Number(intento) || 1);
+  let ms = Math.min(RECONEXION_MAX_MS, RECONEXION_BASE_MS * Math.pow(2, n - 1));
+  if (jitter > 0) {
+    const variacion = Math.round(ms * jitter * (Math.random() * 2 - 1));
+    ms = Math.min(RECONEXION_MAX_MS, Math.max(RECONEXION_BASE_MS, ms + variacion));
+  }
+  return ms;
+}
+
+/** ¿El motivo del 'disconnected' es un desvinculado (LOGOUT) o una caída de red? */
+export function clasificarDesconexion(motivo) {
+  const m = String(motivo || '').toLowerCase();
+  return /logout|logged\s?out|unpaired|desvincul/i.test(m) ? 'logout' : 'red';
+}
+
+/* ---------------- webVersionCache con fallback local ---------------- */
+// whatsapp-web.js necesita el HTML de una versión concreta de WhatsApp Web.
+// Antes se bajaba SIEMPRE de raw.githubusercontent (dependencia de un tercero
+// en cada arranque). Ahora se guarda una copia local en bot/data y el remoto
+// solo se consulta para refrescarla (cada 7 días o si falta): si no hay red,
+// el bot arranca igual con la copia local.
+const dataDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data');
+const WEB_VERSION_PIN = '2.3000.1053990023-alpha';
+export const WEB_VERSION_URL = `https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/${WEB_VERSION_PIN}.html`;
+export const WEB_VERSION_CACHE = path.join(dataDir, 'web-version-cache.html');
+export const WEB_VERSION_TTL_MS = 7 * 24 * 3600 * 1000;
+
+function infoCacheWeb(ahoraMs = Date.now()) {
+  try {
+    const st = fs.statSync(WEB_VERSION_CACHE);
+    if (st.isFile()) return { existe: true, edadMs: ahoraMs - st.mtimeMs, path: WEB_VERSION_CACHE };
+  } catch { /* no existe */ }
+  return { existe: false, edadMs: Infinity, path: WEB_VERSION_CACHE };
+}
+
+async function descargarVersionWeb() {
+  try {
+    const resp = await conTimeout(
+      fetch(WEB_VERSION_URL, { signal: AbortSignal.timeout(10000) }),
+      15000,
+      'descargar versión web de WhatsApp'
+    );
+    if (!resp.ok) return null;
+    const html = await conTimeout(resp.text(), 10000, 'leer versión web de WhatsApp');
+    return html && html.includes('<html') ? html : null;
+  } catch { return null; }
+}
+
+/** Resuelve la opción de webVersionCache: local (copia en disco) o remoto (último recurso). */
+export async function resolverWebVersionCache(ahoraMs = Date.now()) {
+  const cache = infoCacheWeb(ahoraMs);
+  if (cache.existe && cache.edadMs < WEB_VERSION_TTL_MS) {
+    return { type: 'local', path: cache.path };
+  }
+  const html = await descargarVersionWeb();
+  if (html) {
+    escribirAtomico(cache.path, html);
+    return { type: 'local', path: cache.path };
+  }
+  if (cache.existe) {
+    logFn(`Versión web de WhatsApp: sin red; se usa la copia local (${Math.round(cache.edadMs / 3600000)} h de antigüedad).`);
+    return { type: 'local', path: cache.path };
+  }
+  logFn('Versión web de WhatsApp: sin copia local y sin red; se pedirá al repositorio remoto (último recurso).');
+  return { type: 'remote', remotePath: WEB_VERSION_URL };
 }
 
 /** id -> { id, estado, conectado, qr, qrDataUrl, numero, error, client, reintentos } */
@@ -54,7 +132,7 @@ function esEnvioPropioReciente(texto) {
 
 let logFn = console.log;
 
-function crearEstado(id) {
+export function crearEstado(id) {
   return {
     id: String(id),
     etiqueta: `Número ${id}`,
@@ -66,8 +144,87 @@ function crearEstado(id) {
     error: null,
     client: null,
     reintentos: 0,
-    msgKeyParche: false
+    msgKeyParche: false,
+    // ---------------- estabilidad de conexión ----------------
+    cerrada: false,           // logout manual: no se reconecta ni se revive
+    sinAutoReintento: false,  // LOGOUT/auth_failure: un único QR, sin bucle
+    reintentando: false,      // ya hay una reconexión programada o en curso
+    reintentoTimer: null,
+    fallosAuth: 0,
+    ultimoMensajeEn: null,    // ISO del último mensaje RECIBIDO (salud/zombi)
+    conectadoDesde: null,     // ISO del último 'ready'
+    bloqueo: Promise.resolve(), // serializa crear/reiniciar/destruir por sesión
+    timers: new Set(),        // timeouts/intervalos rastreados y cancelables
+    vigilante: null,
+    llamandoSync: false,
+    autenticado: false,
+    manejadores: null         // { onMensaje, onMensajePropio, onAck, log }
   };
+}
+
+/* ---------------- timers rastreados y lock por sesión ---------------- */
+// Todos los timers de una sesión viven en s.timers: se cancelan en logout y
+// reinicio para que una reconexión pendiente no "resucite" una sesión cerrada.
+function sProgramar(s, fn, ms) {
+  const t = setTimeout(() => { s.timers.delete(t); fn(); }, ms);
+  s.timers.add(t);
+  return t;
+}
+
+function sIntervalo(s, fn, ms) {
+  const t = setInterval(fn, ms);
+  s.timers.add(t);
+  return t;
+}
+
+function cancelarTimersSesion(s) {
+  for (const t of s.timers) { clearTimeout(t); clearInterval(t); }
+  s.timers.clear();
+  if (s.vigilante) { clearInterval(s.vigilante); s.vigilante = null; }
+  if (s.reintentoTimer) { clearTimeout(s.reintentoTimer); s.reintentoTimer = null; }
+  s.reintentando = false;
+}
+
+/** Serializa operaciones por sesión (crear/reiniciar/destruir): un solo Chrome a la vez. */
+export function conBloqueoSesion(id, fn) {
+  const s = sesiones.get(String(id));
+  if (!s) return Promise.resolve().then(fn);
+  const p = s.bloqueo.then(fn, fn);
+  s.bloqueo = p.then(() => {}, () => {});
+  return p;
+}
+
+/** Cierra el cliente actual con un tope de 10 s; si no cierra, mata el Chrome huérfano. */
+async function destruirCliente(s) {
+  const c = s.client;
+  if (!c) return;
+  s.client = null;
+  try {
+    await conTimeout(Promise.resolve(typeof c.destroy === 'function' ? c.destroy() : undefined), 10000, 'cerrar Chrome anterior');
+  } catch (e) {
+    try {
+      const p = c.pupBrowser && typeof c.pupBrowser.process === 'function' ? c.pupBrowser.process() : null;
+      if (p && typeof p.kill === 'function') p.kill('SIGKILL');
+    } catch { /* proceso ya muerto */ }
+    logFn(`[${s.id}] El Chrome anterior no cerró a tiempo; se forzó su cierre.`);
+  }
+}
+
+/** Borra la sesión local guardada (LocalAuth): obliga a escanear un QR nuevo. */
+function borrarSesionLocal(id) {
+  const carpeta = path.join(config.sessionPath, `session-${id}`);
+  try {
+    fs.rmSync(carpeta, { recursive: true, force: true });
+  } catch (e) {
+    logFn(`[${id}] No se pudo borrar la sesión local (${e.message}); se reintentará al crear el cliente.`);
+  }
+}
+
+/** Gancho SOLO para pruebas: permite inyectar una fábrica de clientes falsos. */
+let fabricaClient = null;
+export function _fabricaClientParaPruebas(fn) {
+  if (typeof fn === 'function') fabricaClient = fn;
+  return fabricaClient;
 }
 
 export async function iniciarWhatsApp({ onMensaje, onMensajePropio, onAck, log, sesionIds = ['1'] }) {
@@ -87,13 +244,14 @@ export async function iniciarWhatsApp({ onMensaje, onMensajePropio, onAck, log, 
   for (const id of sesionIds) {
     const key = String(id);
     if (sesiones.has(key)) continue;
-    sesiones.set(key, crearEstado(key));
+    const s = crearEstado(key);
+    sesiones.set(key, s);
     const espera = retraso;
     retraso += 12000;
-    setTimeout(() => {
+    sProgramar(s, () => {
       crearSesion(key, { onMensaje, onMensajePropio, onAck, log }).catch(e => {
-        const s = sesiones.get(key);
-        if (s) { s.estado = 'desconectado'; s.error = e.message; }
+        const st = sesiones.get(key);
+        if (st) { st.estado = 'desconectado'; st.error = e.message; }
         log(`No se pudo iniciar la sesión ${key}: ${e.message}`);
       });
     }, espera);
@@ -213,35 +371,52 @@ export function buscarChromium() {
   return '';
 }
 
-async function crearSesion(id, { onMensaje, onMensajePropio, onAck, log }) {
+/**
+ * Crea la sesión bajo el lock de la sesión: crearSesion y reiniciarSesion
+ * nunca corren en paralelo (un solo Chrome por sesión).
+ * `conReintentos:false` = no programar reconexión si initialize falla
+ * (se usa tras LOGOUT/auth_failure: un único QR, sin bucle).
+ */
+export function crearSesion(id, manejadores = {}, opciones = {}) {
+  return conBloqueoSesion(id, () => crearSesionSinLock(id, manejadores, opciones));
+}
+
+async function crearSesionSinLock(id, { onMensaje, onMensajePropio, onAck, log }, opciones = {}) {
   const s = sesiones.get(id);
-  const opciones = {
+  if (!s) return;
+  if (s.cerrada) return;
+  s.manejadores = { onMensaje, onMensajePropio, onAck, log: log || logFn };
+  s.onMensaje = onMensaje;
+  s.onMensajePropio = onMensajePropio;
+  s.onAck = onAck;
+
+  // Un solo Chrome por sesión: el cliente anterior se cierra antes de crear otro.
+  await destruirCliente(s);
+  if (s.cerrada) return;
+
+  const cacheWeb = await resolverWebVersionCache();
+  const opcionesWa = {
     authStrategy: new LocalAuth({ clientId: `sesion-${id}`, dataPath: config.sessionPath }),
-    webVersionCache: {
-      type: 'remote',
-      remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.1053990023-alpha.html'
-    },
+    webVersionCache: cacheWeb,
     puppeteer: {
       headless: config.headless,
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
     }
   };
   const chromium = buscarChromium();
-  if (chromium) opciones.puppeteer.executablePath = chromium;
+  if (chromium) opcionesWa.puppeteer.executablePath = chromium;
   if (!chromiumLogeado) {
     chromiumLogeado = true;
     logFn(`Chromium: ${chromium || 'el que resuelva Puppeteer por defecto'}`);
   }
 
-  const client = new Client(opciones);
+  const client = fabricaClient ? fabricaClient(opcionesWa) : new Client(opcionesWa);
   s.client = client;
   s.estado = 'iniciando';
   s.msgKeyParche = false;
-  s.onMensaje = onMensaje;
-  s.onMensajePropio = onMensajePropio;
-  s.onAck = onAck;
 
   client.on('qr', async qr => {
+    if (s.cerrada || s.client !== client) return; // evento de un cliente viejo
     s.estado = 'qr';
     s.autenticado = false;
     s.qr = qr;
@@ -252,12 +427,15 @@ async function crearSesion(id, { onMensaje, onMensajePropio, onAck, log }) {
   });
 
   client.on('authenticated', () => {
+    if (s.cerrada || s.client !== client) return;
     if (!s.autenticado) log(`[${id}] WhatsApp autenticado.`);
     s.autenticado = true;
     vigilarConexion(id, client, s);
   });
 
   client.on('ready', () => {
+    if (s.cerrada || s.client !== client) return;
+    cancelarTimersSesion(s);
     s.estado = 'conectado';
     s.conectado = true;
     s.numero = client.info?.wid?.user || null;
@@ -265,34 +443,75 @@ async function crearSesion(id, { onMensaje, onMensajePropio, onAck, log }) {
     s.qrDataUrl = null;
     s.error = null;
     s.reintentos = 0;
+    s.fallosAuth = 0;
+    s.sinAutoReintento = false;
     s.autenticado = true;
-    if (s.vigilante) { clearInterval(s.vigilante); s.vigilante = null; }
+    s.conectadoDesde = new Date().toISOString();
     log(`[${id}] WhatsApp conectado como +${s.numero || 'desconocido'}.`);
     // WhatsApp Web nuevo: restaura MsgKey._serialized para poder enviar fotos.
     parcharMsgKey(client, s);
   });
 
+  // Fallo de autenticación: la sesión local ya no sirve. Se borra y se genera
+  // UN único QR nuevo, sin bucle de reintentos (si vuelve a fallar, se repite
+  // una sola vez más y luego queda esperando el escaneo manual/reinicio).
   client.on('auth_failure', m => {
+    if (s.cerrada || s.client !== client) return;
+    s.fallosAuth = (s.fallosAuth || 0) + 1;
     s.estado = 'desconectado';
     s.conectado = false;
     s.error = String(m || 'Fallo de autenticación');
-    log(`[${id}] Fallo de autenticación: ${s.error}`);
+    log(`[${id}] Fallo de autenticación (${s.fallosAuth}): ${s.error}`);
+    cancelarTimersSesion(s);
+    s.sinAutoReintento = true;
+    log(`[${id}] Se borra la sesión local y se genera un único QR nuevo (sin reintentos automáticos).`);
+    borrarSesionLocal(id);
+    destruirCliente(s).then(() => {
+      if (s.cerrada) return;
+      crearSesion(id, s.manejadores || {}, { conReintentos: false }).catch(e => {
+        const st = sesiones.get(String(id));
+        if (st) { st.estado = 'desconectado'; st.error = e.message; }
+        logFn(`[${id}] No se pudo generar el QR nuevo: ${e.message}`);
+      });
+    });
   });
 
   client.on('disconnected', motivo => {
+    if (s.cerrada || s.client !== client) return; // cerrado a propósito o cliente viejo
+    const razon = String(motivo || '');
     s.estado = 'desconectado';
     s.conectado = false;
     s.numero = null;
-    s.error = `Desconectado: ${motivo}`;
+    s.error = `Desconectado: ${razon}`;
     log(`[${id}] ${s.error}`);
-    if (s.reintentos < 5) {
-      s.reintentos++;
-      log(`[${id}] Reintentando conexión en 15 segundos (intento ${s.reintentos}/5)…`);
-      setTimeout(() => client.initialize().catch(e => log(`[${id}] Error al reconectar: ${e.message}`)), 15000);
+    cancelarTimersSesion(s);
+    if (s.sinAutoReintento) {
+      log(`[${id}] Sin reintentos automáticos (QR pendiente de escanear).`);
+      return;
     }
+    if (clasificarDesconexion(razon) === 'logout') {
+      // Desvinculado desde el celular (LOGOUT): borrar sesión local, un único QR.
+      log(`[${id}] WhatsApp desvinculado (LOGOUT): se borra la sesión local y se genera un único QR nuevo.`);
+      s.reintentos = 0;
+      s.sinAutoReintento = true;
+      borrarSesionLocal(id);
+      destruirCliente(s).then(() => {
+        if (s.cerrada) return;
+        crearSesion(id, s.manejadores || {}, { conReintentos: false }).catch(e => {
+          const st = sesiones.get(String(id));
+          if (st) { st.estado = 'desconectado'; st.error = e.message; }
+          logFn(`[${id}] No se pudo generar el QR nuevo: ${e.message}`);
+        });
+      });
+      return;
+    }
+    // Caída de red/WhatsApp: backoff exponencial infinito (15 s → 5 min).
+    programarReconexion(id, razon);
   });
 
   client.on('message', async msg => {
+    if (s.cerrada || s.client !== client) return;
+    s.ultimoMensajeEn = new Date().toISOString();
     try { await onMensaje(msg, id); }
     catch (e) { log(`[${id}] Error al procesar mensaje: ${e.message}`); }
   });
@@ -300,6 +519,7 @@ async function crearSesion(id, { onMensaje, onMensajePropio, onAck, log }) {
   // Mensajes creados por este número (los que envías tú desde el celular).
   // Los que manda el propio bot se descartan aquí para no duplicarlos.
   client.on('message_create', async msg => {
+    if (s.cerrada || s.client !== client) return;
     try {
       // Descarta lo que acaba de enviar el propio bot (evita marcarlo como
       // mensaje del dueño y duplicarlo). Se comprueba por id y, como respaldo,
@@ -314,6 +534,7 @@ async function crearSesion(id, { onMensaje, onMensajePropio, onAck, log }) {
   // Estado de entrega/lectura (palomitas) de los mensajes salientes:
   // 0 pendiente · 1 enviado ✓ · 2 entregado ✓✓ · 3 leído ✓✓ azul.
   client.on('message_ack', async (msg, ack) => {
+    if (s.cerrada || s.client !== client) return;
     try { if (onAck) await onAck(msg, ack, id); }
     catch (e) { log(`[${id}] Error al leer el estado del mensaje: ${e.message}`); }
   });
@@ -321,7 +542,47 @@ async function crearSesion(id, { onMensaje, onMensajePropio, onAck, log }) {
   // Arranca también un vigilante por si 'authenticated' nunca llega.
   vigilarConexion(id, client, s);
 
-  await client.initialize();
+  try {
+    await client.initialize();
+  } catch (e) {
+    if (s.cerrada) return;
+    log(`[${id}] No se pudo iniciar la sesión: ${e.message}`);
+    if (opciones.conReintentos === false) {
+      s.estado = 'desconectado';
+      s.error = e.message;
+      return;
+    }
+    programarReconexion(id, `inicio fallido: ${e.message}`);
+  }
+}
+
+/**
+ * Caída de red/WhatsApp: programa la reconexión con backoff exponencial
+ * infinito (15 s → 5 min). Se cancela con logout/reinicio (timers rastreados).
+ */
+function programarReconexion(id, motivo) {
+  const s = sesiones.get(String(id));
+  if (!s || s.cerrada || s.sinAutoReintento || s.reintentando) return;
+  if (s.reintentoTimer) { clearTimeout(s.reintentoTimer); s.reintentoTimer = null; }
+  s.reintentos = (s.reintentos || 0) + 1;
+  const espera = esperaReintentoMs(s.reintentos);
+  logFn(`[${id}] Reintentando conexión en ${Math.round(espera / 1000)} s (intento ${s.reintentos}, motivo: ${String(motivo || '').slice(0, 80)})…`);
+  s.reintentando = true;
+  s.reintentoTimer = sProgramar(s, () => {
+    s.reintentoTimer = null;
+    s.reintentando = false;
+    reconectar(id).catch(e => logFn(`[${id}] Error al reconectar: ${e.message}`));
+  }, espera);
+}
+
+async function reconectar(id) {
+  const s = sesiones.get(String(id));
+  if (!s || s.cerrada || s.sinAutoReintento) return;
+  await conBloqueoSesion(id, async () => {
+    const st = sesiones.get(String(id));
+    if (!st || st.cerrada || st.sinAutoReintento) return;
+    await crearSesionSinLock(id, st.manejadores || { onMensaje: st.onMensaje, onMensajePropio: st.onMensajePropio, onAck: st.onAck, log: logFn });
+  });
 }
 
 /**
@@ -368,8 +629,8 @@ function vigilarConexion(id, client, s) {
       s.llamandoSync = false;
     }
   };
-  s.vigilante = setInterval(tick, 8000);
-  setTimeout(tick, 3000);
+  s.vigilante = sIntervalo(s, tick, 8000);
+  sProgramar(s, tick, 3000);
 }
 
 function sesionParaEnviar(sesionId) {
@@ -381,14 +642,62 @@ function sesionParaEnviar(sesionId) {
   return [...sesiones.values()].find(s => s.estado === 'conectado') || null;
 }
 
+/* ---------------- teléfono canónico (un cliente, un teléfono) ---------------- */
+// WhatsApp identifica el mismo cliente con varios ids: 519…@c.us,
+// 519…@s.whatsapp.net o un @lid opaco. telefonoCanonico los normaliza a UN
+// teléfono único para que la Bandeja no duplique chats.
+// Regla: un @lid SOLO se fusiona con un teléfono si el mapa lid→teléfono lo
+// resolvió con certeza (al recibir/enviar mensajes o al resolverlo en la
+// página); si no, queda como clave propia (`lid:…`) y nunca se confunde con
+// otro número.
+
 // Destinos @lid ya conocidos (el teléfono real puede no estar disponible):
 // se envía directo al id del chat para no fallar con "no tiene WhatsApp".
 const destinosLid = new Map();
+// Mapa inverso lid→teléfono, poblado SOLO cuando la resolución es segura.
+const lidATelefono = new Map();
+
 export function recordarDestinoWa(telefono, wid) {
   const tel = String(telefono || '').replace(/\D/g, '');
   const id = String(wid || '');
-  if (tel && /@lid$/.test(id)) destinosLid.set(tel, id);
+  if (tel && /@lid$/.test(id)) {
+    destinosLid.set(tel, id);
+    const user = id.split('@')[0];
+    if (user) lidATelefono.set(String(user), tel);
+  }
 }
+
+/** Registra un lid→teléfono resuelto con certeza (desde la página de WhatsApp). */
+export function recordarTelefonoDeLid(widSerializado, telefono) {
+  const tel = String(telefono || '').replace(/\D/g, '');
+  const [user, server] = String(widSerializado || '').split('@');
+  if (server === 'lid' && user && /^\d{8,15}$/.test(tel)) lidATelefono.set(String(user), tel);
+}
+
+export function telefonoCanonico(waId, { mapa } = {}) {
+  const s = String(waId || '').trim();
+  if (!s) return '';
+  const [user, server] = s.split('@');
+  if (!server) {
+    const t = normalizar(user);
+    return /^\d{8,15}$/.test(t) ? t : '';
+  }
+  if (server === 'c.us' || server === 's.whatsapp.net') {
+    const t = normalizar(user);
+    return /^\d{8,15}$/.test(t) ? t : '';
+  }
+  if (server === 'lid') {
+    const m = (mapa instanceof Map ? mapa : lidATelefono).get(String(user));
+    if (m) {
+      const t = normalizar(m);
+      if (/^\d{8,15}$/.test(t)) return t;
+    }
+    return `lid:${user}`;
+  }
+  if (server === 'g.us') return `grupo:${user}`;
+  return '';
+}
+
 function destinoConocido(limpio) {
   const w = destinosLid.get(String(limpio || ''));
   return w ? { _serialized: w } : null;
@@ -637,7 +946,9 @@ export async function resolverTelefonoWa(widSerializado, sesionId = null) {
       } catch (e) {}
       return '';
     }, wid, 15000, 'resolver teléfono');
-    return real ? normalizar(real) : '';
+    const tel = real ? normalizar(real) : '';
+    if (tel) recordarTelefonoDeLid(wid, tel); // lid→teléfono resuelto con certeza
+    return tel;
   } catch (e) {
     return '';
   }
@@ -838,7 +1149,10 @@ export async function listarChatsWa(sesionId = null) {
                     const r = await W.WWebJS.enforceLidAndPnRetrieval((c.id && c.id._serialized) || '');
                     phone = r && r.phone;
                   }
-                  if (phone && phone._serialized) tel = String(phone._serialized).split('@')[0];
+                  if (phone && phone._serialized) {
+                    tel = String(phone._serialized).split('@')[0];
+                    if (c.id && c.id.user) recordarTelefonoDeLid(`${c.id.user}@lid`, tel);
+                  }
                 } catch (e) {}
               }
             }
@@ -1091,10 +1405,12 @@ export async function cerrarSesion(sesionId) {
   for (const id of ids) {
     const s = sesiones.get(id);
     if (!s) continue;
-    try { await s.client?.logout(); } catch {}
-    try { await s.client?.destroy(); } catch {}
-    if (s.vigilante) { clearInterval(s.vigilante); s.vigilante = null; }
-    s.client = null;
+    // Marca ANTES de cerrar: el 'disconnected' que dispara logout/destroy no
+    // debe programar reconexiones ni regenerar QRs.
+    s.cerrada = true;
+    cancelarTimersSesion(s);
+    try { await conTimeout(Promise.resolve(s.client?.logout()), 10000, 'logout de WhatsApp'); } catch {}
+    await destruirCliente(s);
     s.estado = 'desconectado';
     s.conectado = false;
     s.numero = null;
@@ -1107,6 +1423,7 @@ export async function cerrarSesion(sesionId) {
 /**
  * Destruye el cliente actual y lo vuelve a crear.
  * Si no hay credenciales guardadas, genera un QR nuevo para vincular.
+ * Corre bajo el lock de la sesión: nunca dos Chromes en paralelo.
  */
 export async function reiniciarSesion(sesionId = null) {
   const ids = sesionId ? [String(sesionId)] : [...sesiones.keys()];
@@ -1114,9 +1431,12 @@ export async function reiniciarSesion(sesionId = null) {
   for (const id of ids) {
     const s = sesiones.get(id);
     if (!s) continue;
-    if (s.vigilante) { clearInterval(s.vigilante); s.vigilante = null; }
-    try { await s.client?.destroy(); } catch {}
-    s.client = null;
+    // Reactiva la sesión (por si se cerró o quedó en "sin reintentos").
+    s.cerrada = false;
+    s.sinAutoReintento = false;
+    s.fallosAuth = 0;
+    s.reintentos = 0;
+    cancelarTimersSesion(s);
     s.estado = 'iniciando';
     s.conectado = false;
     s.numero = null;
@@ -1125,13 +1445,15 @@ export async function reiniciarSesion(sesionId = null) {
     s.error = null;
     s.llamandoSync = false;
     s.autenticado = false;
-    s.reintentos = 0;
     logFn(`[${id}] Reiniciando sesión de WhatsApp...`);
-    crearSesion(id, { onMensaje: s.onMensaje, onMensajePropio: s.onMensajePropio, onAck: s.onAck, log: logFn }).catch(e => {
-      const st = sesiones.get(id);
-      if (st) { st.estado = 'desconectado'; st.error = e.message; }
-      logFn(`No se pudo reiniciar la sesión ${id}: ${e.message}`);
-    });
+    // Fire-and-forget bajo el lock: la ruta responde enseguida y el QR llega
+    // por SSE/estado cuando el cliente nuevo lo genere.
+    conBloqueoSesion(id, () => crearSesionSinLock(id, s.manejadores || { onMensaje: s.onMensaje, onMensajePropio: s.onMensajePropio, onAck: s.onAck, log: logFn }))
+      .catch(e => {
+        const st = sesiones.get(id);
+        if (st) { st.estado = 'desconectado'; st.error = e.message; }
+        logFn(`No se pudo reiniciar la sesión ${id}: ${e.message}`);
+      });
     reiniciadas.push(id);
   }
   return reiniciadas;
@@ -1147,6 +1469,48 @@ export function estadoWa() {
     error: s.error,
     qr: s.estado === 'qr' ? s.qrDataUrl : null
   }));
+}
+
+/* ---------------- salud de sesión (detección de sesión zombi) ---------------- */
+// Una sesión "zombi" está en estado 'conectado' pero no recibe mensajes hace
+// más del umbral (por defecto 10 min, configurable con SALUD_ZOMBI_SEGUNDOS):
+// el socket puede estar muerto sin que 'disconnected' haya llegado. NO se
+// reinicia nada automáticamente: solo se avisa (health + problemas del panel).
+export function umbralZombiMs() {
+  return Math.max(60, Number(process.env.SALUD_ZOMBI_SEGUNDOS) || 600) * 1000;
+}
+
+export function esZombi(s, ahoraMs = Date.now(), umbralMs = umbralZombiMs()) {
+  if (!s || s.estado !== 'conectado') return false;
+  const desde = Date.parse(s.conectadoDesde || '');
+  if (!Number.isFinite(desde) || ahoraMs - desde <= umbralMs) return false; // conectado hace poco
+  const ultimo = Date.parse(s.ultimoMensajeEn || '');
+  if (!Number.isFinite(ultimo)) return true; // nunca recibió mensajes desde que conectó
+  return ahoraMs - ultimo > umbralMs;
+}
+
+export function estadoSalud(ahoraMs = Date.now()) {
+  const umbralMs = umbralZombiMs();
+  const lista = [...sesiones.values()].map(s => {
+    const conectado = s.estado === 'conectado';
+    let segundosSinMensaje = null;
+    const ultimo = Date.parse(s.ultimoMensajeEn || '');
+    if (Number.isFinite(ultimo)) segundosSinMensaje = Math.max(0, Math.round((ahoraMs - ultimo) / 1000));
+    return {
+      id: s.id,
+      estado: s.estado,
+      conectado,
+      numero: conectado ? s.numero : null,
+      ultimoMensajeEn: s.ultimoMensajeEn || null,
+      segundosSinMensaje,
+      zombi: esZombi(s, ahoraMs, umbralMs)
+    };
+  });
+  return {
+    zombi: lista.some(x => x.zombi),
+    sesiones: lista,
+    umbralSegundos: Math.round(umbralMs / 1000)
+  };
 }
 
 export function hayConexion() {

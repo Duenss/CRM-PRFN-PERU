@@ -9,6 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { escribirAtomico } from './almacen.js';
 
 const dataDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data');
 const archivo = path.join(dataDir, 'seguimiento.json');
@@ -39,11 +40,8 @@ function cargar() {
 let estado = cargar();
 
 function guardar() {
-  try {
-    fs.mkdirSync(dataDir, { recursive: true });
-    fs.writeFileSync(archivo, JSON.stringify(estado, null, 2), 'utf8');
-  } catch (e) {
-    console.warn('[seguimiento] no se pudo guardar:', e.message);
+  if (!escribirAtomico(archivo, JSON.stringify(estado, null, 2))) {
+    console.warn('[seguimiento] no se pudo guardar (escritura atómica falló).');
   }
 }
 
