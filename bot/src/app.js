@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config, validarConfig, esNumeroPeru, normalizar } from './config.js';
 import { sb, getCliente, getClientes, getProductos, logMensaje, historial, marcarBaja, importarClientes, estadoWaDe, hayColumnasWa, guardarEstadoWa } from './supabase.js';
-import { iniciarWhatsApp, enviar, enviarImagen, enviarVideo, enviarArchivo, estadoWa, cerrarSesion, reiniciarSesion, hayConexion, sesionDisponible, listarChatsWa, listarChatsActivosWa, listarContactosWa, historialWa, consultarNumeroWa, resolverTelefonoWa, recordarDestinoWa, telefonoCanonico, estadoSalud, idMensaje, descargarMediaWa, conTimeout } from './whatsapp.js';
+import { iniciarWhatsApp, enviar, enviarImagen, enviarVideo, enviarArchivo, estadoWa, cerrarSesion, reiniciarSesion, hayConexion, sesionDisponible, listarChatsWa, listarChatsActivosWa, listarContactosWa, historialWa, consultarNumeroWa, resolverTelefonoWa, recordarDestinoWa, telefonoCanonico, estadoSalud, idMensaje, descargarMediaWa, conTimeout, migrarCacheWebAntiguo } from './whatsapp.js';
 import { redactarRespuesta, transcribirAudio, redactarBorradores, redactarBienvenida, redactarAnuncio, productoPorId, productoMencionado } from './ai.js';
 import { Cola, dormir, esperaEntreEnvios, PRIORIDAD } from './queue.js';
 import { configValidacion, esperaValidacionMs, aplicarResultado, pausaTrasErrores, sinEtiqueta, conEtiqueta, ESTADOS_WA, enVentanaHoraria, msHastaApertura, proximaPausaLarga, esperaPausaLargaMs } from './validacion.js';
@@ -3291,6 +3291,11 @@ setTimeout(() => {
     log('No se pudieron fusionar conversaciones duplicadas: ' + e.message);
   }
 }, 1500).unref?.();
+
+// Migración del caché de versión de WhatsApp Web: antes era un ARCHIVO
+// (web-version-cache.html) y ahora es un DIRECTORIO. Se borra el archivo viejo
+// sin que un fallo aquí impida arrancar.
+try { migrarCacheWebAntiguo({ log }); } catch (e) { log('webVersionCache: migración falló: ' + e.message); }
 
 /* ---------------- multimedia de chats: limpieza con tope de disco ---------- */
 function limpiarMediaChats() {
