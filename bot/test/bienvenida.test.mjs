@@ -1,7 +1,7 @@
 // Pruebas de la bienvenida determinista (bot/src/bienvenida.js):
-// regla de disparo (saludo/info/catálogo → secuencia para nuevos y conocidos),
-// secuencia texto→PDF→video→foto con reintentos, pregunta diferida persistente
-// y validación de medios.
+// regla de disparo (solo saludos/"hola info" → secuencia; consultas concretas
+// se responden directo), secuencia texto→PDF→video→foto con reintentos,
+// pregunta diferida persistente y validación de medios.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -31,9 +31,6 @@ test.after(() => {
 });
 
 const AJUSTES_TODO = { enviarCatalogo: true, enviarVideo: true, enviarFoto: true };
-const chatConocido = () => ({
-  mensajes: [{ direccion: 'entrante', origen: 'cliente', en: new Date().toISOString() }]
-});
 
 /* ---------------- saludos e información ---------------- */
 
@@ -62,43 +59,15 @@ test('frases de información sin saludo disparan', () => {
 });
 
 /* ---------------- regla de disparo de la secuencia ---------------- */
+// La secuencia SOLO sale con saludos/"hola info" (nuevos y conocidos, cada vez
+// que saludan). Las consultas concretas se responden DIRECTO, sin secuencia.
 
-test('saludo/info dispara la secuencia en chats nuevos Y conocidos (cada vez que saludan)', () => {
-  const nuevo = bw.decidirSecuencia({ texto: 'Hola', chat: null });
-  assert.equal(nuevo.enviar, true);
-  assert.equal(nuevo.soloSecuencia, true);
-  const conocido = bw.decidirSecuencia({ texto: 'Buenas, quisiera información de perfumes', chat: chatConocido() });
-  assert.equal(conocido.enviar, true);
-  assert.equal(conocido.soloSecuencia, true);
-});
-
-test('pedir el catálogo dispara la secuencia en chats nuevos y conocidos', () => {
-  assert.equal(bw.decidirSecuencia({ texto: 'me pasas el catálogo', chat: chatConocido(), pideCatalogo: true }).enviar, true);
-  assert.equal(bw.decidirSecuencia({ texto: 'catalogo porfa', chat: null, pideCatalogo: true }).soloSecuencia, true);
-});
-
-test('consulta concreta en un chat nuevo: secuencia y DESPUÉS se responde la consulta', () => {
-  const d = bw.decidirSecuencia({ texto: 'cuánto cuesta el Árabe Blanco?', chat: null });
-  assert.equal(d.enviar, true);
-  assert.equal(d.soloSecuencia, false);
-});
-
-test('chat con solo mensajes del dueño/importados salientes cuenta como primer mensaje (bug yaHuboSaliente)', () => {
-  const chat = { mensajes: [{ direccion: 'saliente', origen: 'panel', en: new Date().toISOString() }] };
-  const d = bw.decidirSecuencia({ texto: 'quiero un perfume para regalo', chat });
-  assert.equal(d.enviar, true);
-  assert.equal(d.soloSecuencia, false);
-});
-
-test('cliente conocido con consulta concreta NO dispara la secuencia (solo se responde)', () => {
-  const d = bw.decidirSecuencia({ texto: 'cuánto cuesta el Árabe Blanco?', chat: chatConocido() });
-  assert.equal(d.enviar, false);
-});
-
-test('mensaje multimedia en un chat nuevo también cuenta como primer mensaje', () => {
-  const d = bw.decidirSecuencia({ texto: '[imagen]', chat: null });
-  assert.equal(d.enviar, true);
-  assert.equal(d.soloSecuencia, false);
+test('consulta concreta NO dispara la secuencia (se responde directo)', () => {
+  assert.equal(bw.esSaludoOInfo('cuánto cuesta el Árabe Blanco?'), false);
+  assert.equal(bw.esSaludoOInfo('quiero un perfume para regalo'), false);
+  assert.equal(bw.esSaludoOInfo('me pasas el catálogo'), false);
+  assert.equal(bw.esSaludoOInfo('[imagen]'), false);
+  assert.equal(bw.esSaludoOInfo('me interesa un perfume árabe'), false);
 });
 
 /* ---------------- exclusiones ---------------- */

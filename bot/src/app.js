@@ -1596,7 +1596,6 @@ async function manejarMensaje(msg, sesionId = null) {
   const cliente = await getCliente(tel);
   const hist = await historial(tel, 12);
   const nombreChat = msg._data?.notifyName || cliente?.nombre || `+${tel}`;
-  const chatAntes = obtener(tel);
   await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'entrante', texto, origen: 'cliente' });
   registrar({ telefono: tel, texto, direccion: 'entrante', nombre: nombreChat, clienteId: cliente?.id, origen: 'cliente', waId });
 
@@ -1630,14 +1629,12 @@ async function manejarMensaje(msg, sesionId = null) {
   }
 
   // ---------------- Bienvenida determinista (sin IA) ----------------
-  // "hola"/"hola info"/pedido de catálogo → secuencia completa (texto → PDF →
-  // video → foto) para clientes NUEVOS y CONOCIDOS, cada vez que saluden.
-  // El primer mensaje de un cliente que nunca escribió también dispara la
-  // secuencia y DESPUÉS se responde su consulta. Un cliente conocido con una
-  // consulta concreta solo recibe la respuesta (sin medios).
+  // "hola"/"hola info"/saludos → secuencia completa (texto → PDF → video →
+  // foto) para clientes NUEVOS y CONOCIDOS, cada vez que saluden. Las
+  // consultas concretas ("cuánto cuesta X", "me pasas el catálogo") se
+  // responden DIRECTO con saludo, sin secuencia ni medios.
   let secuenciaEnviada = false;
-  const decisionBienvenida = bienvenida.decidirSecuencia({ texto, chat: chatAntes, pideCatalogo: pideCatalogo(texto) });
-  if (decisionBienvenida.enviar) {
+  if (bienvenida.esSaludoOInfo(texto)) {
     const sinWsp = !!(cliente && (Array.isArray(cliente.etiquetas) ? cliente.etiquetas : String(cliente.etiquetas || '').split(',')).includes('sin-wsp'));
     const puerta = bienvenida.puedeBienvenida({
       telefono: tel,
@@ -1649,15 +1646,28 @@ async function manejarMensaje(msg, sesionId = null) {
     });
     if (!puerta.ok) {
       log(`Bienvenida omitida para +${tel}: ${puerta.motivo}.`);
-      if (decisionBienvenida.soloSecuencia) return;
-    } else {
-      secuenciaEnviada = true;
-      try {
-        await ejecutarSecuenciaBienvenida({ tel, nombre: nombreChat, clienteId: cliente?.id, sesionId });
-      } catch (e) { log('No se pudo enviar la bienvenida: ' + e.message); }
-      log(`Secuencia de bienvenida a +${tel} (${decisionBienvenida.motivo}).`);
-      if (decisionBienvenida.soloSecuencia) return;
+      return;
     }
+    secuenciaEnviada = true;
+    try {
+      await ejecutarSecuenciaBienvenida({ tel, nombre: nombreChat, clienteId: cliente?.id, sesionId });
+    } catch (e) { log('No se pudo enviar la bienvenida: ' + e.message); }
+    log(`Secuencia de bienvenida a +${tel}.`);
+    return;
+  }
+
+  // Pedido explícito del catálogo: respuesta directa (saludo + PDF + video).
+  if (esTextoReal && pideCatalogo(texto)) {
+    const s = saludoONada(tel, nombreChat);
+    if (s) {
+      try {
+        await enviarRegistrado({ tel, texto: `${s}. ¡Claro! Te comparto el catálogo 📕`, nombre: nombreChat, clienteId: cliente?.id, sesionId });
+      } catch (e) { log('No se pudo responder el pedido del catálogo: ' + e.message); }
+    }
+    try {
+      await enviarCatalogo({ tel, nombre: nombreChat, clienteId: cliente?.id, sesionId });
+    } catch (e) { log('No se pudo enviar el catálogo: ' + e.message); }
+    return;
   }
 
   // Flujos determinísticos de compra: resumen, método de pago y agenda.

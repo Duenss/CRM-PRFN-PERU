@@ -1,12 +1,10 @@
 // Bienvenida determinista (SIN IA) para chats de clientes.
 //
-// Regla de negocio (confirmada por el dueño, 2026-11-12): "hola", "hola info"
-// y los pedidos de catálogo disparan la secuencia completa — texto → PDF →
-// video → foto — para clientes NUEVOS y CONOCIDOS por igual, cada vez que
-// saludan. El primer mensaje de un cliente que nunca escribió también dispara
-// la secuencia y, si trae una consulta concreta, se responde después.
-// Un cliente conocido con una consulta concreta solo recibe la respuesta
-// (sin medios).
+// Regla de negocio (confirmada por el dueño, 2026-11-12):
+//  - "hola"/"hola info"/saludos → secuencia completa: texto → PDF → video →
+//    foto, para clientes NUEVOS y CONOCIDOS, cada vez que saluden.
+//  - Consultas concretas ("cuánto cuesta X", "me pasas el catálogo") se
+//    responden DIRECTO con saludo, sin secuencia ni medios (app.js).
 //
 // Secuencia: pausas cortas aleatorias (2-4 s) y UN reintento por medio. Si un
 // medio falla se registra y se sigue con los demás. Al final se programa la
@@ -157,26 +155,6 @@ export function esSaludoOInfo(texto) {
   return /^(informacion|info|me das informacion|me puedes dar informacion|me pasas informacion|quisiera informacion|quiero informacion|deseo informacion)(\b.*)?$/.test(t);
 }
 
-/**
- * Decide si un mensaje dispara la secuencia de bienvenida.
- *  - "hola"/"hola info"/pedido de catálogo → secuencia completa SIEMPRE
- *    (clientes nuevos y conocidos, cada vez que saluden); no se responde
- *    nada más: la secuencia ya lo cubre todo.
- *  - primer mensaje de un cliente que nunca escribió en el chat (aunque haya
- *    mensajes importados o del dueño) → secuencia y DESPUÉS se responde su
- *    consulta concreta.
- *  - cliente conocido con consulta concreta → sin secuencia (solo respuesta).
- */
-export function decidirSecuencia({ texto = '', chat = null, pideCatalogo = false }) {
-  if (esSaludoOInfo(texto)) return { enviar: true, motivo: 'saludo o pedido de información', soloSecuencia: true };
-  if (pideCatalogo) return { enviar: true, motivo: 'pide el catálogo', soloSecuencia: true };
-  const previos = Array.isArray(chat?.mensajes) ? chat.mensajes : [];
-  if (!previos.some(m => m && m.direccion === 'entrante')) {
-    return { enviar: true, motivo: 'primer mensaje del cliente', soloSecuencia: false };
-  }
-  return { enviar: false, motivo: 'cliente conocido con consulta concreta' };
-}
-
 /* ---------------- exclusiones ---------------- */
 
 /**
@@ -321,7 +299,7 @@ export function recargar() {
 
 export default {
   mediaDir, archivosDir, rutaMedia, validarMedios,
-  esSaludoOInfo, decidirSecuencia, puedeBienvenida,
+  esSaludoOInfo, puedeBienvenida,
   programarPregunta, cancelarPregunta, preguntasPendientes, marcarPreguntaEnviada, vencerPreguntas, textoPregunta,
   ejecutarSecuencia, recargar
 };
