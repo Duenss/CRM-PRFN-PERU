@@ -104,3 +104,26 @@
     directo en Supabase), así que no hay dónde llamarlo. Consecuencia: un cambio en esa tabla tarda
     hasta 5 min en verse en la IA. Si algún día se agrega el endpoint de configuración, debe llamar
     a `invalidarConfiguracion()`. (2026-11-12.)
+
+## Plan final/todo-en-uno (rama final/todo-en-uno, 2026-11-12)
+
+22. **Despliegue**: `/api/health` no expone versión/commit, así que desde fuera no se puede
+    confirmar que Coolify ya reconstruyó la imagen; solo se validó que el servicio responde
+    `{"ok":true}`. Revisar el deploy en Coolify tras el merge a master. (2026-11-12.)
+23. **Diseño**: los woff2 de Space Grotesk siguen en `assets/fonts/` aunque el rediseño ya no
+    los usa (se conservan por compatibilidad de caché); se pueden eliminar en una limpieza
+    futura junto con sus `@font-face`. (2026-11-12.)
+24. **Panel móvil**: el buscador global `#gsearch` se oculta a ≤760 px para no producir scroll
+    horizontal; las búsquedas por vista (Bandeja/Pedidos) y el resto de filtros siguen
+    disponibles. Si se quiere el buscador global en móvil, habría que moverlo a un botón/hoja.
+    (2026-11-12.)
+25. **Filtros persistentes**: si el dueño quiere volver a los filtros por defecto, debe borrar
+    `pf_bandeja_filtros_v1` y `pf_pedidos_filtros_v1` del localStorage del navegador (no hay
+    botón de "restablecer todo" fuera del de cada vista). (2026-11-12.)
+26. **SQL pendiente del dueño**: no se ejecutó nada en Supabase (no existe `SUPABASE_DB_URL` en
+    el entorno del agente). Queda preparado `sql/EJECUTAR_ESTO.sql` con los bloques 11 y 13.
+    Sin sql/11, el estado `error` de campaña (T4) no se podrá guardar; sin sql/13, la validación
+    anti-bloqueo no tiene columnas. (2026-11-12.)
+27. **Artefactos e2e**: `docs/auditoria/capturas/*.json` y `*.png` se regeneran en cada corrida
+    del arnés (timestamps); no tratarlos como que el panel cambió. Las capturas de diseño
+    revisadas viven en `docs/capturas/`. (2026-11-12.)
