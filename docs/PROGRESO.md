@@ -12,11 +12,16 @@
 | 4 · IA (ejemplos curados, respaldo ante fallo, evaluación) | ✅ | `22053d4` | 186/187 (1 fallo CRLF preexistente) |
 | 5 · Panel (filtros bandeja/pedidos, búsqueda persistente) | ✅ | `52f11fc` | e2e 20/20 · bot 231/232 (1 CRLF) |
 | 6 · Pendientes auditoría (T2, T3, T4, T5, T7, T8) | ✅ | `ad90f1b` | 231/232 (1 fallo CRLF preexistente) |
-| 7 · Rediseño dashboard (tokens, tipografía, capturas) | ⬜ | — | — |
-| Cierre (docs, tests finales, push, deploy, health) | ⬜ | — | — |
+| 7 · Rediseño dashboard (tokens, tipografía, capturas) | ✅ | `d4fa346` | e2e 20/20 · capturas 5 pantallas × 360/768/1280 |
+| Cierre (docs, tests finales, push, deploy, health) | ✅ | `0222300` (docs) | bot 231/232 (1 CRLF) · e2e 20/20 |
 
 ## Notas de la sesión
 
 - Base de producción antes de empezar: `GET /api/health` → `{"ok":true,"zombi":false}`.
 - `SUPABASE_DB_URL` no existe en el entorno: NO se ejecuta SQL; se deja `sql/EJECUTAR_ESTO.sql`.
 - Tag `pre-final` creado y subido antes de tocar código (punto de retorno).
+- Deploy temprano de las partes 1-3 a `master` verificado: `/api/health` OK (04:14 -05:00).
+- Partes 5 y 6 se integraron con revisión del Lead; Parte 6 (T2-T8) por subagente
+  con +45 tests nuevos.
+- Diseño verificado con capturas propias en `docs/capturas/` (5 pantallas × 3 anchos),
+  corrigiendo overflow horizontal, gráfico colapsado y cabecera del chat.

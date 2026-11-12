@@ -1,8 +1,8 @@
 {
   "kind": "e2e",
-  "ts": "2026-11-12T09:36:02.010Z",
-  "startedAt": "2026-11-12T09:35:12.462Z",
-  "durationMs": 49547,
+  "ts": "2026-11-12T09:54:39.308Z",
+  "startedAt": "2026-11-12T09:53:54.084Z",
+  "durationMs": 45224,
   "environment": {
     "node": "v24.16.0",
     "platform": "win32/x64",
@@ -14,9 +14,9 @@
   },
   "index": {
     "path": "C:\\Users\\Juan Pablo\\Documents\\WEB PROJECTS\\Crm Perfumeriafina\\index.html",
-    "bytes": 53925,
-    "sha256": "7ea897cd2fbade63dbf0f78bfb75d4cd01d5f42b662152d340e3ee9912c67f9f",
-    "mtime": "2026-11-12T09:27:38.156Z"
+    "bytes": 54163,
+    "sha256": "7d295c1d72bd8bb285c2f32b23428e6b8db129bb2805b0e239d9d880d093e6a8",
+    "mtime": "2026-11-12T09:50:06.742Z"
   },
   "supabaseScript": {
     "source": "bot/node_modules (offline)",
@@ -69,13 +69,13 @@
       "id": "E2E-08",
       "name": "Idle 20 s: sin mutaciones, sin polling de eventos ni recargas",
       "status": "PASS",
-      "detail": "0 mutaciones · 0 eventos · 2 req (conversaciones×1, estado×1) · 0 REST"
+      "detail": "0 mutaciones · 0 eventos · 1 req (conversaciones×1) · 0 REST"
     },
     {
       "id": "E2E-09",
       "name": "Fallo de red del bot NO borra la lista ya pintada",
       "status": "PASS",
-      "detail": "4 items intactos · aviso \"⚠ Sin conexión con el bot · datos de 04:35 a. m.\" · recuperada y asentada"
+      "detail": "4 items intactos · aviso \"⚠ Sin conexión con el bot · datos de 04:54 a. m.\" · recuperada y asentada"
     },
     {
       "id": "E2E-10",
@@ -155,7 +155,7 @@
     "pageErrors": [],
     "netErrors": [
       {
-        "ts": 1794476148753,
+        "ts": 1794477267239,
         "type": "error",
         "text": "Failed to load resource: net::ERR_EMPTY_RESPONSE",
         "url": "http://127.0.0.1:3199/api/conversaciones?limite=80&offset=0&filtro=todos&q="
@@ -163,7 +163,7 @@
     ],
     "requestFailures": [
       {
-        "ts": 1794476148749,
+        "ts": 1794477267229,
         "url": "http://127.0.0.1:3199/api/conversaciones?limite=80&offset=0&filtro=todos&q=",
         "method": "OPTIONS",
         "error": "net::ERR_EMPTY_RESPONSE"
@@ -173,8 +173,8 @@
   },
   "requests": {
     "botByPath": {
-      "/api/conversaciones": 28,
       "/api/estadisticas": 3,
+      "/api/conversaciones": 27,
       "/api/estado": 6,
       "/api/stream": 1,
       "/api/pedidos": 5,
@@ -188,7 +188,7 @@
       "/api/conversaciones/51910418951/leido": 1,
       "/api/conversaciones/51910418951/importar": 1
     },
-    "total": 59
+    "total": 58
   },
   "supabase": {
     "restRequests": 4,
