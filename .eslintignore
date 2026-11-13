@@ -1,0 +1,17 @@
+# .eslintignore
+node_modules/
+dist/
+build/
+*.log
+.env
+.env.*
+*.example
+bot/data/
+bot/.wwebjs_auth/
+bot/.wwebjs_cache/
+docs/catalogo/
+deploy/
+*.html
+assets/
+scripts/
+sql/

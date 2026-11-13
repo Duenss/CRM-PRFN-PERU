@@ -10,7 +10,12 @@
   "scripts": {
     "start": "node src/server.js",
     "mock": "node src/server.js --mock",
-    "test": "node --test \"test/*.test.mjs\""
+    "test": "node --test \"test/*.test.mjs\"",
+    "test:watch": "node --test --watch \"test/*.test.mjs\"",
+    "lint": "eslint src/**/*.js test/**/*.mjs",
+    "lint:fix": "eslint src/**/*.js test/**/*.mjs --fix",
+    "format": "prettier --write \"src/**/*.js\" \"test/**/*.mjs\" \"*.json\"",
+    "format:check": "prettier --check \"src/**/*.js\" \"test/**/*.mjs\" \"*.json\""
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.0",
@@ -18,5 +23,11 @@
     "express": "^5.3.0",
     "qrcode": "^1.5.4",
     "whatsapp-web.js": "^1.34.7"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.15.0",
+    "eslint": "^9.15.0",
+    "globals": "^15.12.0",
+    "prettier": "^3.3.3"
   }
 }

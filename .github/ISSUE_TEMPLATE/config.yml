@@ -1,0 +1,14 @@
+# .github/ISSUE_TEMPLATE/config.yml
+# Configuration for GitHub Issues
+
+blank_issues_enabled: false
+contact_links:
+  - name: 📖 Documentation & Guides
+    url: https://github.com/duenss/crm-perfumeriafina/tree/master/docs
+    about: Check ENTREGA.md, GUIA-DUENO.md, DESPLIEGUE-PRODUCCION.md, etc.
+  - name: 💬 Discussions / Questions
+    url: https://github.com/duenss/crm-perfumeriafina/discussions
+    about: Ask questions, propose ideas, get help from community
+  - name: 🔒 Report Security Vulnerability Privately
+    url: https://github.com/duenss/crm-perfumeriafina/security/advisories/new
+    about: Use this for sensitive security issues (not public issues)

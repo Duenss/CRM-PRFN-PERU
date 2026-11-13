@@ -1,0 +1,31 @@
+# .github/CODEOWNERS
+# Code owners for automatic review requests
+
+# Global owners (all files)
+* @duenss
+
+# Bot backend
+/bot/ @duenss
+
+# Panel frontend
+/assets/ @duenss
+/index.html @duenss
+/functions/ @duenss
+
+# Database migrations
+/sql/ @duenss
+
+# CI/CD and deployment
+/.github/ @duenss
+/docker-compose.yml @duenss
+/bot/Dockerfile @duenss
+/ecosystem.config.cjs @duenss
+
+# Documentation
+/docs/ @duenss
+/README.md @duenss
+/CHANGELOG.md @duenss
+/SECURITY.md @duenss
+
+# Scripts and tools
+/scripts/ @duenss

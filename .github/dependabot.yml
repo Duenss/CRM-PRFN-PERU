@@ -1,0 +1,58 @@
+# .github/dependabot.yml
+# Automated dependency updates for security and maintenance
+
+version: 2
+updates:
+  # Bot dependencies (npm)
+  - package-ecosystem: "npm"
+    directory: "bot"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/Lima"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "bot"
+    commit-message:
+      prefix: "deps(bot):"
+    groups:
+      dev-dependencies:
+        patterns:
+          - "@eslint/*"
+          - "eslint"
+          - "prettier"
+          - "globals"
+        update-types:
+          - "minor"
+          - "patch"
+      production-dependencies:
+        patterns:
+          - "@supabase/*"
+          - "dotenv"
+          - "express"
+          - "qrcode"
+          - "whatsapp-web.js"
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      # Major updates require manual review
+      - dependency-type: "all"
+        update-type: "version-update:semver-major"
+
+  # GitHub Actions dependencies
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:30"
+      timezone: "America/Lima"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "deps(actions):"
