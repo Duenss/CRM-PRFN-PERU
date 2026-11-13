@@ -1,8 +1,8 @@
 {
   "kind": "e2e",
-  "ts": "2026-11-12T21:25:33.635Z",
-  "startedAt": "2026-11-12T21:24:45.981Z",
-  "durationMs": 47653,
+  "ts": "2026-11-13T00:07:02.281Z",
+  "startedAt": "2026-11-13T00:06:16.247Z",
+  "durationMs": 46034,
   "environment": {
     "node": "v24.16.0",
     "platform": "win32/x64",
@@ -75,7 +75,7 @@
       "id": "E2E-09",
       "name": "Fallo de red del bot NO borra la lista ya pintada",
       "status": "PASS",
-      "detail": "4 items intactos · aviso \"⚠ Sin conexión con el bot · datos de 04:25 p. m.\" · recuperada y asentada"
+      "detail": "4 items intactos · aviso \"⚠ Sin conexión con el bot · datos de 07:06 p. m.\" · recuperada y asentada"
     },
     {
       "id": "E2E-10",
@@ -153,7 +153,7 @@
       "id": "E2E-11",
       "name": "Cero errores de consola JS y cero pageerror en toda la corrida",
       "status": "PASS",
-      "detail": "0 console.error JS · 0 pageerror · 2 aviso(s) de red esperados (fallo simulado/imágenes offline)"
+      "detail": "0 console.error JS · 0 pageerror · 1 aviso(s) de red esperados (fallo simulado/imágenes offline)"
     }
   ],
   "totals": {
@@ -167,13 +167,7 @@
     "pageErrors": [],
     "netErrors": [
       {
-        "ts": 1794518720790,
-        "type": "error",
-        "text": "Failed to load resource: net::ERR_EMPTY_RESPONSE",
-        "url": "http://127.0.0.1:3199/api/conversaciones?limite=80&offset=0&filtro=todos&q="
-      },
-      {
-        "ts": 1794518720938,
+        "ts": 1794528409735,
         "type": "error",
         "text": "Failed to load resource: net::ERR_EMPTY_RESPONSE",
         "url": "http://127.0.0.1:3199/api/conversaciones?limite=80&offset=0&filtro=todos&q="
@@ -181,13 +175,7 @@
     ],
     "requestFailures": [
       {
-        "ts": 1794518720780,
-        "url": "http://127.0.0.1:3199/api/conversaciones?limite=80&offset=0&filtro=todos&q=",
-        "method": "OPTIONS",
-        "error": "net::ERR_EMPTY_RESPONSE"
-      },
-      {
-        "ts": 1794518720938,
+        "ts": 1794528409728,
         "url": "http://127.0.0.1:3199/api/conversaciones?limite=80&offset=0&filtro=todos&q=",
         "method": "OPTIONS",
         "error": "net::ERR_EMPTY_RESPONSE"
@@ -198,7 +186,7 @@
   "requests": {
     "botByPath": {
       "/api/estadisticas": 3,
-      "/api/conversaciones": 28,
+      "/api/conversaciones": 29,
       "/api/estado": 6,
       "/api/stream": 1,
       "/api/pedidos": 5,
@@ -207,7 +195,7 @@
       "/api/ia": 1,
       "/api/ajustes": 3,
       "/api/archivos": 3,
-      "/api/logs": 2,
+      "/api/logs": 1,
       "/api/conversaciones/51910418951": 6,
       "/api/conversaciones/51910418951/leido": 2,
       "/api/conversaciones/51910418951/importar": 2,
