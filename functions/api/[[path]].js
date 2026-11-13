@@ -56,6 +56,7 @@ const TIEMPOS_LENTOS = [
   { re: /^\/api\/(sincronizar|borradores|sesion|logout|prueba)/, ms: 150000 },
   { re: /^\/api\/anuncios\/ia/, ms: 120000 },
   { re: /^\/api\/(enviar|revisar)/, ms: 60000 },
+  { re: /^\/api\/conversaciones\/[^/]+\/enviar-media$/, ms: 180000 },
   { re: /^\/api\/archivos/, ms: 180000 }
 ];
 function tiempoMaximo(ruta) {
