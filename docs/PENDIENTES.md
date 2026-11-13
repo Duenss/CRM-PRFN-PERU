@@ -146,3 +146,11 @@
     resolver (número oculto), el mensaje entrante se descarta para no crear un chat fantasma.
     Queda un log `Mensaje de un LID sin número resoluble`. Si en el futuro se decide mostrarlo,
     hace falta un esquema de clave `lid:<uid>` en la Bandeja y en el panel.
+
+33. **Fotos de producto**: el bot ya usa las fotos empaquetadas en `bot/media/products/`
+    (desde la web del dueño) y no la columna `productos.imagen_ruta`. Si Supabase tenía rutas
+    viejas, quedan como legado; para regenerar fotos: `scripts/importar-imagenes-web.py`.
+    Si un perfume no tiene foto correcta, pedir la imagen al dueño y volver a ejecutar el script.
+34. **9 fotos convertidas desde `.webp`** (212-sexy, 360, 212-vip, 212-vip-rose, lair-du-temps,
+    coco, classique, tommy-girl, valentino-woman): verificar visualmente que sean el perfume
+    correcto y pedir reemplazo si no.

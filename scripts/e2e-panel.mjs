@@ -244,6 +244,10 @@ function createBotMock() {
   /* ---- conversaciones fixture ---- */
   const nowMs = Date.now();
   const isoAgo = mins => new Date(nowMs - mins * 60000).toISOString();
+  // Fechas "recientes" que SIEMPRE caen en el día local actual (evita que el
+  // test de rangos falle si la corrida empieza justo después de medianoche).
+  const inicioHoyMs = (() => { const d = new Date(nowMs); d.setHours(0, 0, 0, 0); return d.getTime(); })();
+  const isoHoy = mins => new Date(Math.max(nowMs - mins * 60000, inicioHoyMs + 60000)).toISOString();
   // Reloj FIJO para los eventos SSE: si usáramos "ahora" en cada emisión, el texto
   // HH:MM de la lista cambiaría al cruzar el minuto durante la ventana de idle y el
   // panel repintaría (falso positivo). Con timestamp fijo el HTML es estable.
@@ -289,7 +293,7 @@ function createBotMock() {
       clienteId: 'c1',
       noLeidos: 2,
       ultimoTexto: 'Mensaje del cliente #29: consulta sobre perfumes',
-      ultimoEn: isoAgo(2),
+      ultimoEn: isoHoy(2),
       pin: false,
       wa: true,
       mensajes: seedMessages(),
@@ -306,7 +310,7 @@ function createBotMock() {
       clienteId: 'c2',
       noLeidos: 0,
       ultimoTexto: 'Gracias, lo reviso',
-      ultimoEn: isoAgo(60),
+      ultimoEn: isoHoy(60),
       pin: false,
       wa: true,
       mensajes: [
@@ -326,7 +330,7 @@ function createBotMock() {
       clienteId: 'c3',
       noLeidos: 1,
       ultimoTexto: '¿Cuánto cuesta el de 100 ml?',
-      ultimoEn: isoAgo(20),
+      ultimoEn: isoHoy(20),
       pin: false,
       wa: true,
       mensajes: [
@@ -613,6 +617,7 @@ function createBotMock() {
           },
           {
             id: 'P-0002', telefono: '51955512345', nombre: 'Lucía Torres', estado: 'comprobante_recibido',
+            creadoEn: new Date(nowMs).toISOString(),
             entrega: 'delivery', fechaEntrega: '',
             items: [{ cantidad: 1, nombre: 'Árabe Blanco', ml: 50, precio: 45 }],
             total: 45, saldo: 0, metodo: 'yape', actualizado: new Date(nowMs - 2 * 3600e3).toISOString(),

@@ -1,0 +1,1836 @@
+{
+  "generado": "2026-11-13",
+  "origen": "perfumeria-fina-peru",
+  "total": 202,
+  "convertidas_desde_webp": [
+    "212-sexy",
+    "212-vip",
+    "212-vip-rose",
+    "360",
+    "classique",
+    "coco",
+    "lair-du-temps",
+    "tommy-girl",
+    "valentino-woman"
+  ],
+  "items": [
+    {
+      "id": "1-million",
+      "archivo": "1-million.jpg",
+      "origen": "v05_00.jpg",
+      "sha256": "dd8563f5751290f95246ab2667428640eddaee833145f36f0ec19ec8e3797e0b",
+      "bytes": 32174,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "1-million-elixir",
+      "archivo": "1-million-elixir.jpg",
+      "origen": "v08_05.jpg",
+      "sha256": "da068bdcdc477c6d8ad9789aa7091e4ab20cab33da1d4c8eda4e03e1722744e4",
+      "bytes": 33059,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "1-million-gold",
+      "archivo": "1-million-gold.jpg",
+      "origen": "v05_03.jpg",
+      "sha256": "f70cf1f96e44f9490efba1bde921d27e785d2b6e9d43fcd556abd086feb275f7",
+      "bytes": 30850,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "1-million-lucky",
+      "archivo": "1-million-lucky.jpg",
+      "origen": "v08_06.jpg",
+      "sha256": "ce8dda35cd46af2787f92f033764ad2444eff0a335d2d890b9dbd225d0958081",
+      "bytes": 31665,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "1-million-night-elixir",
+      "archivo": "1-million-night-elixir.jpg",
+      "origen": "v10_03.jpg",
+      "sha256": "ddddc72a1e01cbb98ab51a344c216e98351f9b2a19c66b4e6e3ddeca478c48e1",
+      "bytes": 32513,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "1-million-prive",
+      "archivo": "1-million-prive.jpg",
+      "origen": "v05_04.jpg",
+      "sha256": "ef62f8ccb2d314301de1391c88e8a1e098ed9d7cb0e64f586c3114f12e93253f",
+      "bytes": 28555,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "212",
+      "archivo": "212.jpg",
+      "origen": "d03_0.jpg",
+      "sha256": "43590f503fe89c0c626b77d6671d4594f7ea9d5f3c75490bfb6df1b2b039abe4",
+      "bytes": 33595,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "212-heroes",
+      "archivo": "212-heroes.jpg",
+      "origen": "v03_07.jpg",
+      "sha256": "1b0f645c4ebc4ab8e3c19fd9fb23b073e9a209ce1bc861ba812b1f45cdcc6a17",
+      "bytes": 36116,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "212-men",
+      "archivo": "212-men.jpg",
+      "origen": "v03_05.jpg",
+      "sha256": "9f86355099af24cf254ed014f22b3f0fbcd4067f475fba50c88b1163a4dba819",
+      "bytes": 26532,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "212-sexy",
+      "archivo": "212-sexy.jpg",
+      "origen": "d03_1.webp",
+      "sha256": "e4eaff8289a2f52777c0fac20d3f26d8562ecc56d31ec6bbe7120a7cb1705002",
+      "bytes": 31542,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "212-sexy-men",
+      "archivo": "212-sexy-men.jpg",
+      "origen": "v07_08.jpg",
+      "sha256": "2fbe632c4b4ddcf55a9915e72c1bdb5641e35a9c3c3d121b353459558ca0dc50",
+      "bytes": 28868,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "212-vip",
+      "archivo": "212-vip.jpg",
+      "origen": "d04_0.webp",
+      "sha256": "3ee0fc203e95cb3e9d980f7649b9bea07a4fd0ff137c011eecbad23064f7fe98",
+      "bytes": 41341,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "212-vip-black",
+      "archivo": "212-vip-black.jpg",
+      "origen": "v07_10.jpg",
+      "sha256": "010c0406fd0b31c4b2162841d003843cc538bcb15234002ea1054b9375026dd2",
+      "bytes": 27503,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "212-vip-black-red",
+      "archivo": "212-vip-black-red.jpg",
+      "origen": "v07_07.jpg",
+      "sha256": "c2a71b22e25e68e3bcb625042e0f9e28805dc43130a8cf1eb4d1696437f53ecd",
+      "bytes": 35013,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "212-vip-rose",
+      "archivo": "212-vip-rose.jpg",
+      "origen": "d04_1.webp",
+      "sha256": "f6221b9d9d31616d8019ad3f89d64fc0c9eef54989f6b1c62408adb54ab72b7e",
+      "bytes": 34454,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "360",
+      "archivo": "360.jpg",
+      "origen": "d03_2.webp",
+      "sha256": "f40058c461f49e42078d9bda1212697a1573cf43d398f39bc269d9a41e598979",
+      "bytes": 20932,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "9pm",
+      "archivo": "9pm.jpg",
+      "origen": "9pm.jpg",
+      "sha256": "b8f767866c66498ae98c35bc7c90d9ec037334a31601f338c271466eac62fba4",
+      "bytes": 24366,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "9pm-rebel",
+      "archivo": "9pm-rebel.jpg",
+      "origen": "v14_04.jpg",
+      "sha256": "2ece80c808a5ba494f2deed6514d765e7fda68d8a060cfb752497bbecef2e9c9",
+      "bytes": 26403,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "absolu-aventus",
+      "archivo": "absolu-aventus.jpg",
+      "origen": "v16_01.jpg",
+      "sha256": "8a1a666de6ceb5ad1d13e620c023bf99d76f7a5a8470562670bff9c3bffd53c6",
+      "bytes": 30451,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "acqua-di-gio",
+      "archivo": "acqua-di-gio.jpg",
+      "origen": "v01_04.jpg",
+      "sha256": "f48b9270adc1fddef1329e1403b9bd7bc6afa02acd234e6e2e237f388c961e03",
+      "bytes": 30136,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "acqua-di-gio-profondo",
+      "archivo": "acqua-di-gio-profondo.jpg",
+      "origen": "v01_06.jpg",
+      "sha256": "367dd4e1bc19a2dac72a35722d61f9b09577a9428d4213b34dcff1dcfa439c9f",
+      "bytes": 30917,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "acqua-di-gio-profumo",
+      "archivo": "acqua-di-gio-profumo.jpg",
+      "origen": "v01_08.jpg",
+      "sha256": "7f0ead02f87c7561a6971482388a03c0e46957373eb3354ba50e25cd7ebdca0e",
+      "bytes": 29640,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "althair",
+      "archivo": "althair.jpg",
+      "origen": "v18_08.jpg",
+      "sha256": "058859250c88c730f425fc489f1afecb414ba1e507d22c2fc5f5e86199bec214",
+      "bytes": 27777,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "amber-oud-gold-edition",
+      "archivo": "amber-oud-gold-edition.jpg",
+      "origen": "v13_01.jpg",
+      "sha256": "d0eec0917668e063a7fb33e8b999d2a95512cbf0d301410ad2ee1c6b05726444",
+      "bytes": 41919,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "amber-rouge",
+      "archivo": "amber-rouge.jpg",
+      "origen": "v15_00.jpg",
+      "sha256": "a5d15a1cc954e8bcd5e2ca16a77bcfcce80e52ade2f8b43faec146d32d95883b",
+      "bytes": 58174,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "amber-wood",
+      "archivo": "amber-wood.jpg",
+      "origen": "v17_04.jpg",
+      "sha256": "92c348d33a0d22eec1c4dd998d4968010afdb5be0817243b9f0568f302de8aed",
+      "bytes": 32832,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "anais-anais",
+      "archivo": "anais-anais.jpg",
+      "origen": "d05_0.jpg",
+      "sha256": "5bd23a111f445f2e403daf7ae436ee8831d7efe4849853c4e583f84f9e7faf68",
+      "bytes": 30456,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "ange-ou-demon",
+      "archivo": "ange-ou-demon.jpg",
+      "origen": "d05_1.jpg",
+      "sha256": "f015482d40f6ded2f916e8397fbf1508f83c39417f31e97d4d2ea961b61754d0",
+      "bytes": 40959,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "angel",
+      "archivo": "angel.jpg",
+      "origen": "d05_2.jpg",
+      "sha256": "2d41a18e23e73e85957e4fc6533308c96299c55280fc764500866efcd42c4ea7",
+      "bytes": 83515,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "aqva-pour-homme",
+      "archivo": "aqva-pour-homme.jpg",
+      "origen": "v01_09.jpg",
+      "sha256": "d919bcfe5a547e5ead2796e943a3429f8118519b1c00d383ef4350e1f3cabf7e",
+      "bytes": 29103,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "arabians-tonka",
+      "archivo": "arabians-tonka.jpg",
+      "origen": "v19_03.jpg",
+      "sha256": "aebb66736abadd0b1bb75b5d9c2903bf24bc1437e293341101217e77de2f95be",
+      "bytes": 38729,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "armani-code",
+      "archivo": "armani-code.jpg",
+      "origen": "v05_09.jpg",
+      "sha256": "ae406aded9739b31f07abd5a1e5c324d4f838d7009bd1a95f7edcd95f73ab6a9",
+      "bytes": 20678,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "asad",
+      "archivo": "asad.jpg",
+      "origen": "asad.jpg",
+      "sha256": "c69c3c79218ad922aac5f5573429dada98eb2abea006382ed87ef042c159f531",
+      "bytes": 33253,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "asad-bourbon",
+      "archivo": "asad-bourbon.jpg",
+      "origen": "v15_03.jpg",
+      "sha256": "a55ad7a5c1ba085c9ff82b09972cefc4992e63e01ddb1ea6ed8ac3ffae8043f3",
+      "bytes": 30756,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "asad-elixir",
+      "archivo": "asad-elixir.jpg",
+      "origen": "v13_02.jpg",
+      "sha256": "3b5692578b4c5383e5c07219ef5eeee2ec16463273797b8047c79fd4e4965292",
+      "bytes": 28597,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "asad-zanzibar",
+      "archivo": "asad-zanzibar.jpg",
+      "origen": "v12_00.jpg",
+      "sha256": "4964f89da00ae9a9c65a9c854ccee1935ce4e3e0f299da47604ec995fefbd77c",
+      "bytes": 33968,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "aventus",
+      "archivo": "aventus.jpg",
+      "origen": "aventus.jpg",
+      "sha256": "440d3c6cd115612585fb7fed160e11ac9444768c9bc17c14d52ca342e0552350",
+      "bytes": 36958,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "baccarat-rouge-540",
+      "archivo": "baccarat-rouge-540.jpg",
+      "origen": "baccarat-rouge-540.jpg",
+      "sha256": "f353ff2223bfc1adce21094548f9afa416c70f868afdc9f0ac0ba4b45b303a0c",
+      "bytes": 42590,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "baccarat-rouge-540-extrait-de-parfum",
+      "archivo": "baccarat-rouge-540-extrait-de-parfum.jpg",
+      "origen": "v18_01.jpg",
+      "sha256": "a06134349bd28a91f90b8098f4209df31db1216d62cbbb11d6c340f220193418",
+      "bytes": 42197,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "bad-boy",
+      "archivo": "bad-boy.jpg",
+      "origen": "v05_06.jpg",
+      "sha256": "74b782687b07d283d287dc6bacda056ed39f4e5690274fcefbec91345a15779a",
+      "bytes": 23137,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "bad-boy-dazzling-garden",
+      "archivo": "bad-boy-dazzling-garden.jpg",
+      "origen": "v07_03.jpg",
+      "sha256": "b9b7213278ed152af3b3cacf1e1c1ca5ce3665621a0b4c5d35eeddd7821af720",
+      "bytes": 26133,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "badee-al-oud-honor-glory",
+      "archivo": "badee-al-oud-honor-glory.jpg",
+      "origen": "badee-al-oud-honor-glory.jpg",
+      "sha256": "8f2cf86a221739e704d52e4ad7858c01a4e31037ab4f193e6a2a090422e4ac4d",
+      "bytes": 54430,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "badee-al-oud-sublime",
+      "archivo": "badee-al-oud-sublime.jpg",
+      "origen": "v14_03.jpg",
+      "sha256": "0718d4b1cd103a0e8b8da1186abaca9a2467ededf68cbe382c1b8f3791464567",
+      "bytes": 61459,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "berry-santal",
+      "archivo": "berry-santal.jpg",
+      "origen": "d27_0.jpg",
+      "sha256": "f7802bd5ead6a2d9593af1c0241912bd30baeceeb6153ed125dba8c65510d73b",
+      "bytes": 73954,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "black-afgano",
+      "archivo": "black-afgano.jpg",
+      "origen": "v17_01.jpg",
+      "sha256": "8d3cacd33428e4a2e93a3e6cb3f7d90f7c9378f2846f38f6feba89039dda7c0a",
+      "bytes": 25434,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "black-opium",
+      "archivo": "black-opium.jpg",
+      "origen": "d18_0.jpg",
+      "sha256": "637e3b153c1118abb5fc13f22265c852f2a60ac701d9a274054a88e92a6f75e3",
+      "bytes": 123206,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "black-xs",
+      "archivo": "black-xs.jpg",
+      "origen": "v07_09.jpg",
+      "sha256": "9031e44c3714f064e6404c975ca7576806a30e2a60076982d3802bf3415286ba",
+      "bytes": 31595,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "bleu-de-chanel",
+      "archivo": "bleu-de-chanel.jpg",
+      "origen": "bleu-de-chanel.jpg",
+      "sha256": "34da00181dc17952551d1229b238eea5fb7306375944e7a885119fc8278ce3fa",
+      "bytes": 37900,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "bleu-de-chanel-eau-de-parfum",
+      "archivo": "bleu-de-chanel-eau-de-parfum.jpg",
+      "origen": "v03_03.jpg",
+      "sha256": "860ec12f5bee1847e2c020a20531ec6639c370f45a862c9381bd2b459b98fe00",
+      "bytes": 35974,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "blush",
+      "archivo": "blush.jpg",
+      "origen": "d10_2.jpg",
+      "sha256": "4e201ac635b14038ce0b6982f65f93707080939806141a630c23391ba944d326",
+      "bytes": 42753,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "bombshell",
+      "archivo": "bombshell.jpg",
+      "origen": "d06_0.jpg",
+      "sha256": "541bfdba1aa1a82ce032526de408630653cff97845369e72e55d01c346924406",
+      "bytes": 115675,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "boss-bottled",
+      "archivo": "boss-bottled.jpg",
+      "origen": "v03_04.jpg",
+      "sha256": "ae6b6954cf27e887b4eac8f49cd257249ec03fba175477ebf8ce4c683ad7ccc1",
+      "bytes": 30403,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "boss-bottled-night",
+      "archivo": "boss-bottled-night.jpg",
+      "origen": "v09_07.jpg",
+      "sha256": "d96ffb2d62742d14d40b262c7ff5e20e2d31e7fe25b80e2a92d9cbefa6962c94",
+      "bytes": 33794,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "boss-bottled-tonic",
+      "archivo": "boss-bottled-tonic.jpg",
+      "origen": "v01_03.jpg",
+      "sha256": "756d52affcab5ded352ea85e0125d340681b079524abcd23e72df0a21f5e7457",
+      "bytes": 35176,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "boss-bottled-unlimited",
+      "archivo": "boss-bottled-unlimited.jpg",
+      "origen": "v03_09.jpg",
+      "sha256": "eac09bd69b3fd88aa198b024abbcd8f0cc75f08ec1bd7d6bce3c9f0d298fa62a",
+      "bytes": 26472,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "boss-the-scent-elixir-for-him",
+      "archivo": "boss-the-scent-elixir-for-him.jpg",
+      "origen": "v07_06.jpg",
+      "sha256": "dd9ddae3cc2b52f0c7c246980835cc00b80b0146aaef4f3a8599399daefedc7d",
+      "bytes": 38098,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "boss-woman",
+      "archivo": "boss-woman.jpg",
+      "origen": "d11_1.jpg",
+      "sha256": "fe5eb149861bb5b5203c2fe3fc7124729ff25b0e22d12c8abd9c4386bd0f860f",
+      "bytes": 83991,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "bvlgari-man-in-black",
+      "archivo": "bvlgari-man-in-black.jpg",
+      "origen": "v05_07.jpg",
+      "sha256": "5afcec9bb22ee87e982b963f6812ba1ef44ea9fe99c50f66d7e8a3d1717e525d",
+      "bytes": 30230,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "bvlgari-man-wood-essence",
+      "archivo": "bvlgari-man-wood-essence.jpg",
+      "origen": "v06_06.jpg",
+      "sha256": "8f04dd8d785784090bb2e99c7169846ee00b301d07040e36ab08c373f2a075e8",
+      "bytes": 38701,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "carmina",
+      "archivo": "carmina.jpg",
+      "origen": "carmina.jpg",
+      "sha256": "0ae622f14c02ba310c2b5b2504208a91ea49cd53e85f1c52619af78b41e7b436",
+      "bytes": 26826,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "carolina-herrera",
+      "archivo": "carolina-herrera.jpg",
+      "origen": "d06_1.jpg",
+      "sha256": "ec1b3cead9ba26d779359031695f9e29d8e1184f8f2026a60aa5dae62389a4ae",
+      "bytes": 57667,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "ch",
+      "archivo": "ch.jpg",
+      "origen": "d06_2.jpg",
+      "sha256": "84957eae8d2ecf4bd6fba83404182769bd673d3b2856273e3fc0ea630206f654",
+      "bytes": 92183,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "ch-men",
+      "archivo": "ch-men.jpg",
+      "origen": "v05_08.jpg",
+      "sha256": "f880daa0e55025a1b8bdf8ae9833229c29b565bfbdddec42d9025c5e2f52b654",
+      "bytes": 41907,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "ch-men-prive",
+      "archivo": "ch-men-prive.jpg",
+      "origen": "v05_02.jpg",
+      "sha256": "00ca230733a1330c1b8a0402e0d92ed372eb80ff50bc6c9bcfc849a0f2b4c514",
+      "bytes": 29587,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "chance",
+      "archivo": "chance.jpg",
+      "origen": "d07_1.jpg",
+      "sha256": "313840e668aedb76d33fb8c3a24ad04d862609cc9972b62c85533a99734edc7c",
+      "bytes": 80595,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "ck-in2u-for-him",
+      "archivo": "ck-in2u-for-him.jpg",
+      "origen": "v01_10.jpg",
+      "sha256": "029022e6f2125d56e0957d6476fda01496c8991a3b6b059fe0a2da817fe69106",
+      "bytes": 23013,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "ck-one",
+      "archivo": "ck-one.jpg",
+      "origen": "v01_07.jpg",
+      "sha256": "283a1f8d271816969322d2480439818177cbdfa76088516f3127385af5dee7d0",
+      "bytes": 25880,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "classique",
+      "archivo": "classique.jpg",
+      "origen": "d11_2.webp",
+      "sha256": "cb158677ace2f4074a848a09cd14378f967b998f01540bfc4d6c6e2a6d68d92d",
+      "bytes": 29202,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "cloud",
+      "archivo": "cloud.jpg",
+      "origen": "d26_0.jpg",
+      "sha256": "d7ff11b19e2ce7b1650c1d220ffee044f7e6e1318701930eb8171952ddfad745",
+      "bytes": 63018,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "club-de-nuit-intense-man",
+      "archivo": "club-de-nuit-intense-man.jpg",
+      "origen": "v11_04.jpg",
+      "sha256": "48f4d937b47672653d48e1c1268f575c53c26b31f098127361dcad97c6a4e87a",
+      "bytes": 25515,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "club-de-nuit-milestone",
+      "archivo": "club-de-nuit-milestone.jpg",
+      "origen": "v12_02.jpg",
+      "sha256": "0506103d083ddfc1be87d72a1467e49ec7b70c3f64c3bbcf55218ac51653f2db",
+      "bytes": 35718,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "coco",
+      "archivo": "coco.jpg",
+      "origen": "d07_2.webp",
+      "sha256": "4dd176c11c147d547b37c5f1a251f5781dc7a63835d73e89bd626eff8a4e762d",
+      "bytes": 47412,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "coco-mademoiselle",
+      "archivo": "coco-mademoiselle.jpg",
+      "origen": "coco-mademoiselle.jpg",
+      "sha256": "f0078ddbf653581c72e4782a613491ba427e4aeccd6c29d7f4042b836405bd51",
+      "bytes": 26365,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "coconut-passion",
+      "archivo": "coconut-passion.jpg",
+      "origen": "d27_1.jpg",
+      "sha256": "34c335fd7216fea515a499037cf136f6c79264551938672bd6a8cd3b34daa226",
+      "bytes": 48124,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "delina",
+      "archivo": "delina.jpg",
+      "origen": "delina.jpg",
+      "sha256": "70e7ec1a378c1b936c78ebd4a55e11f8142f6da4d245d628ffd8992ab4503ce4",
+      "bytes": 22186,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "devotion-pour-homme-parfum",
+      "archivo": "devotion-pour-homme-parfum.jpg",
+      "origen": "v05_01.jpg",
+      "sha256": "8a862e519e52b5b4bb879fc1788fed5c0256fda74a46eb6fa64c5fa3391782c5",
+      "bytes": 39858,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "dolce",
+      "archivo": "dolce.jpg",
+      "origen": "d08_2.jpg",
+      "sha256": "75c7c96e7190c98571e4a50c5bb23ccd32e002d793b67d4eaffcfeb4fdd634ba",
+      "bytes": 77768,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "dune",
+      "archivo": "dune.jpg",
+      "origen": "d08_1.jpg",
+      "sha256": "ddd3f8b3c25f9bb900c2642b7ef3a1fad3bcc2320d1d5df35c546eaef899e77f",
+      "bytes": 115183,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "eclaire",
+      "archivo": "eclaire.jpg",
+      "origen": "d22_1.jpg",
+      "sha256": "56ca833c6cfe37587d8cf0f1a202a53be86bd3c910559351ec9ff291a15a98a1",
+      "bytes": 54839,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "emporio-armani-stronger-with-you",
+      "archivo": "emporio-armani-stronger-with-you.jpg",
+      "origen": "v08_04.jpg",
+      "sha256": "070989aa9cf46084db2aa10437371f7680adb45dd3811a578ff7a211020450d2",
+      "bytes": 42206,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "emporio-armani-stronger-with-you-intensely",
+      "archivo": "emporio-armani-stronger-with-you-intensely.jpg",
+      "origen": "v09_04.jpg",
+      "sha256": "eb09936c0b06ceda6516ce051d5fd0002ad43e7bf8c786b9a7ae415f61391f78",
+      "bytes": 42398,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "erba-pura",
+      "archivo": "erba-pura.jpg",
+      "origen": "v07_02.jpg",
+      "sha256": "d70a97c85fac5273a0c522edc2cc476a31839f5ee960a735902ef6f537956ffc",
+      "bytes": 24196,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "eros",
+      "archivo": "eros.jpg",
+      "origen": "v04_00.jpg",
+      "sha256": "7005531d3060b753c83c721be5d3056f0c5beead694b13be79536206dfab2e20",
+      "bytes": 66827,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "eros-energy",
+      "archivo": "eros-energy.jpg",
+      "origen": "v01_02.jpg",
+      "sha256": "ba36c48b91d824b4f1d8abddc95b26e4242dd2d3306bfff0673a3672746239d3",
+      "bytes": 61568,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "eros-flame",
+      "archivo": "eros-flame.jpg",
+      "origen": "v02_01.jpg",
+      "sha256": "a92da3442375471b5726777143919bdf379d2b2afe2034fb4579c26521a68333",
+      "bytes": 70491,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "eros-pour-femme",
+      "archivo": "eros-pour-femme.jpg",
+      "origen": "d18_2.jpg",
+      "sha256": "43a36b217817d947fb73675b7250abf83c23aa8ad107dcdba3bc3f5df98eae52",
+      "bytes": 162169,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "eternity-for-men",
+      "archivo": "eternity-for-men.jpg",
+      "origen": "v03_08.jpg",
+      "sha256": "5d22e0403fc57a6672ebcb1070f0e1cc5f133d71521cd5360421503a5494c731",
+      "bytes": 44560,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "fahrenheit",
+      "archivo": "fahrenheit.jpg",
+      "origen": "v05_05.jpg",
+      "sha256": "e3a7f4402a2ddf53a71f7c7c78e5f3495949a3389a7e55fbf2501c7284fea969",
+      "bytes": 29669,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "fakhar-black",
+      "archivo": "fakhar-black.jpg",
+      "origen": "v12_03.jpg",
+      "sha256": "2733370513063e9240dff54abbd7917b95ec1b45cae79ae1591b5ddcfd379cd4",
+      "bytes": 40676,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "fakhar-extrait",
+      "archivo": "fakhar-extrait.jpg",
+      "origen": "v13_03.jpg",
+      "sha256": "f6340d7589a7b53e28ecc3324dbe209ea64783348cadc3264adaf465dd684c2d",
+      "bytes": 45316,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "fame",
+      "archivo": "fame.jpg",
+      "origen": "d17_2.jpg",
+      "sha256": "cbcc6c7fbb8ec25ed14031f356b3d263bc349acab6d1cb1c584e6115ff94cbb2",
+      "bytes": 117002,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "fantasy",
+      "archivo": "fantasy.jpg",
+      "origen": "d24_0.jpg",
+      "sha256": "04352e49cb3787441e16640c63429945cf63f90f019dbfb221f1904091a3f0b8",
+      "bytes": 108535,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "flower-by-kenzo",
+      "archivo": "flower-by-kenzo.jpg",
+      "origen": "d09_1.jpg",
+      "sha256": "8a2410003fded14c148502dbeb7aec9f909a24d61011cb93f04182c408bbc676",
+      "bytes": 24994,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "good-girl",
+      "archivo": "good-girl.jpg",
+      "origen": "d09_2.jpg",
+      "sha256": "dd0a62c4fc35f4337bc50926f8aea992bb97f6baf2101649c668e92192978ab9",
+      "bytes": 45895,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "h24",
+      "archivo": "h24.jpg",
+      "origen": "v03_02.jpg",
+      "sha256": "7faf95a05f09f6c066a0c527e11e1fb01b07ad91d9923716ad3d8380876adba2",
+      "bytes": 30006,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "habik-for-men",
+      "archivo": "habik-for-men.jpg",
+      "origen": "v13_04.jpg",
+      "sha256": "26527e9db53154a93b66c0a197a81ec5427599af20582c60b3fbc9f7e9a5080e",
+      "bytes": 45388,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "halloween",
+      "archivo": "halloween.jpg",
+      "origen": "d11_0.jpg",
+      "sha256": "39003fc9ac8ac5540871aa3290c6643278decbdd3cf2fb049d5d840526f2e197",
+      "bytes": 49610,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "halloween-man",
+      "archivo": "halloween-man.jpg",
+      "origen": "v06_08.jpg",
+      "sha256": "ecc0e2a424341fa30bbc1b9a31e43640068f0931cf74390ae5938e759b2e2e9e",
+      "bytes": 27185,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "hamarain-amber-oud",
+      "archivo": "hamarain-amber-oud.jpg",
+      "origen": "hamarain-amber-oud.jpg",
+      "sha256": "b766101d64487571cb69023a1abd0044ba0a36ae2a57cb900c17f783e38c095f",
+      "bytes": 84774,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "heiress",
+      "archivo": "heiress.jpg",
+      "origen": "d25_0.jpg",
+      "sha256": "f5d291686c5288138bf5482d349a27ed61cd071c31cb5987b074c7d5c90aa853",
+      "bytes": 83048,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "her-confession",
+      "archivo": "her-confession.jpg",
+      "origen": "d23_0.jpg",
+      "sha256": "d475d5d927bce35a745c8fd3c3f0b949c914c58783332b22439c74fa906a0801",
+      "bytes": 58764,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "herod",
+      "archivo": "herod.jpg",
+      "origen": "v19_01.jpg",
+      "sha256": "7584771ee9d0bac72f01d1ddeddc1c755aa0e191c95d002b22864eab93bcd9e6",
+      "bytes": 31130,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "hugo-man",
+      "archivo": "hugo-man.jpg",
+      "origen": "v03_00.jpg",
+      "sha256": "d4b660c71510e85658e5b76b571be6e43e1bbda4fef3514079e54ebc58bd90ea",
+      "bytes": 37859,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "hugo-red",
+      "archivo": "hugo-red.jpg",
+      "origen": "v08_08.jpg",
+      "sha256": "b91adc1eaa6d8b03e06fd1231e696acbed3b747f35c49f3479dbc36443184c0b",
+      "bytes": 28797,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "imagination",
+      "archivo": "imagination.jpg",
+      "origen": "v01_01.jpg",
+      "sha256": "0f29146f204192a8a655761f87bb6df5cb1f12f97412a8c0d58fb63737589782",
+      "bytes": 31784,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "impact",
+      "archivo": "impact.jpg",
+      "origen": "v06_10.jpg",
+      "sha256": "65e2761d7bd0afc0106d1bed835801510f4524cdbd0794616e041f60884fb30b",
+      "bytes": 33428,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "invictus-aqua",
+      "archivo": "invictus-aqua.jpg",
+      "origen": "v03_01.jpg",
+      "sha256": "3e76e2c17f462e5d05ba95d1ccc6f2888eaeac014a5d4e0337d37121212c8aed",
+      "bytes": 39108,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "invictus-legend",
+      "archivo": "invictus-legend.jpg",
+      "origen": "v03_06.jpg",
+      "sha256": "fea59f892bde0b2c8c78172db91172a150598b7a66c17d738036bcf07b587c99",
+      "bytes": 45243,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "invictus-victory",
+      "archivo": "invictus-victory.jpg",
+      "origen": "v09_08.jpg",
+      "sha256": "10de29d0f30804588282e8296639af85d8b7f0ca4d08e856a2c2a734f71e5c90",
+      "bytes": 41576,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "invictus-victory-elixir",
+      "archivo": "invictus-victory-elixir.jpg",
+      "origen": "v09_02.jpg",
+      "sha256": "e00ec00dad2b44f806d25cba82661aba997420736eb5132a4c908b1d20046e9e",
+      "bytes": 43974,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "jadore",
+      "archivo": "jadore.jpg",
+      "origen": "jadore.jpg",
+      "sha256": "29297236ad5427d4ef587b042f9d434b07a1727a1e7b8537e6f06fdd93156542",
+      "bytes": 19776,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "k-by-dolce-gabbana",
+      "archivo": "k-by-dolce-gabbana.jpg",
+      "origen": "v02_07.jpg",
+      "sha256": "11b2033baf6b9b5464c1827b18f208c933912385bfd2fa1adeef6f631cde13f1",
+      "bytes": 49320,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "khamrah",
+      "archivo": "khamrah.jpg",
+      "origen": "khamrah.jpg",
+      "sha256": "7ad92ee11c5e364b135359ae4f1cee5be885e90567e37d140ad987f46912243e",
+      "bytes": 79190,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "khamrah-qahwa",
+      "archivo": "khamrah-qahwa.jpg",
+      "origen": "khamrah-qahwa.jpg",
+      "sha256": "f4197aae7793b7ec534a09af2fafeb793e55a406712f37f70cb82a61ba97d5f8",
+      "bytes": 87226,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "king",
+      "archivo": "king.jpg",
+      "origen": "v16_03.jpg",
+      "sha256": "74030004b2f32182b2fff4f762a552b7114c24e720fdd7a33f2ac53bfa7e6315",
+      "bytes": 27763,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "kirke",
+      "archivo": "kirke.jpg",
+      "origen": "v18_09.jpg",
+      "sha256": "9b66efebb0c38770f0e28df4ea1df78e743082ae6193b122e39f463bffb6c6ff",
+      "bytes": 35140,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "la-vie-est-belle",
+      "archivo": "la-vie-est-belle.jpg",
+      "origen": "la-vie-est-belle.jpg",
+      "sha256": "48ec08867807594218797b237a3a12b7bcba30bb102fe15d103bb543c367205e",
+      "bytes": 23654,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "lacoste-essential-collector-edition",
+      "archivo": "lacoste-essential-collector-edition.jpg",
+      "origen": "v02_06.jpg",
+      "sha256": "b3bbb7787313376bb74e98a1c2d384af2bd5fb7dfb7bc1a4edd7a7dd729bb92b",
+      "bytes": 32846,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "lady-million",
+      "archivo": "lady-million.jpg",
+      "origen": "d13_0.jpg",
+      "sha256": "e8b55af1120d4e0148591dff33082441b15e60a0aa9b9f15af97f9bbfc6ba3b9",
+      "bytes": 118263,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "lair-du-temps",
+      "archivo": "lair-du-temps.jpg",
+      "origen": "d04_2.webp",
+      "sha256": "4eb1b9983f2e6fab380a8989555912fc42cde393abb53473b2cdc8668d6304ca",
+      "bytes": 71877,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "layton",
+      "archivo": "layton.jpg",
+      "origen": "layton.jpg",
+      "sha256": "58ff71802e39af24166466a2a20728c839528b972c6782a747f2bf9003f1e4d2",
+      "bytes": 30613,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "le-beau",
+      "archivo": "le-beau.jpg",
+      "origen": "v07_04.jpg",
+      "sha256": "e37b4b9e91804ff89e69b135d0b602ee00ba3be256083ac1cb80fd9ba9f1c80f",
+      "bytes": 39964,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "le-beau-le-parfum",
+      "archivo": "le-beau-le-parfum.jpg",
+      "origen": "v07_01.jpg",
+      "sha256": "dbb7cc27e8be38dd4cbb8b7545c20351223fac3949614b34fbb44c6a36b5d255",
+      "bytes": 36112,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "le-beau-paradise-garden",
+      "archivo": "le-beau-paradise-garden.jpg",
+      "origen": "v07_05.jpg",
+      "sha256": "b8f89ed9c6338bf21d8ac084f178b05d9a496d72fbdbbf9c804326f0ba9c2e69",
+      "bytes": 39240,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "le-male-elixir",
+      "archivo": "le-male-elixir.jpg",
+      "origen": "v08_07.jpg",
+      "sha256": "6bc0c8eacf35b42001d5650bc235f9579bea2a75577f1f9943d47ca33141e85d",
+      "bytes": 43845,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "le-male-le-parfum",
+      "archivo": "le-male-le-parfum.jpg",
+      "origen": "v08_00.jpg",
+      "sha256": "8aa9cc2106435fdbb3712f3c469754e75104786618da85f8fe7edad6badc226e",
+      "bytes": 26021,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "leau-dissey",
+      "archivo": "leau-dissey.jpg",
+      "origen": "d12_1.jpg",
+      "sha256": "aa36b58d0ab677e06e6141e8720f5935a8e5b1a3f081908c8bcd637cbc3ea454",
+      "bytes": 29193,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "legend",
+      "archivo": "legend.jpg",
+      "origen": "v04_12.jpg",
+      "sha256": "8d5f4c9d6dcf0d8e21781de4ed8e72ac10278cf459f1570acf90772f2d6adde0",
+      "bytes": 30341,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "legend-spirit",
+      "archivo": "legend-spirit.jpg",
+      "origen": "v04_09.jpg",
+      "sha256": "1ad0b67ed2cf437a77928ae491a50d9c96acc73d8dd2f2d909026b61ce157e7e",
+      "bytes": 29407,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "libre",
+      "archivo": "libre.jpg",
+      "origen": "libre.jpg",
+      "sha256": "2a4b77299d17ccf0fb7dca763009b5798992c2f167e514e2122bbaf9e4e59695",
+      "bytes": 79044,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "light-blue",
+      "archivo": "light-blue.jpg",
+      "origen": "d12_2.jpg",
+      "sha256": "1232aeea0020028dafdc76d1926c3fb5db6e4b3de460d2a3d956a218f2c3dc55",
+      "bytes": 45001,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "limmensite",
+      "archivo": "limmensite.jpg",
+      "origen": "v01_00.jpg",
+      "sha256": "9e2142808ae924cf546443288abafa311ca2689096158afa6bd465f0b9772450",
+      "bytes": 32458,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "lost-cherry",
+      "archivo": "lost-cherry.jpg",
+      "origen": "v18_04.jpg",
+      "sha256": "fc8f1ae8fe4bf904b8632f4dbc7d81bf00e299aa96fd45fe51332f1b4a896ae9",
+      "bytes": 35650,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "marshmallow-81",
+      "archivo": "marshmallow-81.jpg",
+      "origen": "d22_2.jpg",
+      "sha256": "006f7ae9caa15b7e937949040afa629270a2b952f379bb3790a955ac0453e196",
+      "bytes": 48104,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "meteore",
+      "archivo": "meteore.jpg",
+      "origen": "v02_09.jpg",
+      "sha256": "adb75242ea1322bd66022b8b10e438444b1870cf0ae58ff3a7834c7b64f7a7f6",
+      "bytes": 31586,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "miss-dior",
+      "archivo": "miss-dior.jpg",
+      "origen": "miss-dior.jpg",
+      "sha256": "97d4dd04751c8843edeb165c0f914754de25260c9e931906c613b6a66e60fecd",
+      "bytes": 121290,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "musamam-black-intense",
+      "archivo": "musamam-black-intense.jpg",
+      "origen": "v13_00.jpg",
+      "sha256": "695718f131e63bf1196604062445b8b66c091e6cd04199a31951f7b7c002489d",
+      "bytes": 35550,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "my-way",
+      "archivo": "my-way.jpg",
+      "origen": "d14_0.jpg",
+      "sha256": "2d391fd8230aef5f22121b20b556e7c36f47e9d6daa37c20da5cea82d6f0f814",
+      "bytes": 86828,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "myslf-le-parfum",
+      "archivo": "myslf-le-parfum.jpg",
+      "origen": "v09_00.jpg",
+      "sha256": "9b98daa1eed0d2c08a160d0d4290c70124e2ad75af1cad0eed3918758c9ac215",
+      "bytes": 22571,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "n5",
+      "archivo": "n5.jpg",
+      "origen": "d07_0.jpg",
+      "sha256": "f3f879ba9a70b692a0d81cfb808273580fab90123f10ff36dcfb036cfe9f2e81",
+      "bytes": 78627,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "new-york-the-city-of-dreams",
+      "archivo": "new-york-the-city-of-dreams.jpg",
+      "origen": "v15_01.jpg",
+      "sha256": "1a18ada222c0e19e26e2f60ff462ae8628b0746d5f271355641418649072b5a9",
+      "bytes": 54045,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "no-1",
+      "archivo": "no-1.jpg",
+      "origen": "v19_02.jpg",
+      "sha256": "76b5fa49bfd1798742029cf4e1cc0a8b7e2d0e3c1a31268914365fef03477c5b",
+      "bytes": 39633,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "noble-blush",
+      "archivo": "noble-blush.jpg",
+      "origen": "noble-blush.jpg",
+      "sha256": "6c432c45ae3991b7127b13fea7f9acf645165dfe9cec946a0a895de875c2fa14",
+      "bytes": 43963,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "obsession",
+      "archivo": "obsession.jpg",
+      "origen": "d15_0.jpg",
+      "sha256": "1df7e424619021109b8f5110a0d9cd34128e173649700512a8b26839f37ccd06",
+      "bytes": 80878,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "odyssey-artisto",
+      "archivo": "odyssey-artisto.jpg",
+      "origen": "v15_02.jpg",
+      "sha256": "0f1681762a52cc632f0189e06582bd486a9e5eaf91250da300e04012fab5b49c",
+      "bytes": 45117,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "odyssey-bahamas",
+      "archivo": "odyssey-bahamas.jpg",
+      "origen": "v12_01.jpg",
+      "sha256": "5562287c47bc5e83052d944a81f38c092639af26857ebf542c0bfcd455f74820",
+      "bytes": 62221,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "odyssey-go-mango",
+      "archivo": "odyssey-go-mango.jpg",
+      "origen": "v14_01.jpg",
+      "sha256": "914057ecefb5cfbcb87334ada87d942471ce5d5cb8e24aecc612bfc7da74af91",
+      "bytes": 53404,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "odyssey-mandarin-sky",
+      "archivo": "odyssey-mandarin-sky.jpg",
+      "origen": "v11_03.jpg",
+      "sha256": "948858f72e5d5865d354089db5c94ea9b5aff814179d096b37f7f663bfc63b88",
+      "bytes": 35461,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "odyssey-mega-man",
+      "archivo": "odyssey-mega-man.jpg",
+      "origen": "v11_00.jpg",
+      "sha256": "a02a7355a41accdc77b6c63cb8ec7fa27f4097613f0069a6ee5c9f99371b6c82",
+      "bytes": 33401,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "olympea",
+      "archivo": "olympea.jpg",
+      "origen": "d15_1.jpg",
+      "sha256": "432b18eb673291c380c687cd0c6390840535e47bc48c35e8a1556f916e588c64",
+      "bytes": 107801,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "olympea-parfum",
+      "archivo": "olympea-parfum.jpg",
+      "origen": "d18_1.jpg",
+      "sha256": "f9df881c90806d44c29b1d0824dc057b13e99530e5a322d60358c6e00984850b",
+      "bytes": 69143,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "ombre-leather-parfum",
+      "archivo": "ombre-leather-parfum.jpg",
+      "origen": "v17_02.jpg",
+      "sha256": "f548f6e4b10da4e1cae4d6baf7e9fd86fd6d28e5dec380acf77c4ab2c865222a",
+      "bytes": 26178,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "ombre-nomade",
+      "archivo": "ombre-nomade.jpg",
+      "origen": "v06_03.jpg",
+      "sha256": "7ebac6de3a1022c9e8340ef1277d1784d988968e76320bc3f9b7b64f5e359d7e",
+      "bytes": 27757,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "onyx",
+      "archivo": "onyx.jpg",
+      "origen": "v19_00.jpg",
+      "sha256": "fd5c4ef446a3cc1475e590bdc43776bf9279ae91791fbaa50f477457e4af0aa8",
+      "bytes": 29957,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "opium",
+      "archivo": "opium.jpg",
+      "origen": "d14_2.jpg",
+      "sha256": "4079ee1756db4743f14f365ad57949b466daca1b630f24aa68796082da98206c",
+      "bytes": 117226,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "oud-cadenza",
+      "archivo": "oud-cadenza.jpg",
+      "origen": "v17_03.jpg",
+      "sha256": "2e1f1da1e45610d7c1b8dbc0d804ad6152d4b77e6c6c7c8dba22cefda18e386c",
+      "bytes": 28680,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "our-moment",
+      "archivo": "our-moment.jpg",
+      "origen": "d24_2.jpg",
+      "sha256": "0bed7674edfe0747a870c03138fb49e7a2e3c78f19fc3cb9132d392811cec952",
+      "bytes": 93761,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "paco-rabanne-pour-homme",
+      "archivo": "paco-rabanne-pour-homme.jpg",
+      "origen": "paco-rabanne-pour-homme.jpg",
+      "sha256": "3e997dd4aaec1a76f8facab1bd67df556509cb99c42ac1dd0cc038f0a9b88723",
+      "bytes": 30379,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "paradigme",
+      "archivo": "paradigme.jpg",
+      "origen": "v04_11.jpg",
+      "sha256": "4aa1ab5579adbf8b28cacba00aa5b22f621b98c459bbfbf4ca450631239e5b7d",
+      "bytes": 38061,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "paris-hilton",
+      "archivo": "paris-hilton.jpg",
+      "origen": "d24_1.jpg",
+      "sha256": "555eaaca1ec2ab83ee61a9556844f65693efa211f4fee28005abf267dad32f59",
+      "bytes": 61211,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "pegasus",
+      "archivo": "pegasus.jpg",
+      "origen": "pegasus.jpg",
+      "sha256": "abbac4c3312d3bccc084c3c34d45b1f0c6fba29d56cfbcceb215f9192299222e",
+      "bytes": 34685,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "phantom",
+      "archivo": "phantom.jpg",
+      "origen": "v08_02.jpg",
+      "sha256": "bb3604639ee8fcee218685aa0f741cd57197f0c5044e171ec36580dfac25e221",
+      "bytes": 40361,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "phantom-in-red",
+      "archivo": "phantom-in-red.jpg",
+      "origen": "v10_02.jpg",
+      "sha256": "36e8ba21295e9d758fca2006f4d17ea6b7c88ef280fc7a89a5cfa6ac7b18bfda",
+      "bytes": 44154,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "poison",
+      "archivo": "poison.jpg",
+      "origen": "d15_2.jpg",
+      "sha256": "c93e31f610d141398505bc1bb000a484aa72ce544891c857d434133fc6aff194",
+      "bytes": 79419,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "polo-black",
+      "archivo": "polo-black.jpg",
+      "origen": "v06_01.jpg",
+      "sha256": "41b0744c0a16757789bf3e0b467621423c686a5eba630b627ab5e542c745596c",
+      "bytes": 28115,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "polo-blue",
+      "archivo": "polo-blue.jpg",
+      "origen": "v04_10.jpg",
+      "sha256": "302a54b9514423e2bd8f9b44563149c8ffd2b85fd080bb7e91fda4840707e1b9",
+      "bytes": 39763,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "ralph",
+      "archivo": "ralph.jpg",
+      "origen": "d16_0.jpg",
+      "sha256": "cd4507bc4ee60c33fc7daf91d64e5b92aefc7f8015f97a3f1864c25e15973eda",
+      "bytes": 125130,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "samsara",
+      "archivo": "samsara.jpg",
+      "origen": "d16_1.jpg",
+      "sha256": "26222323cce4edfc3d07bf6c3e04146f13535fa770ff54218b4087b36d52381b",
+      "bytes": 73919,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "santal-33",
+      "archivo": "santal-33.jpg",
+      "origen": "santal-33.jpg",
+      "sha256": "fa8487de06ef164b7d0a982334927a8a5b5b8e1add0d876385ef918a9a3058f6",
+      "bytes": 34095,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "sauvage",
+      "archivo": "sauvage.jpg",
+      "origen": "sauvage.jpg",
+      "sha256": "34217525031b6d87bb1eacaa1b7849be249a1c54f75037118f02089adb0c5b99",
+      "bytes": 32515,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "sauvage-elixir",
+      "archivo": "sauvage-elixir.jpg",
+      "origen": "v09_01.jpg",
+      "sha256": "dffb29677d7d4b512e464c0a3380a100f7584d31137c3b155385abc3289fc384",
+      "bytes": 32081,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "scandal",
+      "archivo": "scandal.jpg",
+      "origen": "d09_0.jpg",
+      "sha256": "26bd50df557315b9d18a218b65aa5ee367520b4c89eed21defb632b52438ba05",
+      "bytes": 72194,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "scandal-pour-homme",
+      "archivo": "scandal-pour-homme.jpg",
+      "origen": "scandal-pour-homme.jpg",
+      "sha256": "3142fad1a8777ecab46543d3c4fb2b38c91d9525e91cba86e9c80f4713938f06",
+      "bytes": 53435,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "scandal-pour-homme-absolu",
+      "archivo": "scandal-pour-homme-absolu.jpg",
+      "origen": "v10_00.jpg",
+      "sha256": "240c0e773598268cad700d82feab9e60c69b5ac9e0c7521b723a828c6034eb75",
+      "bytes": 50245,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "scandal-pour-homme-le-parfum",
+      "archivo": "scandal-pour-homme-le-parfum.jpg",
+      "origen": "v06_07.jpg",
+      "sha256": "118a826eb388f0e15da7dabb78e35dd286726d25f64868d209fda68866e0e070",
+      "bytes": 46345,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "silver-mountain-water",
+      "archivo": "silver-mountain-water.jpg",
+      "origen": "v16_00.jpg",
+      "sha256": "b612a7d67e3f8e1109ad1f1a71e2cc081aba24c175bc36eb5144a8cbaa92b379",
+      "bytes": 27520,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "smoking-hot",
+      "archivo": "smoking-hot.jpg",
+      "origen": "v18_07.jpg",
+      "sha256": "fb061ddc74de50bb4df70563a1cd458dd6f2ae749d9bc7d65bbd1eba19ced1d1",
+      "bytes": 30682,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "sofia",
+      "archivo": "sofia.jpg",
+      "origen": "d25_1.jpg",
+      "sha256": "3678f47928307504a1667fdbd73b9b9ef5da794960ab13e318d9736477c48485",
+      "bytes": 79186,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "spicebomb",
+      "archivo": "spicebomb.jpg",
+      "origen": "v09_05.jpg",
+      "sha256": "cc8d18ade1f7bd3408cdbe9e1747b6a389f4cf8d7616c827eb5fb27da6c8f4e0",
+      "bytes": 40072,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "spicebomb-extreme",
+      "archivo": "spicebomb-extreme.jpg",
+      "origen": "v09_03.jpg",
+      "sha256": "101fb878eb47bb8cfa15ed290b0646c9a68c6d503df8cb28c5c6e4b5af71e7e4",
+      "bytes": 38539,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "starwalker",
+      "archivo": "starwalker.jpg",
+      "origen": "v04_06.jpg",
+      "sha256": "46217fcc48c3603a9dde672037992292034359390a0886ffcb0a12db72593a67",
+      "bytes": 35875,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "summer-hammer",
+      "archivo": "summer-hammer.jpg",
+      "origen": "v18_05.jpg",
+      "sha256": "b6522e9120bbae972c2e5fe8af47823b185ed6474709adf5895fbbd8f6ce660d",
+      "bytes": 49211,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "supreme",
+      "archivo": "supreme.jpg",
+      "origen": "d10_1.jpg",
+      "sha256": "631e78b7e9b7f02ae5af508e445707f82d743a60205fe27d07c956598c496705",
+      "bytes": 62469,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "sweet-like-candy",
+      "archivo": "sweet-like-candy.jpg",
+      "origen": "d25_2.jpg",
+      "sha256": "e26dc76b14e38787486712220e670d3e0db583e51c8e79ade68b00ab7cb41539",
+      "bytes": 51741,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "swiss-army",
+      "archivo": "swiss-army.jpg",
+      "origen": "v02_00.jpg",
+      "sha256": "c72905b3e43d89da2766b06464a2badb759eb31e533141e0d82e3261306797ae",
+      "bytes": 26673,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "the-most-wanted",
+      "archivo": "the-most-wanted.jpg",
+      "origen": "v08_01.jpg",
+      "sha256": "8cb17ec362bd39af848ca7f3f4c704ddf76ed2ef2e488f0e4f06188739df49f7",
+      "bytes": 41785,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "the-one-for-men",
+      "archivo": "the-one-for-men.jpg",
+      "origen": "v06_02.jpg",
+      "sha256": "dcdab5ae217ff0267bb02168e34f91bea2c0151faad64c6da3c5720fb6a1b08c",
+      "bytes": 39530,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "tobacco-vanille",
+      "archivo": "tobacco-vanille.jpg",
+      "origen": "tobacco-vanille.jpg",
+      "sha256": "f0f506b78a2d9da282a546a8ba7667bb40d7ba0e66d39997166e94b579e65745",
+      "bytes": 19629,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "tommy-citrus-brights",
+      "archivo": "tommy-citrus-brights.jpg",
+      "origen": "v04_08.jpg",
+      "sha256": "1e4290209641e03b8c99440673741d249693f538bfb721867d53165e9543caae",
+      "bytes": 37011,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "tommy-girl",
+      "archivo": "tommy-girl.jpg",
+      "origen": "d16_2.webp",
+      "sha256": "99b4dcba32b0f664c1caf84615f3edd00a33167f4c95822599335e1f55cc1b6d",
+      "bytes": 36184,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "tresor",
+      "archivo": "tresor.jpg",
+      "origen": "d17_0.jpg",
+      "sha256": "8f8ddb36a80999323061d818e93483917891651ab6eaefa988b7caf095607407",
+      "bytes": 107483,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "valentino-uomo-born-in-roma",
+      "archivo": "valentino-uomo-born-in-roma.jpg",
+      "origen": "v06_04.jpg",
+      "sha256": "a0677cd18572d43069f65877613c9d676e5b90f62844d1c47449a23e79619809",
+      "bytes": 53215,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "valentino-uomo-born-in-roma-intense",
+      "archivo": "valentino-uomo-born-in-roma-intense.jpg",
+      "origen": "v10_01.jpg",
+      "sha256": "d93e993e2f29db578785ef692f83816504a3288a75f7c77f3029fa33b72fbbb3",
+      "bytes": 50640,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "valentino-woman",
+      "archivo": "valentino-woman.jpg",
+      "origen": "d19_1.webp",
+      "sha256": "b190a03bf37a9b47e2d7211d79a696e66da85444a0675f71625538959b3b1b4e",
+      "bytes": 92914,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "versace-man-eau-fraiche",
+      "archivo": "versace-man-eau-fraiche.jpg",
+      "origen": "v02_10.jpg",
+      "sha256": "d095cbe62bfec29da26ae6bd92b23b4664a4cd4139d84ee0525ae2322792c4d7",
+      "bytes": 57478,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "versace-pour-homme",
+      "archivo": "versace-pour-homme.jpg",
+      "origen": "v02_08.jpg",
+      "sha256": "db062094519b9e9eff61c611b91c1914efdabe2b8fca5ece6bec4dd0fd91f8b5",
+      "bytes": 42630,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "very-good-girl",
+      "archivo": "very-good-girl.jpg",
+      "origen": "d10_0.jpg",
+      "sha256": "319fbee321e65d202c84a1edcb120a05b80b9b270ee121ab0d585a914de1b3cc",
+      "bytes": 62160,
+      "ancho": 375,
+      "alto": 500
+    },
+    {
+      "id": "wanted",
+      "archivo": "wanted.jpg",
+      "origen": "v06_09.jpg",
+      "sha256": "fc4b68f3818b3a227d5e49f8bc15cd50e106557668ca443c1b21e15dc241293b",
+      "bytes": 54629,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "wanted-by-night",
+      "archivo": "wanted-by-night.jpg",
+      "origen": "v09_09.jpg",
+      "sha256": "c461634a1a372aca2e3657d784219d0acf81e3d96e2529a6c75aaf34e4334632",
+      "bytes": 52961,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "y-edp",
+      "archivo": "y-edp.jpg",
+      "origen": "y-edp.jpg",
+      "sha256": "735c36cbf3dbb51032b9c4104c036edc8ed82c6ecd38ddb0dbfb3ed1e36bad76",
+      "bytes": 30752,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "yara",
+      "archivo": "yara.jpg",
+      "origen": "yara.jpg",
+      "sha256": "635373c9ed9b9d0551dd22f3397d110f1c2dbde9323bb5f9864f29f6909853cd",
+      "bytes": 28227,
+      "ancho": 600,
+      "alto": 800
+    },
+    {
+      "id": "yara-candy",
+      "archivo": "yara-candy.jpg",
+      "origen": "yara-candy.jpg",
+      "sha256": "c219ac2a084cbfbfbd6f22ca2776082f2d3c5ee4038bb909a9e5fd5f5010ad26",
+      "bytes": 36230,
+      "ancho": 600,
+      "alto": 800
+    }
+  ]
+}

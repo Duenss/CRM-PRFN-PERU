@@ -13,6 +13,7 @@ import { estadoAjustes, actualizarAjustes, esperaMasivaMs, esperaChatMs } from '
 import { oculto, ocultar, limpiar as limpiarOcultos } from './ocultos.js';
 import { registrar, listar, buscar, marcarAgregados, aplicarContactos, aplicarNombresClientes, marcarSinWhatsApp, marcarSinChat, obtener, marcarLeido, respuestasIA, porDia, resumen as resumenChats, registrarCabecera, importarMensajes, yaExisteWa, actualizarAck, mensajesEntrantes, eliminar as eliminarConversacion, fijar as fijarChat, archivar as archivarChat, vaciar as vaciarConversaciones, flush as flushConversaciones, buscarMensajePorWa, actualizarMediaMensaje, fusionarDuplicados } from './conversaciones.js';
 import { telefonoDeDestino, claveTemporalLid } from './identidad.js';
+import { imagenLocalProducto } from './productos-media.js';
 import { datosMediaEntrante, esMarcadorMedia, tipoDeMarcador, guardarMediaChat, podarMediaChats, archivoMediaSeguro, rutaMediaSegura } from './media-chats.js';
 import * as pedidos from './pedidos.js';
 import * as anuncios from './anuncios.js';
@@ -166,11 +167,16 @@ function guardarComprobante(pedidoId, media = {}) {
 
 /** Ruta local o URL pública de la foto de un producto. */
 function mediaProducto(p) {
+  // 1) Foto CORRECTA empaquetada desde la web del dueño (por id de producto).
+  //    No se depende de `imagen_ruta` de Supabase ni de la URL en vivo, que
+  //    pueden estar desactualizadas y mostrar otro perfume.
+  const local = imagenLocalProducto(p?.id);
+  if (local) return { archivo: local };
   const ruta = String(p?.imagen_ruta || '').trim();
   if (!ruta) return null;
   if (/^https?:\/\//i.test(ruta)) return { url: ruta };
-  const local = path.join(raizProyecto, ruta);
-  if (fs.existsSync(local)) return { archivo: local };
+  const enRepo = path.join(raizProyecto, ruta);
+  if (fs.existsSync(enRepo)) return { archivo: enRepo };
   if (!config.panelUrl) return null;
   return { url: `${config.panelUrl}/${ruta.replace(/^\.?\//, '')}` };
 }

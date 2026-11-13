@@ -1,11 +1,11 @@
 {
   "kind": "e2e-parcial",
-  "ts": "2026-11-13T04:56:35.738Z",
+  "ts": "2026-11-13T05:59:19.496Z",
   "index": {
     "path": "C:\\Users\\Juan Pablo\\Documents\\WEB PROJECTS\\Crm Perfumeriafina\\index.html",
     "bytes": 54163,
     "sha256": "455f18f1a4c332d4fb476f325127f0f566e945fc521ae7676c5adca2149da34b",
-    "mtime": "2026-11-13T04:53:08.686Z"
+    "mtime": "2026-11-13T05:07:20.654Z"
   },
   "totals": {
     "total": 22,
@@ -66,7 +66,7 @@
       "id": "E2E-09",
       "name": "Fallo de red del bot NO borra la lista ya pintada",
       "status": "PASS",
-      "detail": "4 items intactos · aviso \"⚠ Sin conexión con el bot · datos de 11:56 p. m.\" · recuperada y asentada"
+      "detail": "4 items intactos · aviso \"⚠ Sin conexión con el bot · datos de 12:58 a. m.\" · recuperada y asentada"
     },
     {
       "id": "E2E-10",

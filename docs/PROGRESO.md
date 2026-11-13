@@ -36,3 +36,5 @@
 | Extra 2 | Horario 24/7 por defecto (migración de 9-20) | ✅ | _(pendiente de hash)_ | bot 262/263 |
 | Extra 3 | Multimedia automática (sin botones; video/sticker incluidos) | ✅ | _(pendiente de hash)_ | e2e 22/22 |
 | Extra 4 | Sync ≤2 min (lectura ligera + caché de destino directo) | ✅ | `9de6a28` | bot 261/262 |
+
+| Extra 5 | Fotos de producto correctas: 202 empaquetadas desde la web del dueño | ✅ | _(pendiente de hash)_ | 202/202 verificadas · 9 webp convertidas |

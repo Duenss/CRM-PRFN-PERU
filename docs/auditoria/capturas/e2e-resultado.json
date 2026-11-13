@@ -1,8 +1,8 @@
 {
   "kind": "e2e",
-  "ts": "2026-11-13T04:56:35.741Z",
-  "startedAt": "2026-11-13T04:55:49.097Z",
-  "durationMs": 46643,
+  "ts": "2026-11-13T05:59:19.499Z",
+  "startedAt": "2026-11-13T05:58:32.919Z",
+  "durationMs": 46579,
   "environment": {
     "node": "v24.16.0",
     "platform": "win32/x64",
@@ -16,7 +16,7 @@
     "path": "C:\\Users\\Juan Pablo\\Documents\\WEB PROJECTS\\Crm Perfumeriafina\\index.html",
     "bytes": 54163,
     "sha256": "455f18f1a4c332d4fb476f325127f0f566e945fc521ae7676c5adca2149da34b",
-    "mtime": "2026-11-13T04:53:08.686Z"
+    "mtime": "2026-11-13T05:07:20.654Z"
   },
   "supabaseScript": {
     "source": "bot/node_modules (offline)",
@@ -75,7 +75,7 @@
       "id": "E2E-09",
       "name": "Fallo de red del bot NO borra la lista ya pintada",
       "status": "PASS",
-      "detail": "4 items intactos · aviso \"⚠ Sin conexión con el bot · datos de 11:56 p. m.\" · recuperada y asentada"
+      "detail": "4 items intactos · aviso \"⚠ Sin conexión con el bot · datos de 12:58 a. m.\" · recuperada y asentada"
     },
     {
       "id": "E2E-10",
@@ -167,7 +167,7 @@
     "pageErrors": [],
     "netErrors": [
       {
-        "ts": 1794545783130,
+        "ts": 1794549546509,
         "type": "error",
         "text": "Failed to load resource: net::ERR_EMPTY_RESPONSE",
         "url": "http://127.0.0.1:3199/api/conversaciones?limite=80&offset=0&filtro=todos&q="
@@ -175,7 +175,7 @@
     ],
     "requestFailures": [
       {
-        "ts": 1794545783124,
+        "ts": 1794549546505,
         "url": "http://127.0.0.1:3199/api/conversaciones?limite=80&offset=0&filtro=todos&q=",
         "method": "OPTIONS",
         "error": "net::ERR_EMPTY_RESPONSE"
@@ -197,13 +197,13 @@
       "/api/archivos": 3,
       "/api/logs": 1,
       "/api/conversaciones/51910418951": 5,
-      "/api/conversaciones/51910418951/leido": 2,
-      "/api/conversaciones/51910418951/importar": 2,
+      "/api/conversaciones/51910418951/leido": 1,
+      "/api/conversaciones/51910418951/importar": 1,
       "/api/conversaciones/51910418951/media": 2,
-      "/api/media/chats/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4": 1,
-      "/api/media/chats/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png": 1
+      "/api/media/chats/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png": 1,
+      "/api/media/chats/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4": 1
     },
-    "total": 67
+    "total": 65
   },
   "supabase": {
     "restRequests": 4,

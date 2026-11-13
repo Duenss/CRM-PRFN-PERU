@@ -183,3 +183,16 @@ limpias `no existe` en momentos distintos.
   documentos) con un máximo de 2 descargas simultáneas. Las miniaturas aparecen al instante
   y el archivo completo se reemplaza al llegar. Si el archivo expiró en WhatsApp se muestra
   “No disponible (archivo expirado)” y un clic reintenta la descarga.
+
+## 11 · Fotos de producto (Web del dueño → bot) 2026-11-13
+
+- Las fotos que envía el bot están **empaquetadas** en `bot/media/products/<id>.jpg`.
+  Se generaron desde la web local del dueño (`assets/js/data.js` → `assets/img/products`),
+  que es la fuente correcta; **no se depende de Supabase `imagen_ruta` ni de la URL en vivo**.
+- Resolución en el bot: primero `bot/media/products/<id>.jpg|jpeg|png|webp` por id
+  (`bot/src/productos-media.js`); si no existe, se usa `imagen_ruta`/URL como antes.
+- Regenerar cuando el dueño actualice fotos en la web:
+  `python scripts/importar-imagenes-web.py --web "C:/ruta/a/perfumeria-fina-peru"`
+  (convierte `.webp/.png` a JPEG, verifica las 202 imágenes y deja `manifest.json`).
+- Dudas de fotos: el script avisa si falta alguna o si dos productos comparten la misma
+  imagen. Todas las fotos deben revisarse visualmente contra el catálogo antes de campañas.
