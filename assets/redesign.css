@@ -88,6 +88,21 @@ a{color:var(--gold);text-underline-offset:2px}
 #in-filtros-panel{padding-bottom:10px}
 #in-toggle-filtros.on{border-color:var(--gold);color:var(--gold);background:var(--gold-soft)}
 
+/* La barra de Bandeja sube a la barra superior en escritorio: más alto para el chat. */
+#bandejaBar{flex:1 1 auto;min-width:0;display:flex;justify-content:flex-end;align-items:center}
+#bandejaBar[hidden]{display:none!important}
+#bandejaBar .bar{margin:0;padding:0;border:0;background:transparent;box-shadow:none;flex-wrap:nowrap;gap:7px;min-width:0;justify-content:flex-end}
+#bandejaBar #in-q{width:min(250px,25vw);min-width:120px}
+#bandejaBar .in-tools{flex:none}
+body.bandeja-activa #gsearch{display:none!important}
+body.bandeja-activa .page{padding-top:10px}
+body.bandeja-activa #t-bandeja .pagehead.oculto{display:none!important}
+#wa-chip-t{white-space:nowrap}
+@media(max-width:1400px){body.bandeja-activa .toplogo{display:none}}
+@media(max-width:1100px){
+  #bandejaBar #in-q{width:170px}
+}
+
 main{margin-left:var(--sidebar);height:100dvh;min-height:0;overflow:hidden;display:flex;flex-direction:column}
 .topbar{
   flex:none;padding:14px 24px;background:rgba(243,238,229,.88);border-bottom:1px solid var(--line);

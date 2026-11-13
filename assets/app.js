@@ -345,6 +345,7 @@ function irTab(name){
   const c=CRUMBS[name]||['',''];
   if($('#crumb'))$('#crumb').textContent=c[0];
   if($('#crumb-sub'))$('#crumb-sub').textContent=c[1];
+  ajustarBandejaTopbar();
   arrancarTareasBase();
   if(name==='bandeja'){cargarBandeja();alertasNuevas=0;actualizarAlertBadge();}
   else if(name==='pedidos')cargarPedidos();
@@ -357,6 +358,27 @@ function irTab(name){
   else if(name==='bot'){refrescarQR();cargarLogs();cargarAjustes();cargarArchivosInfo();}
   window.scrollTo({top:0,behavior:'smooth'});
 }
+let bandejaBarHome=null;
+function ajustarBandejaTopbar(){
+  const slot=document.getElementById('bandejaBar');
+  const pagehead=document.querySelector('#t-bandeja .pagehead');
+  const bar=pagehead?.querySelector('.bar');
+  if(!slot||!pagehead||!bar)return;
+  const escritorio=window.matchMedia('(min-width:901px)').matches;
+  const activo=tabActual==='bandeja'&&escritorio;
+  document.body.classList.toggle('bandeja-activa',activo);
+  if(activo){
+    if(!bandejaBarHome||!bar.parentNode)bandejaBarHome={parent:bar.parentNode,next:bar.nextSibling};
+    if(bar.parentNode!==slot)slot.appendChild(bar);
+    slot.hidden=false;
+    pagehead.classList.add('oculto');
+  }else{
+    if(bandejaBarHome&&bar.parentNode===slot)bandejaBarHome.parent.insertBefore(bar,bandejaBarHome.next);
+    slot.hidden=true;
+    pagehead.classList.remove('oculto');
+  }
+}
+window.addEventListener('resize',()=>{clearTimeout(window.__pfBandejaResize);window.__pfBandejaResize=setTimeout(ajustarBandejaTopbar,120)});
 $('#tabs').onclick=e=>{const b=e.target.closest('button');if(b)irTab(b.dataset.tab)};
 
 /* ---------- clientes ---------- */
