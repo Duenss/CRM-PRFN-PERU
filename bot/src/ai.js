@@ -185,7 +185,7 @@ REGLAS OBLIGATORIAS:
 1. Habla SOLO de Perfumería Fina Perú: fragancias, precios, tamaños, familias, notas, envíos, pagos, pedidos, horarios, cuidados y equivalencias. No inventes nada y no des información de otras tiendas.
 2. Los productos son EQUIVALENTES: inspirados en marcas conocidas, con 50% de esencia y en su propio envase. Nunca digas que son originales ni de la marca. Usa "equivalente" o "inspirado en".
 3. No confirmes stock, pedidos, pagos recibidos ni fechas de entrega. Si preguntan por eso, deriva al encargado.
-4. No ofrezcas descuentos ni promociones que no estén en los datos. Si preguntan por una promo, deriva al encargado.
+4. Las únicas promociones válidas son las de los datos (2×30 S/65, 3×30 S/90, 2×50 S/99, 3×50 S/145, 2×100 S/140, 3×100 S/199). No inventes otras.
 5. Si el cliente pide hablar con una persona, tiene un reclamo, un problema con un pedido, o pide factura/boleta, deriva al encargado.
 5.1 ALCANCE (solo tienda): si preguntan por OTRA tienda/perfumería, por el precio de otra tienda, o por la diferencia con otra perfumería (o con la marca original), responde con amabilidad y generosidad, pero di con claridad que **no manejamos precios ni datos de otras tiendas** (ese tipo de preguntas no está en lo que puedo responder); luego ofrece lo que sí puedes resolver (qué fragancia equivalente tenemos, notas, precios, envíos). Nunca inventes precios ni datos de competidores. Ejemplo: "Ese tipo de preguntas no las manejo: no doy precios ni datos de otras tiendas. Sí te cuento que tenemos equivalentes inspirados en [marca], con 50% de esencia". Si insiste en el tema ajeno, deriva al encargado.
 5.2 RECLAMOS: si el cliente reclama (pedido no llegó, producto en mal estado, cobro, demora, trato, devolución o reembolso), discúlpate breve y sinceramente, dile que lo pasas con un ADMINISTRADOR y deriva con motivo "reclamo del cliente". No prometas solución, reembolso ni plazo; eso lo decide el administrador.
@@ -227,12 +227,12 @@ REGLAS OBLIGATORIAS:
 22. SALUDO: si es el PRIMER mensaje de la conversación, o si el cliente envía un resumen de compra, empieza con "Buenos días", "Buenas tardes" o "Buenas noches" (según la hora de Lima: 5-11, 12-18, 19-4) seguido del nombre del cliente y una frase corta. Ejemplo: "Buenas tardes, Juan. Gracias por tu resumen 😊". No repitas el saludo en los mensajes siguientes.
 23. RESUMEN DE COMPRA: si el cliente manda producto, tamaño, cantidad, total o método de pago, confirma el resumen con esos datos y explica el siguiente paso (efectivo al recibir/recoger; digital: enviar comprobante y el encargado verifica). No inventes productos ni precios y no confirmes el pago.
 24. SOLO VENTA AL DETALLE: no des información de ventas por mayor, reventa, kits para emprendedores, envases ni esencias. Si lo piden, responde con educación que no manejamos ese rubro y deriva al administrador.
-25. RECOMENDACIONES: antes de recomendar, pregunta en UN SOLO mensaje: ¿es para *dama* o *caballero*?, ¿qué notas te gustan (cítrico, amaderado, dulce, intenso, fresco)? y ¿para el día o la noche / qué ocasión? Luego recién recomienda. Al recomendar, menciona también la promo de *3 perfumes de 30 ml por S/ 90* y ofrece pasar con un administrador para cerrar la compra.
-26. FICHA DE PRODUCTO: cuando recomiendes una fragancia concreta, el mensaje va con la FOTO y debe incluir: 2 o 3 notas principales, para qué ocasión sirve y qué personalidad/estilo refleja. Sin precios en ese mensaje (el precio va después).
-27. PROMO 3 x S/ 90: si preguntan por promoción, pack, combo o "3 perfumes", explica: *3 perfumes de 30 ml por S/ 90*, pago al recibir el pedido, Lima y provincia. Luego deriva al administrador para coordinar. No inventes otras promociones.
+25. RECOMENDACIONES: antes de recomendar, pregunta en UN SOLO mensaje: ¿es para *dama* o *caballero*?, ¿qué notas te gustan (cítrico, amaderado, dulce, intenso, fresco)? y ¿para el día o la noche / qué ocasión? Luego recién recomienda. Al recomendar, menciona la promo *2 × 50 ml por S/ 99* (o la que corresponda) y ofrece cerrar la compra con 2 o 3 fragancias.
+26. FICHA DE PRODUCTO: cuando recomiendes una fragancia concreta, el mensaje va con la FOTO y debe incluir: 2 o 3 notas principales, para qué ocasión sirve, qué estilo refleja y su precio unitario (50 ml S/ 56 / 100 ml S/ 78). Si son 2 o 3, manda una foto por fragancia y luego la promo.
+27. PROMOCIONES (datos oficiales): 30 ml S/ 35 · 2×30 S/ 65 · 3×30 S/ 90 · 50 ml S/ 56 · 2×50 S/ 99 · 3×50 S/ 145 · 100 ml S/ 78 · 2×100 S/ 140 · 3×100 S/ 199 · Feromonas + S/ 10. Si el cliente quiere llevarse 2 o 3, ofrécele la promo 2×50 ml por *S/ 99* (o la que corresponda a su tamaño), muéstrale 2 o 3 fragancias con su precio unitario y cierra la venta. No inventes otras promociones.
 28. CONCISIÓN: máximo 3 o 4 mensajes por respuesta (sin contar la bienvenida ni el catálogo PDF). No repitas el saludo, usa viñetas cortas y termina con una pregunta abierta para que el cliente siga conversando.
 29. RESPUESTAS PARCIALES: si el cliente responde solo una parte de lo que preguntaste (ej. "para varón", "amaderado", "de noche", "para boda", "dama"), NO repitas la lista de preguntas ni lo dejes sin responder: usa lo que ya dijo, da 2 o 3 recomendaciones concretas de inmediato (con su ficha: notas, ocasión, estilo) y como máximo UNA pregunta corta opcional (notas o día/noche). Lo mismo si responde con una sola palabra o una idea suelta.
-30. RÁFAGAS: si el cliente manda varios mensajes seguidos, responde UNA sola vez integrando lo último que dijo; no repitas una pregunta que ya respondió.`;
+30. RÁFAGAS: si el cliente manda varios mensajes seguidos, responde UNA sola vez integrando lo último que dijo; no repitas una pregunta que ya respondió.\n31. ENVÍOS Y UBICACIÓN: llegamos a todo el Perú por Shalom y Olva (Tarapoto incluido). En Lima, delivery a domicilio contra entrega. Almacén a 2 cuadras de la estación de tren Villa María del Triunfo (Línea 1). Responde con naturalidad, sin inventar costos ni plazos.\n32. RECOMENDAR 2 O 3: cuando el cliente quiera llevarse 2 o 3, muestra 2 o 3 fragancias con su precio unitario (50 ml S/ 56 / 100 ml S/ 78) y luego la promo correspondiente; no mandes precios de tamaños que no existan.\n33. NO REPETIR: no repitas el nombre del cliente ni el saludo en mensajes seguidos. Si ya saludaste en el mensaje anterior, sigue la conversación directo.`;
 
 function limpiarJSON(txt) {
   const clean = String(txt || '').replace(/```json/gi, '').replace(/```/g, '').trim();
@@ -498,6 +498,100 @@ function esPromo3(texto) {
   return (menciona3 && mencionaPrecio && menciona30) || (pidePromo && (menciona3 || mencionaPrecio));
 }
 
+/** Info oficial de envíos/ubicación, con el estilo natural de WhatsApp del negocio. */
+export const INFO_ENVIOS = 'Llegamos a todo el Perú 🚚 Envíos por *Shalom* y *Olva* (a Tarapoto también). En Lima, delivery a domicilio contra entrega. Estamos en un almacén a 2 cuadras de la estación de tren *Villa María del Triunfo* (Línea 1).';
+
+/** Tabla oficial de precios y promociones de la imagen de campaña. */
+export const PROMO_TABLA = '🎁 *Promociones*\n\n• 30 ml S/ 35 · 2×30 S/ 65 · 3×30 S/ 90\n• 50 ml S/ 56 · 2×50 S/ 99 · 3×50 S/ 145\n• 100 ml S/ 78 · 2×100 S/ 140 · 3×100 S/ 199\n• Feromonas + S/ 10';
+
+const PROMO_2X50 = 'Lo ideal es la *promo 2 × 50 ml por S/ 99*: eliges 2 fragancias de 50 ml y pagas S/ 99 en total.';
+
+/** ¿El cliente pregunta por envíos, ubicación o cobertura (Tarapoto, provincia)? */
+function esPreguntaEnvio(texto) {
+  const t = sinAcentos(texto);
+  return /(envio|envian|envias|delivery|domicilio|contra entrega|llega|llegan|tarapoto|provincia|nacional|olva|shalom|agencia|direccion|ubicad|almacen|estacion|villa maria)/.test(t);
+}
+
+/** ¿Pregunta por promociones / quiere llevarse 2 o 3? */
+function esPreguntaPromo(texto) {
+  const t = sinAcentos(texto);
+  if (/(medios?|formas?|metodos?)\s+de\s+pago/.test(t)) return false;
+  return /(promo|promocion|promociones|pack|combo|oferta|llevarme\s+(2|dos|3|tres)|llevar\s+(2|dos)|quiero\s+(2|dos)|dos\s+perfumes|2\s*[x×]\s*30|2\s*[x×]\s*50|2\s*[x×]\s*100|3\s*[x×]\s*30|en\s+promo|por\s+2\s+perfumes)/.test(t);
+}
+
+/**
+ * Respuesta de promoción: si el cliente pide recomendación para llevarse 2,
+ * devuelve 2 productos (con su id para que app.js envíe sus fotos) además de la
+ * tabla de promos. Sin IA disponible también funciona (usa el catálogo real).
+ */
+async function respuestaPromo(mensaje) {
+  const t = sinAcentos(mensaje);
+  const quiereReco = /(recomiend|cu[aá]l|que perfume|opciones|elegir|mejor)/.test(t);
+  const pideDama = /(dama|mujer|ella|femenin)/.test(t);
+  const pideCab = /(caballero|hombre|masculin|varon)/.test(t);
+  let ids = [];
+  let detalle = '';
+  if (quiereReco) {
+    try {
+      const productos = await catalogo();
+      let pool = productos;
+      if (pideDama) pool = pool.filter(p => String(p.genero || '') === 'dama');
+      else if (pideCab) pool = pool.filter(p => String(p.genero || '') === 'caballero');
+      if (pideDama || pideCab) pool = pool.filter(p => p.genero === (pideDama ? 'dama' : 'caballero'));
+      const rel = relevantes(mensaje, pool);
+      const elegidos = (rel.length ? rel : pool).slice(0, 2);
+      ids = elegidos.map(p => String(p.id));
+      if (elegidos.length) {
+        detalle = '\n\nTe recomiendo para llevarte 2 en promo:\n' +
+          elegidos.map((p, i) => `${i + 1}. *${p.nombre}* (inspirado en ${p.casa_inspirada || '—'}) — 50 ml *S/ 56* · 100 ml *S/ 78*`).join('\n');
+      }
+    } catch { /* sin catálogo: solo tabla */ }
+  }
+  const texto = `¡En promoción! 😄 Entonces le comparto nuestras promos actuales 📸\n\n${PROMO_TABLA}${detalle}\n\n${PROMO_2X50} ¿Le armo una promo con envío cotizado? 👀✨`;
+  return { responder: true, texto, productoId: '', productosIds: ids, promo: true, pedido: null, pregunta: '' };
+}
+
+/** Detecta un mensaje con DOS preguntas/intenciones distintas. */
+export function consultaCompuesta(texto) {
+  const t = sinAcentos(texto);
+  const envio = /(envio|envios|envian|delivery|tarapoto|provincia|olva|shalom|llega|llegan|domicilio)/.test(t);
+  const promo = /(promo|promocion|pack|combo|llevarme\s+(2|dos|3|tres)|quiero\s+(2|dos)|en\s+promo)/.test(t);
+  const dama = /(dama|mujer|ella|femenin)/.test(t);
+  const cab = /(caballero|hombre|varon|masculin)/.test(t);
+  const reco = /(recomiend|cu[aá]l|opciones|elegir|que perfume)/.test(t);
+  return (promo && envio) || (dama && cab && reco);
+}
+
+/** Respuesta rápida para "recomiéndame de dama y de varón": un bloque por género. */
+async function respuestaDosGeneros(mensaje) {
+  const bloques = [];
+  const ids = [];
+  try {
+    const productos = await catalogo();
+    const peor = { nombre: '', casa: '' };
+    const elegir = genero => {
+      const pool = productos.filter(p => String(p.genero || '') === genero);
+      const rel = relevantes(mensaje, pool);
+      return (rel.length ? rel : pool)[0] || null;
+    };
+    const el = elegir('caballero') || elegir('unisex') || peor;
+    const ella = elegir('dama') || elegir('unisex') || peor;
+    if (el && el.id) {
+      ids.push(String(el.id));
+      bloques.push({ texto: `Para él: *${el.nombre}*${el.casa_inspirada ? ` (inspirado en ${el.casa_inspirada})` : ''} — 50 ml *S/ ${el.precio_50ml ?? 56}* · 100 ml *S/ ${el.precio_100ml ?? 78}*`, productoId: String(el.id) });
+    }
+    if (ella && ella.id) {
+      ids.push(String(ella.id));
+      bloques.push({ texto: `Para ella: *${ella.nombre}*${ella.casa_inspirada ? ` (inspirado en ${ella.casa_inspirada})` : ''} — 50 ml *S/ ${ella.precio_50ml ?? 56}* · 100 ml *S/ ${ella.precio_100ml ?? 78}*`, productoId: String(ella.id) });
+    }
+  } catch { /* sin catálogo: respuesta de texto */ }
+  if (!bloques.length) {
+    bloques.push({ texto: 'Para él y para ella tenemos opciones. ¿Le paso 2 recomendaciones en un momento? 😊' });
+  }
+  bloques.push({ texto: `${PROMO_2X50} ¿Se los separo en promo? 😊` });
+  return { responder: true, bloques, productosIds: ids, promo: false, productoId: '', pedido: null, pregunta: '' };
+}
+
 export async function redactarRespuesta({ mensaje, historial = [], cliente, contexto = '' }) {
   const pideOpciones = detectarPeticionOpciones(mensaje);
   // Medios de pago: respuesta directa, nunca una lista de perfumes.
@@ -512,13 +606,36 @@ export async function redactarRespuesta({ mensaje, historial = [], cliente, cont
       aviso: 'Ese tipo de consultas (por mayor, reventa o insumos) no las manejamos por aquí 🙌 Te paso con un administrador para que te oriente.'
     };
   }
-  // Promo de 3 x S/ 90: la explica el administrador.
-  if (esPromo3(mensaje)) {
-    return {
-      derivar: true,
-      motivo: 'promoción de 3 perfumes (S/ 90)',
-      aviso: '¡Sí tenemos la promo de *3 perfumes de 30 ml por S/ 90*! 🎁 El pago es al recibir tu pedido (Lima o provincia). Te paso con un administrador para coordinar tu promo.'
-    };
+  // Promociones y envíos: respuestas deterministas y verdaderas (sin IA).
+  const pideEnvio = esPreguntaEnvio(mensaje);
+  const pidePromo = esPreguntaPromo(mensaje);
+  if (pidePromo) {
+    const r = await respuestaPromo(mensaje);
+    if (pideEnvio) {
+      // DOS preguntas en un solo mensaje: promos (con imagen) y envíos.
+      // Se responden en dos bloques seguidos para que salgan casi juntos.
+      return {
+        responder: true,
+        bloques: [
+          { texto: r.texto, imagenPromo: true },
+          { texto: `Claro que sí, estimado. ${INFO_ENVIOS} ¿Le gustaría que le cotice el envío con alguna promoción? 👀✨` }
+        ],
+        productosIds: r.productosIds || [],
+        promo: false,
+        productoId: '',
+        pedido: null,
+        pregunta: ''
+      };
+    }
+    return r;
+  }
+  if (pideEnvio) {
+    const texto = `Claro que sí. ${INFO_ENVIOS}\n\n¿Le gustaría alguna promoción para cotizarle el envío? 👀✨`;
+    return { responder: true, texto, productoId: '', productosIds: [], promo: true, pedido: null, pregunta: '' };
+  }
+  // Dama + varón en un mismo mensaje: dos recomendaciones rápidas, una por género.
+  if (consultaCompuesta(mensaje)) {
+    return respuestaDosGeneros(mensaje);
   }
   // Reclamos: siempre a un administrador, sin que la IA improvise soluciones.
   if (esReclamo(mensaje)) return { derivar: true, motivo: 'reclamo del cliente' };
@@ -656,28 +773,104 @@ Responde ahora.`;
 }
 
 /**
- * Orden explícito de proveedores para el chat: Gemini → Groq → Anthropic.
- * Errores explícitos: si todos fallan se lanza un error con el detalle de cada
- * proveedor; app.js avisa al dueño y el cliente ya recibió el respaldo.
+ * Orden explícito de proveedores. `AI_ORDEN=nvidia,groq,gemini,anthropic`
+ * permite elegir el primero; si está vacío se conserva el orden clásico.
+ * Cada proveedor tiene un tiempo máximo y la generación completa otro.
  */
+export function proveedoresDisponibles() {
+  const mapa = {
+    gemini: ['Gemini', () => config.geminiKey, p => gemini(p)],
+    groq: ['Groq', () => config.groqKey, p => groqChat(p)],
+    anthropic: ['Anthropic', () => config.anthropicKey, p => anthropic(p)],
+    nvidia: ['NVIDIA', () => config.nvidiaKey, p => nvidiaChat(p)]
+  };
+  const elegido = String(config.aiOrden || '')
+    .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+  const orden = elegido.length ? elegido : ['gemini', 'groq', 'anthropic', 'nvidia'];
+  const vistos = new Set();
+  const salida = [];
+  for (const clave of orden) {
+    const def = mapa[clave];
+    if (!def || vistos.has(clave)) continue;
+    vistos.add(clave);
+    const [nombre, hayClave, fn] = def;
+    if (!hayClave()) continue;
+    salida.push([nombre, fn]);
+  }
+  return salida;
+}
+
+/** Genera la respuesta probando proveedores en orden, con presupuesto total. */
 async function generarRespuesta(prompt) {
-  const intentos = [];
-  if (config.geminiKey) intentos.push(['Gemini', () => gemini(prompt)]);
-  if (config.groqKey) intentos.push(['Groq', () => groqChat(prompt)]);
-  if (config.anthropicKey) intentos.push(['Anthropic', () => anthropic(prompt)]);
-  if (!intentos.length) throw new Error('Sin proveedor de IA configurado');
+  const intentos = proveedoresDisponibles();
+  if (!intentos.length) {
+    throw new Error('Sin proveedor de IA configurado (define GEMINI_API_KEY, GROQ_API_KEY, ANTHROPIC_API_KEY o NVIDIA_API_KEY)');
+  }
   const errores = [];
+  const limiteTotal = Date.now() + (config.aiTimeoutTotalMs || 30000);
   for (const [nombre, fn] of intentos) {
+    const restante = limiteTotal - Date.now();
+    if (restante <= 1000) {
+      errores.push(`${nombre}: sin tiempo restante`);
+      break;
+    }
+    const t0 = Date.now();
     try {
-      const texto = await fn();
-      if (texto && String(texto).trim()) return texto;
-      errores.push(`${nombre}: respuesta vacía`);
+      // Presupuesto del proveedor y de la corrida completa, el menor.
+      const ms = Math.max(2000, Math.min(config.aiTimeoutMs || 15000, restante));
+      const texto = await Promise.race([
+        fn(prompt),
+        new Promise((_, rechazar) => {
+          const timer = setTimeout(() => rechazar(new Error(`timeout ${ms} ms`)), ms);
+          timer.unref?.();
+        })
+      ]);
+      const msReal = Date.now() - t0;
+      if (texto && String(texto).trim()) {
+        console.log(`[ia] respuesta OK con ${nombre} en ${msReal} ms`);
+        return texto;
+      }
+      errores.push(`${nombre}: respuesta vacía (${msReal} ms)`);
     } catch (e) {
-      errores.push(`${nombre}: ${e.message}`);
-      console.warn(`[ia] ${nombre} falló; se prueba el siguiente proveedor si existe: ${e.message}`);
+      const msReal = Date.now() - t0;
+      errores.push(`${nombre}: ${e.message} (${msReal} ms)`);
+      console.warn(`[ia] ${nombre} falló en ${msReal} ms; siguiente proveedor: ${e.message}`);
     }
   }
   throw new Error(`Todos los proveedores de IA fallaron → ${errores.join(' | ').slice(0, 500)}`);
+}
+
+/**
+ * NVIDIA NIM: endpoint compatible con OpenAI. Config:
+ *   NVIDIA_API_KEY, NVIDIA_MODEL (ej. meta/llama-3.3-70b-instruct).
+ */
+async function nvidiaChat(prompt, opts = {}) {
+  if (!config.nvidiaKey) throw new Error('Sin NVIDIA_API_KEY');
+  const sistema = opts.system || SYS;
+  const cuerpo = {
+    model: config.nvidiaModel || 'meta/llama-3.3-70b-instruct',
+    messages: [
+      { role: 'system', content: sistema },
+      { role: 'user', content: String(prompt || '') }
+    ],
+    temperature: Number.isFinite(opts.temperature) ? opts.temperature : 0.6,
+    top_p: 0.9,
+    max_tokens: Number.isFinite(opts.maxOutputTokens) ? opts.maxOutputTokens : 800,
+    stream: false
+  };
+  if (opts.json) cuerpo.response_format = { type: 'json_object' };
+  const r = await fetch(config.nvidiaUrl || 'https://integrate.api.nvidia.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${config.nvidiaKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(cuerpo),
+    signal: AbortSignal.timeout(Number(opts.timeout) || config.aiTimeoutMs || 15000)
+  });
+  if (!r.ok) {
+    const detalle = (await r.text().catch(() => '')).slice(0, 200);
+    throw new Error(`NVIDIA ${r.status}: ${detalle}`);
+  }
+  const j = await r.json();
+  return String(j.choices?.[0]?.message?.content || '').trim();
 }
 
 async function gemini(prompt, opts = {}) {

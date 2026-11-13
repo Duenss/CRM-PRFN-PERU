@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { config, validarConfig, esNumeroPeru, normalizar } from './config.js';
 import { sb, getCliente, getClientes, getProductos, logMensaje, historial, marcarBaja, importarClientes, estadoWaDe, hayColumnasWa, guardarEstadoWa } from './supabase.js';
 import { iniciarWhatsApp, enviar, enviarImagen, enviarVideo, enviarArchivo, estadoWa, cerrarSesion, reiniciarSesion, hayConexion, sesionDisponible, listarChatsWa, listarChatsActivosWa, listarContactosWa, historialWa, consultarNumeroWa, resolverTelefonoWa, recordarDestinoWa, recordarDestinoDirecto, telefonoCanonico, estadoSalud, idMensaje, descargarMediaWa, conTimeout, migrarCacheWebAntiguo } from './whatsapp.js';
-import { redactarRespuesta, transcribirAudio, redactarBorradores, redactarBienvenida, redactarAnuncio, productoPorId, productoMencionado } from './ai.js';
+import { redactarRespuesta, transcribirAudio, redactarBorradores, redactarBienvenida, redactarAnuncio, productoPorId, productoMencionado, consultaCompuesta } from './ai.js';
 import { Cola, dormir, esperaEntreEnvios, PRIORIDAD } from './queue.js';
 import { configValidacion, esperaValidacionMs, aplicarResultado, pausaTrasErrores, sinEtiqueta, conEtiqueta, ESTADOS_WA, enVentanaHoraria, msHastaApertura, proximaPausaLarga, esperaPausaLargaMs } from './validacion.js';
 import { estadoIA, actualizarIA, pausarIA, estaPausado, promptIA, resumenIA, podarPausados } from './ia.js';
@@ -14,6 +14,7 @@ import { oculto, ocultar, limpiar as limpiarOcultos } from './ocultos.js';
 import { registrar, listar, buscar, marcarAgregados, aplicarContactos, aplicarNombresClientes, marcarSinWhatsApp, marcarSinChat, obtener, marcarLeido, respuestasIA, porDia, resumen as resumenChats, registrarCabecera, importarMensajes, yaExisteWa, actualizarAck, mensajesEntrantes, eliminar as eliminarConversacion, fijar as fijarChat, archivar as archivarChat, vaciar as vaciarConversaciones, flush as flushConversaciones, buscarMensajePorWa, actualizarMediaMensaje, fusionarDuplicados } from './conversaciones.js';
 import { telefonoDeDestino, claveTemporalLid } from './identidad.js';
 import { imagenLocalProducto } from './productos-media.js';
+import { saludoPorHora } from './saludo.js';
 import { datosMediaEntrante, esMarcadorMedia, tipoDeMarcador, guardarMediaChat, podarMediaChats, archivoMediaSeguro, rutaMediaSegura } from './media-chats.js';
 import * as pedidos from './pedidos.js';
 import * as anuncios from './anuncios.js';
@@ -125,10 +126,7 @@ function limiteAlcanzado() {
 const primerNombre = n => String(n || '').trim().split(/\s+/)[0] || 'cliente';
 /** Saludo según la hora de Lima (no la del servidor). */
 function saludoHora() {
-  const h = partesLima().h;
-  if (h >= 5 && h < 12) return 'Buenos días';
-  if (h >= 12 && h < 19) return 'Buenas tardes';
-  return 'Buenas noches';
+  return saludoPorHora(partesLima().h);
 }
 /** 15:00 -> "3:00 p. m." para que el cliente nunca tenga que adivinar AM/PM. */
 function hora12(hora) {
@@ -1614,17 +1612,19 @@ function estiloDelChat(tel) {
 }
 
 async function notificarDueno(texto, sesionId = null) {
-  if (!config.ownerNumber) return;
+  // Número configurable (NUMERO_ALERTAS); si no, el OWNER_NUMBER clásico.
+  const destino = normalizar(config.numeroAvisos || config.ownerNumber || '');
+  if (!/^\d{8,15}$/.test(destino)) return;
   try {
     let env;
     try {
-      env = await enviar(config.ownerNumber, texto, sesionId);
+      env = await enviar(destino, texto, sesionId);
     } catch {
-      env = await enviar(config.ownerNumber, texto);
+      env = await enviar(destino, texto);
     }
-    await logMensaje({ telefono: config.ownerNumber, direccion: 'saliente', texto, origen: 'aviso' });
+    await logMensaje({ telefono: destino, direccion: 'saliente', texto, origen: 'aviso' });
     // También queda en la Bandeja: ningún aviso del bot debe quedar fuera del panel.
-    registrar({ telefono: config.ownerNumber, texto, direccion: 'saliente', nombre: 'Aviso del bot', origen: 'aviso', waId: env?.waId || '' });
+    registrar({ telefono: destino, texto, direccion: 'saliente', nombre: 'Aviso del bot', origen: 'aviso', waId: env?.waId || '' });
   } catch (e) {
     log('No se pudo avisar al dueño: ' + e.message);
   }
@@ -1777,6 +1777,18 @@ async function manejarMensaje(msg, sesionId = null) {
   // cancela: el cliente escribió antes.
   if (bienvenida.cancelarPregunta(tel)) log(`Pregunta de asesoría a +${tel} cancelada: el cliente escribió antes.`);
 
+  // PAUSA: se respeta ANTES de la bienvenida/catálogo/flujos deterministas.
+  // Antes solo se miraba justo antes de la IA y esos flujos seguían respondiendo.
+  const iaActual = estadoIA();
+  if (!iaActual.activa || !iaActual.autoRespuesta) {
+    log(`IA desactivada${iaActual.activa ? ' (auto-respuesta off)' : ''}; no se responde a +${tel}.`);
+    return;
+  }
+  if (estaPausado(tel)) {
+    log(`Conversación con +${tel} en pausa (el administrador tomó el control); no se responde.`);
+    return;
+  }
+
   // Si el audio no se pudo transcribir, nunca se deja al cliente en visto.
   if (audioFallido) {
     const aviso = 'No pude escuchar bien tu audio 😕 ¿Me lo escribes o me lo mandas de nuevo, un poquito más corto?';
@@ -1787,6 +1799,11 @@ async function manejarMensaje(msg, sesionId = null) {
     } catch (e) { log('No se pudo avisar que el audio falló: ' + e.message); }
     return;
   }
+
+  // Mensaje con DOS preguntas distintas (promo+envío, dama+varón): se responde
+  // de inmediato y en dos bloques seguidos, sin esperar cooldown ni turno.
+  const esCompuesta = consultaCompuesta(textoIA);
+  if (esCompuesta) log(`Consulta compuesta de +${tel}; se responde de inmediato (sin esperas).`);
 
   // Baja explícita: se confirma SIEMPRE y se guarda aunque aún no sea cliente.
   if (esTextoReal && /^\s*(baja|stop|no me escribas|no quiero recibir|eliminar)\s*[.!]*\s*$/i.test(texto)) {
@@ -1819,7 +1836,7 @@ async function manejarMensaje(msg, sesionId = null) {
     telefono: tel,
     ajustes: estadoAjustes()
   });
-  if (decisionBienvenida.secuencia) {
+  if (decisionBienvenida.secuencia && !esCompuesta) {
     const sinWsp = !!(cliente && (Array.isArray(cliente.etiquetas) ? cliente.etiquetas : String(cliente.etiquetas || '').split(',')).includes('sin-wsp'));
     const puerta = bienvenida.puedeBienvenida({
       telefono: tel,
@@ -1990,10 +2007,11 @@ ${String(texto).slice(0, 300)}
   // Enfriamiento inteligente: en vez de descartar el mensaje, se espera a que
   // el cliente termine de escribir (ráfaga) y recién ahí se responde UNA vez.
   // Así un "para varón" enviado 3 s después del último mensaje no se pierde.
-  if (!esPrueba && config.cooldownSegundos > 0) {
+  if (!esPrueba && !esCompuesta && config.cooldownSegundos > 0) {
     ultimoEntrante.set(tel, Date.now());
     if (turnoEnCurso.has(tel)) return; // ya hay una respuesta preparándose
     turnoEnCurso.add(tel);
+    const tEspera = Date.now();
     try {
       for (let vueltas = 0; vueltas < 6; vueltas++) {
         const t0 = ultimoEntrante.get(tel) || Date.now();
@@ -2006,6 +2024,7 @@ ${String(texto).slice(0, 300)}
     } finally {
       turnoEnCurso.delete(tel);
     }
+    log(`Latencia espera anti-ráfaga para +${tel}: ${Date.now() - tEspera} ms (cooldown ${config.cooldownSegundos}s).`);
     // Si mientras esperaba llegó un mensaje más nuevo, se responde a ese.
     const chatAhora = obtener(tel);
     const ultEnt = [...((chatAhora && chatAhora.mensajes) || [])].reverse()
@@ -2018,8 +2037,15 @@ ${String(texto).slice(0, 300)}
   cooldown.set(tel, Date.now());
 
   // El bot atiende chat por chat: respeta el intervalo configurado entre
-  // respuestas a conversaciones distintas (anti-baneo).
-  await esperarTurnoChat();
+  // respuestas a conversaciones distintas (anti-baneo). Las consultas
+  // compuestas (dos preguntas en un mensaje) contestan YA, en dos bloques.
+  const tTurno = Date.now();
+  if (!esCompuesta) {
+    await esperarTurnoChat();
+    log(`Latencia turno entre chats para +${tel}: ${Date.now() - tTurno} ms (intervalo ${estadoAjustes().intervaloEntreChats}s).`);
+  } else {
+    log(`Consulta compuesta de +${tel}: se omite el turno entre chats para responder rápido.`);
+  }
 
   try {
     log(`Pensando respuesta para +${tel}...`);
@@ -2029,7 +2055,9 @@ ${String(texto).slice(0, 300)}
     const contextoBienvenida = secuenciaEnviada
       ? 'Acabas de enviar a este cliente la bienvenida completa: texto, catálogo PDF, video y foto. NO saludes de nuevo ni vuelvas a ofrecer el catálogo o la información general; responde únicamente su consulta.'
       : '';
+    const tIA = Date.now();
     const ai = await redactarRespuesta({ mensaje: textoIA, historial: hist, cliente, contexto: [promptIA(), estiloDelChat(tel), contextoBienvenida].filter(Boolean).join('\n\n') });
+    log(`Latencia IA para +${tel}: ${Date.now() - tIA} ms.`);
     if (ai.derivar) {
       // Con números de prueba (o el del dueño) nunca se pausa ni se avisa: se
       // responde algo útil para poder seguir probando el flujo con IA.
@@ -2097,13 +2125,79 @@ ${String(texto).slice(0, 300)}
       !pedidoIA.pedido.pagoEnviadoEn
     );
 
-    // Foto del perfume recomendado + precio. Si hay que enviar la plantilla de
-    // pago, se prioriza el texto y luego la plantilla (no dos imágenes seguidas).
-    const prod = ai.productoId ? await productoPorId(ai.productoId) : null;
+    // Fotos de las fragancias recomendadas + precios por unidad. Si la IA
+    // devuelve 2 o 3 (promoción), se envía una foto por fragancia.
+    let prod = ai.productoId ? await productoPorId(ai.productoId) : null;
+    const idsMulti = Array.isArray(ai.productosIds)
+      ? [...new Set(ai.productosIds.map(String))].slice(0, 3)
+      : [];
+    const prodsMulti = [];
+    for (const id of idsMulti) {
+      const p = await productoPorId(id).catch(() => null);
+      if (p) prodsMulti.push(p);
+    }
+    if (!prod && prodsMulti.length) prod = prodsMulti[0];
     if (prod) ultimoProducto.set(tel, prod.id);
     const media = prod ? mediaProducto(prod) : null;
     let enviado = false;
-    if (media && !pagoPendiente) {
+    // Respuestas compuestas (dos preguntas en un mensaje): varios bloques que
+    // deben salir casi juntos. Primero imagen de promoción, luego el texto de
+    // envíos, o una foto por género; sin esperas largas entre ellos.
+    const bloques = Array.isArray(ai.bloques) ? ai.bloques.slice(0, 4) : [];
+    const bloquesEnviados = bloques.length > 0;
+    if (bloquesEnviados) {
+      const promoRuta = path.join(botDataDir, '..', 'media', 'promos', 'promo-navidad.jpg');
+      for (const b of bloques) {
+        const textoBloque = String(b?.texto || '').trim();
+        try {
+          if (b?.productoId) {
+            const p = await productoPorId(b.productoId).catch(() => null);
+            const m = p ? mediaProducto(p) : null;
+            if (m) {
+              const env = await enviarImagen(tel, m, textoBloque, sesionId);
+              await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'saliente', texto: '📷 ' + textoBloque, origen: 'ia' });
+              registrar({ telefono: tel, texto: '📷 ' + textoBloque, direccion: 'saliente', nombre: nombreChat, clienteId: cliente?.id, origen: 'ia', waId: env?.waId || '' });
+            } else if (textoBloque) {
+              const env = await enviar(tel, textoBloque, sesionId);
+              await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'saliente', texto: textoBloque, origen: 'ia' });
+              registrar({ telefono: tel, texto: textoBloque, direccion: 'saliente', nombre: nombreChat, clienteId: cliente?.id, origen: 'ia', waId: env?.waId || '' });
+            }
+          } else if (b?.imagenPromo && fs.existsSync(promoRuta)) {
+            const env = await enviarImagen(tel, { archivo: promoRuta }, textoBloque, sesionId);
+            await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'saliente', texto: '🎁 ' + textoBloque, origen: 'ia' });
+            registrar({ telefono: tel, texto: '🎁 ' + textoBloque, direccion: 'saliente', nombre: nombreChat, clienteId: cliente?.id, origen: 'ia', waId: env?.waId || '' });
+          } else if (textoBloque) {
+            const env = await enviar(tel, textoBloque, sesionId);
+            await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'saliente', texto: textoBloque, origen: 'ia' });
+            registrar({ telefono: tel, texto: textoBloque, direccion: 'saliente', nombre: nombreChat, clienteId: cliente?.id, origen: 'ia', waId: env?.waId || '' });
+          }
+          enviado = true;
+          await new Promise(r => setTimeout(r, 350)); // respiro mínimo entre bloques
+        } catch (e) {
+          log(`No se pudo enviar un bloque de respuesta compuesta a +${tel}: ${e.message}`);
+        }
+      }
+    }
+    if (!bloquesEnviados && prodsMulti.length > 1 && !pagoPendiente) {
+      for (let i = 0; i < prodsMulti.length; i++) {
+        const p = prodsMulti[i];
+        const m = mediaProducto(p);
+        if (!m) continue;
+        const caption = i === 0
+          ? ai.texto
+          : `También te recomiendo *${p.nombre}* (inspirado en ${p.casa_inspirada || '—'}) — 50 ml *S/ ${p.precio_50ml ?? 56}* · 100 ml *S/ ${p.precio_100ml ?? 78}*`;
+        try {
+          const envFoto = await enviarImagen(tel, m, caption, sesionId);
+          await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'saliente', texto: '📷 ' + caption, origen: 'ia' });
+          registrar({ telefono: tel, texto: '📷 ' + caption, direccion: 'saliente', nombre: nombreChat, clienteId: cliente?.id, origen: 'ia', waId: envFoto?.waId || '' });
+          enviado = true;
+          log(`Respuesta IA con foto ${i + 1}/${prodsMulti.length} (${p.nombre}) a +${tel}.`);
+        } catch (e) {
+          log(`No se pudo enviar la foto de ${p.nombre} a +${tel}: ${e.message}`);
+        }
+        await new Promise(r => setTimeout(r, 1500));
+      }
+    } else if (!bloquesEnviados && media && !pagoPendiente) {
       try {
         const envFoto = await enviarImagen(tel, media, ai.texto, sesionId);
         const textoReg = '📷 ' + ai.texto;
@@ -2116,16 +2210,31 @@ ${String(texto).slice(0, 300)}
       }
     }
     if (!enviado) {
-      const env = await enviar(tel, ai.texto, sesionId);
-      await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'saliente', texto: ai.texto, origen: 'ia' });
-      registrar({ telefono: tel, texto: ai.texto, direccion: 'saliente', nombre: nombreChat, clienteId: cliente?.id, origen: 'ia', waId: env?.waId || '' });
+      const textoPrincipal = String(ai.texto || (bloquesEnviados ? bloques.map(b => b.texto).filter(Boolean).join('\n\n') : '')).trim();
+      if (textoPrincipal) {
+        const env = await enviar(tel, textoPrincipal, sesionId);
+        await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'saliente', texto: textoPrincipal, origen: 'ia' });
+        registrar({ telefono: tel, texto: textoPrincipal, direccion: 'saliente', nombre: nombreChat, clienteId: cliente?.id, origen: 'ia', waId: env?.waId || '' });
+      }
+    }
+    // Imagen de promoción (la misma de la web del dueño), sin depender de IA.
+    if (ai.promo && !bloquesEnviados) {
+      const promoRuta = path.join(botDataDir, '..', 'media', 'promos', 'promo-navidad.jpg');
+      if (fs.existsSync(promoRuta)) {
+        try {
+          const envP = await enviarImagen(tel, { archivo: promoRuta }, '🎁 *Promociones Perfumería Fina*', sesionId);
+          await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'saliente', texto: '🎁 Imagen de promociones enviada', origen: 'ia' });
+          registrar({ telefono: tel, texto: '🎁 Imagen de promociones', direccion: 'saliente', nombre: nombreChat, clienteId: cliente?.id, origen: 'ia', waId: envP?.waId || '' });
+          await new Promise(r => setTimeout(r, 1000));
+        } catch (e) { log('No se pudo enviar la imagen de promociones: ' + e.message); }
+      }
     }
 
     // Segundo mensaje: pregunta cálida con tamaños y precios. Solo cuando la IA
     // recomendó una fragancia y el cliente todavía no confirmó un pedido.
-    const preguntaIA = ai.pregunta || (prod && !pedidoIA && !/S\//i.test(ai.texto)
+    const preguntaIA = !bloquesEnviados && (ai.pregunta || (prod && !pedidoIA && !/S\//i.test(ai.texto)
       ? `¿Te gustaría que te preparemos el ${prod.nombre}? Tenemos 50 ml por S/ ${prod.precio_50ml ?? 56} y 100 ml por S/ ${prod.precio_100ml ?? 78} 😊`
-      : '');
+      : ''));
     if (prod && preguntaIA && !pedidoIA) {
       try {
         await new Promise(r => setTimeout(r, 1200));

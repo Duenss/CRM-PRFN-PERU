@@ -63,3 +63,6 @@ deploy/coolify-public-key.txt
 # clientes. Las capturas que YA están versionadas se revisan a mano antes de
 # decidir si se retiran del índice (git rm --cached).
 docs/auditoria/capturas/*.png
+
+# Capturas locales de la demo de rediseño (pueden mostrar nombres/teléfonos de prueba)
+docs/demo/capturas/

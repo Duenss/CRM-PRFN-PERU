@@ -52,6 +52,17 @@ export const config = {
   geminiKey: String(process.env.GEMINI_API_KEY || '').trim(),
   anthropicKey: String(process.env.ANTHROPIC_API_KEY || '').trim(),
   aiModel: String(process.env.AI_MODEL || '').trim(),
+  // NVIDIA NIM (API compatible con OpenAI). Se activa solo si hay NVIDIA_API_KEY.
+  nvidiaKey: String(process.env.NVIDIA_API_KEY || '').trim(),
+  nvidiaModel: String(process.env.NVIDIA_MODEL || 'meta/llama-3.3-70b-instruct').trim(),
+  nvidiaUrl: String(process.env.NVIDIA_API_URL || 'https://integrate.api.nvidia.com/v1/chat/completions').trim(),
+  // Orden de proveedores: "nvidia,groq,gemini,anthropic" (coma). Vacío = orden clásico.
+  aiOrden: String(process.env.AI_ORDEN || '').trim(),
+  // Tiempo máximo por proveedor y total de la generación (ms).
+  aiTimeoutMs: Math.max(3000, num(process.env.AI_TIMEOUT_MS, 15000)),
+  aiTimeoutTotalMs: Math.max(5000, num(process.env.AI_TIMEOUT_TOTAL_MS, 30000)),
+  // Número que recibe alertas de "requiere atención" (pausas, límites, promos).
+  numeroAvisos: normalizar(process.env.NUMERO_ALERTAS || process.env.OWNER_NUMBER || ''),
 
   // Respaldo gratuito para IA/audio cuando Gemini no tiene cuota.
   // Groq tiene capa gratuita (API compatible con OpenAI) y Whisper para audios.
