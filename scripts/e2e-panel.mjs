@@ -681,6 +681,9 @@ function createBotMock() {
     if (/^\/api\/seguimiento(\/[^/]+)?$/.test(p)) return json(res, 200, { activo: false, items: [] });
 
     /* analíticas / estadísticas */
+    if (p === '/api/analiticas/recomendaciones' && method === 'POST') {
+      return json(res, 200, { ok: true, texto: '- **Cierra la promo 2×50:** es la que más consultas tiene.\n- **Escribe a los chats fríos:** recupera ventas de esta semana.', fecha: new Date().toISOString() });
+    }
     if (p === '/api/analiticas') {
       return json(res, 200, {
         ok: true,
@@ -2222,6 +2225,52 @@ async function runE2E() {
       await waitFor(() => bot.state.mediaEnviados > antes, 8000, 'el panel no llamó al endpoint de adjuntos');
       fs.rmSync(tmp, { force: true });
       return 'imagen adjuntada y enviada por /enviar-media';
+    });
+
+    await runner.case('E2E-26', 'Pedidos: filtros fuera, limpiar, buscador de clientes e invoice', async () => {
+      await page.click('#tabs button[data-tab="pedidos"]');
+      await sleep(350);
+      await page.select('#pe-f-estado', 'por_entregar');
+      await sleep(300);
+      await page.click('#pe-flimpiar');
+      await sleep(350);
+      const limpio = await page.evaluate(() => ({
+        estado: document.querySelector('#pe-f-estado')?.value,
+        q: document.querySelector('#pe-q')?.value,
+        fuera: !!document.querySelector('#t-pedidos > .pe-toolbar')
+      }));
+      assert(limpio.fuera, 'los filtros no quedaron fuera de la tarjeta');
+      assert(limpio.estado === '' && limpio.q === '', 'Limpiar no vació los filtros');
+      await page.click('#pe-new');
+      await sleep(250);
+      await page.type('#pe-cliente-q', 'Lucía');
+      await sleep(250);
+      const opciones = await page.$$eval('#pe-cliente-list [data-pe-cliente]', xs => xs.length);
+      assert(opciones >= 1, 'el buscador de clientes no mostró resultados');
+      await page.click('#pe-cliente-list [data-pe-cliente]');
+      const telCliente = await page.$eval('#pe-tel', el => el.value);
+      assert(telCliente.length >= 8, 'el buscador no cargó el WhatsApp');
+      await page.click('#pe-cancel');
+      await page.click('[data-inv]');
+      await sleep(250);
+      const abierto = await page.evaluate(() => !!document.querySelector('#dlgInvoice')?.open);
+      assert(abierto, 'el invoice no abrió');
+      await page.evaluate(() => { window.__printed = 0; window.print = () => { window.__printed++; }; });
+      await page.click('#inv-print');
+      assert((await page.evaluate(() => window.__printed)) === 1, 'el botón Imprimir no llamó a imprimir');
+      await page.click('#inv-x');
+      await sleep(200);
+      assert(!(await page.evaluate(() => !!document.querySelector('#dlgInvoice')?.open)), 'el botón cerrar del invoice no funciona');
+      return 'filtros fuera · limpiar OK · buscador cliente OK · invoice abre/cierra';
+    });
+
+    await runner.case('E2E-27', 'Métricas: recomendaciones IA del día', async () => {
+      await page.click('#tabs button[data-tab="analiticas"]');
+      await sleep(400);
+      assert(await page.$('#an-ia-btn'), 'falta el botón de recomendaciones');
+      await page.click('#an-ia-btn');
+      await waitFor(async () => /Cierra la promo/.test(await page.$eval('#an-ia-recs', el => el.textContent)), 8000, 'las recomendaciones no se pintaron');
+      return 'recomendaciones IA renderizadas';
     });
 
     await runner.case('E2E-11', 'Cero errores de consola JS y cero pageerror en toda la corrida', async () => {

@@ -33,7 +33,8 @@ const RUTAS = {
   POST: [
     '/api/anuncios', '/api/pedidos', '/api/ajustes', '/api/ia', '/api/sincronizar',
     '/api/revisar', '/api/enviar', '/api/sesion', '/api/logout', '/api/prueba',
-    '/api/borradores', '/api/seguimiento', '/api/conversaciones', '/api/archivos'
+    '/api/borradores', '/api/seguimiento', '/api/conversaciones', '/api/archivos',
+    '/api/analiticas', '/api/productos'
   ],
   PATCH: ['/api/pedidos', '/api/anuncios'],
   DELETE: ['/api/anuncios', '/api/conversaciones']
@@ -55,6 +56,8 @@ export function rutaPermitida(metodo, ruta) {
 // El resto corta a los 8 s para que el panel no se quede colgado si el bot está caído.
 const TIEMPOS_LENTOS = [
   { re: /^\/api\/(sincronizar|borradores|sesion|logout|prueba)/, ms: 150000 },
+  { re: /^\/api\/analiticas\/recomendaciones$/, ms: 120000 },
+  { re: /^\/api\/productos\/[^/]+\/foto$/, ms: 180000 },
   { re: /^\/api\/anuncios\/ia/, ms: 120000 },
   { re: /^\/api\/(enviar|revisar)/, ms: 60000 },
   { re: /^\/api\/conversaciones\/[^/]+\/enviar-media$/, ms: 180000 },

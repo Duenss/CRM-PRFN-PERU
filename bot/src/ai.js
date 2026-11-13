@@ -1282,3 +1282,21 @@ Redacta las 3 versiones (promo, regalo/novedad y colección) y devuelve solo el 
     return respaldo();
   }
 }
+/**
+ * Recomendaciones comerciales diarias para el panel de Métricas. No envía nada:
+ * solo redacta ideas concretas con los datos del día.
+ */
+export async function redactarRecomendaciones({ resumen = '' } = {}) {
+  const datos = String(resumen || '').slice(0, 2500);
+  const prompt = `Eres analista comercial de *Perfumería Fina Perú* (perfumes equivalentes 50% esencia, Lima, envíos Shalom/Olva).
+Datos reales del CRM:
+${datos || 'Sin datos suficientes todavía.'}
+
+Da EXACTAMENTE 4 recomendaciones concretas y accionables para vender más esta semana.
+Formato estricto, una por línea:
+- **Título corto:** acción concreta y por qué.
+No inventes precios ni productos que no aparezcan en los datos. No saludes, no expliques el prompt.
+Máximo 60 palabras por recomendación, tono directo y peruano.`;
+  const texto = await generarRespuesta(prompt);
+  return String(texto || '').trim().slice(0, 1800);
+}

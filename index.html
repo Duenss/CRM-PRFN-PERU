@@ -198,11 +198,20 @@
         <div><h1>Pedidos y pagos</h1><p class="muted" id="pe-sub">Control de ventas, comprobantes y entregas.</p></div>
         <div class="bar" style="margin:0"><button class="ghost" id="pe-refresh" type="button">Actualizar</button><button id="pe-new" type="button">Nuevo pedido</button></div>
       </div>
+      <div class="kpis" id="pe-kpis"></div>
       <div class="card" id="pe-form" hidden>
         <div class="card-h"><b>Nuevo pedido</b><button class="ghost" id="pe-close" type="button" style="min-height:30px;padding:.2rem .6rem">Cerrar</button></div>
         <div style="padding:1rem">
           <div class="grid2">
-            <div style="grid-column:1/-1"><label for="pe-cliente">Elegir de mis clientes (opcional)</label><select id="pe-cliente"><option value="">— escribir manualmente —</option></select></div>
+            <div style="grid-column:1/-1">
+              <label for="pe-cliente-q">Buscar contacto registrado (opcional)</label>
+              <div class="combo">
+                <input id="pe-cliente-q" type="text" placeholder="Busca por nombre o número…" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="pe-cliente-list" aria-autocomplete="list">
+                <div id="pe-cliente-list" class="combo-list" role="listbox" hidden></div>
+              </div>
+              <select id="pe-cliente" hidden><option value="">— escribir manualmente —</option></select>
+              <div class="row" style="margin:6px 0 0;padding:0;border:0;background:none;box-shadow:none"><span class="muted" id="pe-cliente-info" style="font-size:.76rem">Sin contacto seleccionado · puedes escribir los datos abajo</span><button class="ghost" id="pe-cliente-clear" type="button" style="min-height:30px">Escribir manual</button></div>
+            </div>
             <div><label for="pe-tel">WhatsApp del cliente</label><input id="pe-tel" placeholder="9 dígitos o 51XXXXXXXXX"></div>
             <div><label for="pe-nombre">Nombre</label><input id="pe-nombre" maxlength="120"></div>
           </div>
@@ -242,30 +251,30 @@
               <option value="delivery">Delivery (a domicilio)</option>
               <option value="estacion">Recojo en estación</option>
             </select></div>
-            <div id="pe-estacion-wrap" hidden><label for="pe-estacion">Estación / punto de recojo</label><input id="pe-estacion" maxlength="120" placeholder="Ej. Estación Central"></div>
+            <div id="pe-estacion-wrap" hidden><label for="pe-estacion">Estación / punto de recojo</label><select id="pe-estacion"><option value="">Elige una estación…</option><option value="Estación VMT">Estación VMT · Villa María del Triunfo (gratis)</option><option value="Estación Villa El Salvador">Estación Villa El Salvador (S/ 5)</option><option value="Estación Atocongo">Estación Atocongo · San Juan de Miraflores (S/ 5)</option><option value="Estación Cabitos">Estación Cabitos · Surco (S/ 5)</option><option value="Estación Angamos">Estación Angamos · Miraflores (S/ 5)</option></select><small class="muted" id="pe-estacion-fee" style="font-size:.72rem">VMT gratis · las demás S/ 5</small></div>
             <div><label for="pe-fecha-entrega">Fecha de entrega</label><input id="pe-fecha-entrega" type="date"></div>
-            <div><label for="pe-hora-entrega">Hora de entrega</label><input id="pe-hora-entrega" type="time"></div>
+            <div><label for="pe-hora-entrega">Hora de entrega</label><div class="time-ampm"><input id="pe-hora-entrega" type="time"><select id="pe-hora-ampm" aria-label="AM o PM"><option value="am">a. m.</option><option value="pm">p. m.</option></select></div></div>
           </div>
           <label for="pe-notas">Notas</label><input id="pe-notas" maxlength="300" placeholder="Dirección, referencia, horario de entrega...">
           <p class="muted" id="pe-total">—</p>
           <div class="acts"><button class="ghost" id="pe-cancel" type="button">Cancelar</button><button id="pe-save" type="button">Guardar pedido</button></div>
         </div>
       </div>
+      <div class="pe-toolbar" id="pe-filtros">
+        <input id="pe-q" type="search" placeholder="Buscar pedido, cliente o teléfono" aria-label="Buscar pedidos">
+        <span class="filtro-par"><label class="filtro-lbl" for="pe-f-estado">Estado</label>
+          <select id="pe-f-estado" aria-label="Filtrar por estado"><option value="">Todos</option></select></span>
+        <span class="filtro-par"><label class="filtro-lbl" for="pe-f-entrega">Entrega</label>
+          <select id="pe-f-entrega" aria-label="Filtrar por entrega"><option value="">Todas</option><option value="delivery">Delivery</option><option value="estacion">Recojo en estación</option><option value="sin">Sin definir</option></select></span>
+        <span class="filtro-par"><label class="filtro-lbl" for="pe-f-desde">Desde</label>
+          <input id="pe-f-desde" type="date" aria-label="Pedidos desde"></span>
+        <span class="filtro-par"><label class="filtro-lbl" for="pe-f-hasta">Hasta</label>
+          <input id="pe-f-hasta" type="date" aria-label="Pedidos hasta"></span>
+        <button class="ghost" type="button" id="pe-flimpiar" title="Quitar todos los filtros de pedidos">Limpiar filtros</button>
+      </div>
       <div>
         <div class="card">
           <div class="card-h"><b>Pedidos</b><span class="muted" id="pe-count">—</span></div>
-          <div class="in-filtros-row filtros-extra" id="pe-filtros">
-            <input id="pe-q" type="search" class="filtro-sel" placeholder="Buscar pedido, cliente o teléfono" aria-label="Buscar pedidos">
-            <span class="filtro-par"><label class="filtro-lbl" for="pe-f-estado">Estado</label>
-              <select id="pe-f-estado" class="filtro-sel" aria-label="Filtrar por estado"><option value="">Todos</option></select></span>
-            <span class="filtro-par"><label class="filtro-lbl" for="pe-f-entrega">Entrega</label>
-              <select id="pe-f-entrega" class="filtro-sel" aria-label="Filtrar por entrega"><option value="">Todas</option><option value="delivery">Delivery</option><option value="estacion">Recojo en estación</option><option value="sin">Sin definir</option></select></span>
-            <span class="filtro-par"><label class="filtro-lbl" for="pe-f-desde">Desde</label>
-              <input id="pe-f-desde" type="date" class="filtro-sel" aria-label="Pedidos desde"></span>
-            <span class="filtro-par"><label class="filtro-lbl" for="pe-f-hasta">Hasta</label>
-              <input id="pe-f-hasta" type="date" class="filtro-sel" aria-label="Pedidos hasta"></span>
-            <button class="ghost" type="button" id="pe-flimpiar" title="Quitar todos los filtros de pedidos">Limpiar</button>
-          </div>
           <div id="pe-list" style="padding:.4rem 1rem 1rem"><p class="empty">Cargando...</p></div>
         </div>
       </div>
@@ -286,6 +295,10 @@
           </div>
           <div class="meta-track"><i id="an-meta-bar"></i></div>
         </div>
+      </div>
+      <div class="card" id="an-ia-card" style="margin-bottom:.8rem">
+        <div class="card-h"><b>Recomendaciones IA del día</b><span class="muted" id="an-ia-fecha">—</span><button class="ghost" id="an-ia-btn" type="button">✨ Generar recomendaciones</button></div>
+        <div id="an-ia-recs" style="padding:1rem"><p class="empty">Genera recomendaciones diarias con IA a partir de tus ventas, consultas y pagos.</p></div>
       </div>
       <div class="dash2">
         <div class="card">
@@ -340,48 +353,53 @@
     </section>
 
     <section class="tab" id="t-campanas" hidden>
-      <div class="two">
+      <div class="pagehead">
+        <div><h1>Campañas</h1><p class="muted">Envía un mensaje masivo con vista previa y control de destinatarios. Nada sale sin tu aprobación.</p></div>
+      </div>
+      <div class="camp-layout">
         <div>
-          <div class="box">
-            <h2>Nueva campaña</h2>
+          <div class="card pad camp-editor">
+            <div class="camp-editor-head"><div><h2>Nueva campaña</h2><p class="muted">Escribe el mensaje, revisa la vista previa y programa el envío.</p></div><span class="tag">Envío masivo</span></div>
             <label for="k-tit">Nombre interno</label><input id="k-tit" maxlength="90" placeholder="Promo semanal 12 de noviembre">
+            <label for="k-msg">Mensaje (usa {nombre} para personalizar)</label><textarea id="k-msg" maxlength="2000" rows="4"></textarea>
             <div class="grid2">
+              <div><label for="k-seg">Etiqueta de clientes (opcional)</label><input id="k-seg" maxlength="200" placeholder="Todos si queda vacío · ej. vip"></div>
               <div><label for="k-obj">Objetivo</label><select id="k-obj">
                 <option value="promo">Promoción</option><option value="novedad">Novedad</option>
                 <option value="cumpleaños">Cumpleaños</option><option value="recompra">Recompra</option>
                 <option value="festividad">Festividad</option>
               </select></div>
-              <div><label for="k-fecha">Fecha de envío (opcional)</label><input id="k-fecha" type="datetime-local"></div>
             </div>
-            <label for="k-num">Enviar desde</label><select id="k-num">
-              <option value="1">Número 1 (principal)</option>
-              <option value="2">Número 2 (alterno)</option>
-            </select>
-            <label for="k-pla">Empezar desde una plantilla</label><select id="k-pla"><option value="">Escribir desde cero</option></select>
-            <label for="k-prod">Agregar un perfume al mensaje y a la IA</label>
-            <div class="bar" style="margin:0"><select id="k-prod"></select><button class="ghost" id="k-add" type="button">Agregar</button></div>
-            <div id="k-chips" class="chips"></div>
-            <label for="k-msg">Mensaje (usa {nombre} para el nombre del cliente)</label><textarea id="k-msg" maxlength="2000"></textarea>
             <label for="k-cond">Indicaciones para la IA (opcional)</label><input id="k-cond" maxlength="400" placeholder="Ej. promo válida hasta el domingo, tono alegre">
-            <div class="ai-box">
-              <div class="ai-head"><span class="ai-dot"></span> Borradores con IA</div>
-              <p class="muted" style="margin:0 0 .5rem;font-size:.8rem">La IA solo propone textos. Nada se envía sin que tú lo apruebes.</p>
-              <button class="ai" id="k-ai" type="button">Generar 3 borradores</button>
-              <div id="k-drafts" class="drafts"></div>
-            </div>
-            <label class="ck"><input type="checkbox" id="k-baja" checked> Agregar aviso para darse de baja al final</label>
-            <label for="k-seg">Enviar solo a clientes con etiqueta (separadas por coma; vacío = todos)</label><input id="k-seg" maxlength="200" placeholder="vip, mujer">
+            <div class="camp-ia-row"><button class="ai" id="k-ai" type="button">✨ Generar con IA</button><span class="muted">Solo propone textos; tú decides.</span></div>
+            <div id="k-drafts" class="drafts"></div>
+            <details class="camp-adv">
+              <summary>Opciones avanzadas: programación, plantilla, productos y segmento</summary>
+              <div class="grid2">
+                <div><label for="k-fecha">Fecha de envío (opcional)</label><input id="k-fecha" type="datetime-local"></div>
+                <div><label for="k-num">Enviar desde</label><select id="k-num"><option value="1">Número 1 (principal)</option><option value="2">Número 2 (alterno)</option></select></div>
+              </div>
+              <label for="k-pla">Empezar desde una plantilla</label><select id="k-pla"><option value="">Escribir desde cero</option></select>
+              <label for="k-prod">Agregar un perfume al mensaje y a la IA</label>
+              <div class="bar" style="margin:0"><select id="k-prod"></select><button class="ghost" id="k-add" type="button">Agregar</button></div>
+              <div id="k-chips" class="chips"></div>
+              <label class="ck"><input type="checkbox" id="k-baja" checked> Agregar aviso para darse de baja al final</label>
+            </details>
             <p class="muted" id="k-info"></p>
-            <div class="acts">
-              <button class="ghost" id="k-manual" type="button">Preparar envío manual</button>
-              <button id="k-program" type="button">Programar con el bot</button>
-            </div>
+            <div class="acts"><button class="ghost" id="k-manual" type="button">Guardar borrador</button><button id="k-program" type="button">Programar envío</button></div>
           </div>
           <div id="k-send" hidden class="box"></div>
-          <h2>Campañas anteriores</h2><div id="k-aviso" hidden></div>
-      <div id="k-list"></div>
         </div>
-        <aside class="phone"><small>Vista previa en WhatsApp</small><div class="bub" id="k-prev"></div></aside>
+        <aside class="camp-side">
+          <div class="card pad">
+            <div class="camp-editor-head"><div><h3>Vista previa en WhatsApp</h3><p class="muted">Así lo recibirá el cliente.</p></div></div>
+            <div class="phone camp-preview"><div class="bub" id="k-prev"></div></div>
+          </div>
+          <div class="card pad">
+            <div class="camp-editor-head"><div><h3>Campañas anteriores</h3><p class="muted">Historial y estado de envíos.</p></div></div>
+            <div id="k-aviso" hidden></div><div id="k-list"></div>
+          </div>
+        </aside>
       </div>
     </section>
 
@@ -470,28 +488,43 @@
     </section>
 
     <section class="tab" id="t-clientes" hidden>
-      <div class="bar"><input id="cq" type="search" placeholder="Buscar por nombre, teléfono o etiqueta"><button id="c-new" class="recabar-btn" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg> Recabar contacto</button><button class="ghost" id="c-sync" type="button">Recaudar contactos del WhatsApp</button><button class="ghost" id="c-imp">Importar CSV</button><button class="ghost" id="c-ver-sinwsp" type="button" title="Mostrar u ocultar los contactos marcados como sin WhatsApp">Sin WhatsApp: ocultos</button></div>
+      <div class="pagehead">
+        <div><h1>Clientes</h1><p class="muted">Base de contactos, etiquetas y valor de compra.</p></div>
+        <div class="bar" style="margin:0"><input id="cq" type="search" placeholder="Buscar por nombre, teléfono o etiqueta"><button id="c-new" class="recabar-btn" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg> Recabar contacto</button><button class="ghost" id="c-sync" type="button">Recaudar contactos del WhatsApp</button><button class="ghost" id="c-imp">Importar CSV</button><button class="ghost" id="c-ver-sinwsp" type="button" title="Mostrar u ocultar los contactos marcados como sin WhatsApp">Sin WhatsApp: ocultos</button></div>
+      </div>
       <input type="file" id="c-file" accept=".csv,text/csv,.txt" hidden>
-      <p class="muted" id="c-count"></p><div id="c-list"></div>
+      <p class="muted" id="c-count"></p>
+      <div class="card" style="padding:.4rem 1rem 1rem"><div id="c-list"></div></div>
     </section>
 
     <section class="tab" id="t-catalogo" hidden>
-      <div class="bar"><input id="pq" type="search" placeholder="Buscar perfume o casa"><select id="p-cat" aria-label="Filtrar por categoría"><option value="">Todas las categorías</option><option value="arabe">Árabe</option><option value="nicho">Nicho de autor</option><option value="disenador">Diseñador francés</option></select><select id="p-gen" aria-label="Filtrar por género"><option value="">Todos los géneros</option><option value="dama">Dama</option><option value="caballero">Caballero</option><option value="unisex">Unisex</option></select></div>
+      <div class="pagehead">
+        <div><h1>Catálogo</h1><p class="muted">Fotos, notas y precios de las fragancias que envía el bot.</p></div>
+        <div class="bar" style="margin:0"><input id="pq" type="search" placeholder="Buscar perfume o casa"><select id="p-cat" aria-label="Filtrar por categoría"><option value="">Todas las categorías</option><option value="arabe">Árabe</option><option value="nicho">Nicho de autor</option><option value="disenador">Diseñador francés</option></select><select id="p-gen" aria-label="Filtrar por género"><option value="">Todos los géneros</option><option value="dama">Dama</option><option value="caballero">Caballero</option><option value="unisex">Unisex</option></select></div>
+      </div>
       <p class="muted" id="p-count"></p><div id="p-list" class="grid"></div>
       <div class="acts"><button class="ghost" id="p-more" type="button" hidden>Mostrar más</button></div>
     </section>
 
     <section class="tab" id="t-calendario" hidden>
-      <h1>Calendario</h1><p class="muted">Campañas, cumpleaños, recompras y fechas especiales.</p>
-      <div class="bar"><button class="ghost" id="cal-prev" type="button" aria-label="Mes anterior">‹</button><b id="cal-title" style="min-width:170px;text-align:center;font-family:'Space Grotesk',sans-serif;font-size:1.05rem"></b><button class="ghost" id="cal-next" type="button" aria-label="Mes siguiente">›</button><button class="ghost" id="cal-today" type="button">Hoy</button></div>
-      <div class="legend">
-        <span><i style="background:#E0B85A"></i>Campaña</span><span><i style="background:#3DD9FF"></i>Cumpleaños</span>
-        <span><i style="background:#25D366"></i>Recompra</span><span><i style="background:#F0B14A"></i>Fecha especial</span>
+      <div class="pagehead">
+        <div><h1>Calendario</h1><p class="muted">Campañas, cumpleaños, recompras y entregas en un solo lugar.</p></div>
+        <div class="bar" style="margin:0"><button class="ghost" id="cal-prev" type="button" aria-label="Mes anterior">‹</button><b id="cal-title" style="min-width:150px;text-align:center;font-family:'Space Grotesk',sans-serif;font-size:.95rem"></b><button class="ghost" id="cal-next" type="button" aria-label="Mes siguiente">›</button><button class="ghost" id="cal-today" type="button">Hoy</button></div>
       </div>
-      <div class="cal-head"><div>Lun</div><div>Mar</div><div>Mié</div><div>Jue</div><div>Vie</div><div>Sáb</div><div>Dom</div></div>
-      <div class="cal" id="cal-grid"></div>
-      <h2 style="margin-top:1.5rem">Día seleccionado</h2><div id="cal-day"></div>
-      <h2>Próximos recordatorios</h2><div id="cal-up"></div>
+      <div class="cols">
+        <div class="card pad">
+          <div class="legend">
+            <span><i style="background:#0e5a45"></i>Campaña</span><span><i style="background:#3fae8a"></i>Cumpleaños</span>
+            <span><i style="background:#e08a63"></i>Recompra</span><span><i style="background:#b7791f"></i>Fecha especial / entrega</span>
+          </div>
+          <div class="cal-head"><div>Lun</div><div>Mar</div><div>Mié</div><div>Jue</div><div>Vie</div><div>Sáb</div><div>Dom</div></div>
+          <div class="cal" id="cal-grid"></div>
+        </div>
+        <div class="card pad">
+          <h2>Día seleccionado</h2><div id="cal-day"></div>
+          <h2 style="margin-top:1.2rem">Próximos recordatorios</h2><div id="cal-up"></div>
+        </div>
+      </div>
     </section>
 
     <section class="tab" id="t-bienvenida" hidden>
@@ -743,6 +776,25 @@
   <div class="acts"><button type="button" class="ghost" id="pg-cancel">Cancelar</button><button type="button" id="pg-save">Programar</button></div>
 </dialog>
 
+<dialog id="dlgInvoice" class="inv-dlg" aria-labelledby="inv-title">
+  <div class="inv-card">
+    <div id="inv-body"></div>
+    <div class="acts inv-actions">
+      <button class="ghost" type="button" id="inv-x">Cerrar</button>
+      <button type="button" id="inv-print">Imprimir / Guardar PDF</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="dlgFoto" class="foto-dlg">
+  <h2>Foto del perfume</h2>
+  <p class="muted" style="margin-top:0">La misma foto que enviará el bot. Se guarda como JPG optimizado.</p>
+  <div class="foto-grid"><img id="foto-preview" alt="Vista previa"><div><b id="foto-nombre">—</b><p class="muted" id="foto-estado">Elige un archivo o pega una URL.</p></div></div>
+  <label for="foto-file">Subir desde el PC</label><input type="file" id="foto-file" accept="image/*">
+  <label for="foto-url">O pegar URL de imagen</label><input id="foto-url" placeholder="https://…/foto.webp">
+  <div class="acts"><button type="button" class="ghost" id="foto-x">Cancelar</button><button type="button" id="foto-save">Guardar foto</button></div>
+</dialog>
+
 <script src="assets/vendor/supabase-2.45.4.min.js"></script>
 <script src="assets/app.js"></script>
 <script>
@@ -765,14 +817,5 @@
     aplicar(localStorage.getItem(KEY) || 'light');
   })();
 </script>
-  <dialog id="dlgInvoice" class="inv-dlg">
-    <div class="inv-card">
-      <div id="inv-body"></div>
-      <div class="acts" style="margin-top:1rem">
-        <button class="ghost" type="button" id="inv-print">Imprimir / Guardar PDF</button>
-        <button class="ghost" type="button" id="inv-x">Cerrar</button>
-      </div>
-    </div>
-  </dialog>
 </body>
 </html>

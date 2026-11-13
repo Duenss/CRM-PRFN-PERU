@@ -233,7 +233,13 @@ function limpiarStale(sub,texto){
 const esSinWsp=c=>Array.isArray(c.etiquetas)?c.etiquetas.includes('sin-wsp'):String(c.etiquetas||'').split(',').includes('sin-wsp');
 const puede=c=>c.activo!==false&&!c.baja&&!esSinWsp(c);
 let verSinWhatsApp=false;
-const imgURL=p=>p.imagen_ruta? (String(p.imagen_ruta).startsWith('http')?p.imagen_ruta:'https://perfumeriafinaperu.com/'+p.imagen_ruta):'';
+const BOT_MEDIA_BASE='https://bot.perfumeriafinaperu.com/media/productos/';
+const imgURL=p=>{
+  const ruta=String(p?.imagen_ruta||'');
+  if(/^https?:\/\/bot\./i.test(ruta))return ruta;
+  if(p?.id)return `${BOT_MEDIA_BASE}${encodeURIComponent(p.id)}.jpg${p?.fotoVersion?`?v=${encodeURIComponent(p.fotoVersion)}`:''}`;
+  return ruta&&/^https?:/i.test(ruta)?ruta:'';
+};
 
 /* ---------- sesión ---------- */
 async function boot(){
@@ -362,7 +368,7 @@ let bandejaBarHome=null;
 function ajustarBandejaTopbar(){
   const slot=document.getElementById('bandejaBar');
   const pagehead=document.querySelector('#t-bandeja .pagehead');
-  const bar=pagehead?.querySelector('.bar');
+  const bar=pagehead?.querySelector('.bar')||slot?.querySelector('.bar');
   if(!slot||!pagehead||!bar)return;
   const escritorio=window.matchMedia('(min-width:901px)').matches;
   const activo=tabActual==='bandeja'&&escritorio;
@@ -517,12 +523,75 @@ function renderCatalogo(){
   const q=$('#pq').value.toLowerCase().trim(),cat=$('#p-cat').value,gen=$('#p-gen').value;
   const l=productos.filter(p=>(!cat||p.categoria===cat)&&(!gen||p.genero===gen)&&[p.nombre,p.casa_inspirada,p.notas,p.descripcion].join(' ').toLowerCase().includes(q));
   $('#p-count').textContent=`${l.length} de ${productos.length} perfumes${l.length>pLimit?` (mostrando ${pLimit})`:''}`;
-  $('#p-list').innerHTML=l.slice(0,pLimit).map(p=>`<div class="pc"><img loading="lazy" src="${esc(imgURL(p))}" alt="${esc(p.nombre)}" onerror="this.style.visibility='hidden'"><b>${esc(p.nombre)}</b><small>${esc(p.casa_inspirada||'')} · ${esc(p.genero||'')}</small><span>S/ ${p.precio_50ml??'—'} · S/ ${p.precio_100ml??'—'}</span></div>`).join('')||'<p class="empty">No hay perfumes con ese filtro.</p>';
+  $('#p-list').innerHTML=l.slice(0,pLimit).map(p=>`<div class="pc"><button class="pc-foto" type="button" data-foto-producto="${esc(p.id)}">Cambiar foto</button><img loading="lazy" src="${esc(imgURL(p))}" alt="${esc(p.nombre)}" onerror="this.style.visibility='hidden'"><b>${esc(p.nombre)}</b><small>${esc(p.casa_inspirada||'')} · ${esc(p.genero||'')}</small>${p.notas?`<small class="pc-notas">${esc(String(p.notas).slice(0,70))}</small>`:''}<span>S/ ${p.precio_50ml??'—'} · S/ ${p.precio_100ml??'—'}</span></div>`).join('')||'<p class="empty">No hay perfumes con ese filtro.</p>';
   $('#p-more').hidden=l.length<=pLimit;
 }
 ['#p-cat','#p-gen'].forEach(s=>$(s).oninput=()=>{pLimit=60;renderCatalogo()});
 $('#pq').oninput=debounce(()=>{pLimit=60;renderCatalogo()},160);
 $('#p-more').onclick=()=>{pLimit+=60;renderCatalogo()};
+let fotoProd=null,fotoData='';
+function mostrarFotoProducto(id){
+  const p=productos.find(x=>String(x.id)===String(id));if(!p)return;
+  fotoProd=p;fotoData='';
+  if($('#foto-nombre'))$('#foto-nombre').textContent=p.nombre;
+  if($('#foto-preview'))$('#foto-preview').src=imgURL(p);
+  if($('#foto-estado'))$('#foto-estado').textContent='Elige un archivo o pega una URL; se convertirá a JPG.';
+  if($('#foto-url'))$('#foto-url').value='';
+  if($('#foto-file'))$('#foto-file').value='';
+  $('#dlgFoto')?.showModal();
+}
+function convertirFoto(origen){
+  return new Promise((res,rej)=>{
+    const img=new Image();
+    img.crossOrigin='anonymous';
+    img.onload=()=>{
+      try{
+        const max=1000;
+        const esc=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight));
+        const cv=document.createElement('canvas');
+        cv.width=Math.max(1,Math.round(img.naturalWidth*esc));
+        cv.height=Math.max(1,Math.round(img.naturalHeight*esc));
+        cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
+        res(cv.toDataURL('image/jpeg',0.84));
+      }catch(e){rej(e)}
+    };
+    img.onerror=()=>rej(new Error('No se pudo cargar la imagen (puede requerir CORS).'));
+    img.src=origen;
+  });
+}
+$('#p-list').addEventListener('click',e=>{
+  const b=e.target.closest('[data-foto-producto]');if(b)mostrarFotoProducto(b.dataset.fotoProducto);
+});
+$('#foto-file')?.addEventListener('change',async e=>{
+  const f=e.target.files&&e.target.files[0];if(!f)return;
+  try{
+    fotoData=await convertirFoto(URL.createObjectURL(f));
+    if($('#foto-preview'))$('#foto-preview').src=fotoData;
+    if($('#foto-estado'))$('#foto-estado').textContent=`${f.name} · ${Math.round(f.size/1024)} KB → JPG optimizado`;
+  }catch(err){toast(err.message,'error')}
+});
+$('#foto-url')?.addEventListener('change',async e=>{
+  const url=String(e.target.value||'').trim();if(!url)return;
+  try{
+    fotoData=await convertirFoto(url);
+    if($('#foto-preview'))$('#foto-preview').src=fotoData;
+    if($('#foto-estado'))$('#foto-estado').textContent='Imagen de URL convertida a JPG.';
+  }catch(err){fotoData='';toast('No se pudo convertir esa URL: '+err.message,'error')}
+});
+$('#foto-x')?.addEventListener('click',()=>$('#dlgFoto')?.close());
+$('#foto-save')?.addEventListener('click',async()=>{
+  if(!fotoProd)return;
+  if(!fotoData)return toast('Elige un archivo o una URL válida.','error');
+  const b=$('#foto-save');b.disabled=true;
+  try{
+    const base64=fotoData.split(',')[1]||'';
+    const r=await botFetch('/api/productos/'+encodeURIComponent(fotoProd.id)+'/foto',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({base64,mimetype:'image/jpeg'}),timeoutMs:180000});
+    fotoProd.imagen_ruta=r.url||imgURL(fotoProd);
+    fotoProd.fotoVersion=r.version||Date.now();
+    $('#dlgFoto').close();renderCatalogo();toast('Foto actualizada; el bot usará la misma');
+  }catch(e){toast('No se guardó la foto: '+e.message,'error')}
+  b.disabled=false;
+});
 
 /* ---------- campañas ---------- */
 function renderChips(){
@@ -1182,26 +1251,33 @@ function abrirInvoice(id){
   const body=$('#inv-body');if(!body)return;
   body.innerHTML=`
     <div class="inv-head">
-      <div><h2>Perfumería Fina Perú</h2><small>Aromas que fascinan · RUC/DNI: ________</small></div>
-      <div class="inv-num"><b>RECIBO ${esc(p.id)}</b><small>${esc(fecha)}</small></div>
+      <div class="inv-brand">
+        <span class="inv-logo">PF</span>
+        <div><h2 id="inv-title">Perfumería Fina</h2><small>Comprobante de pedido · Lima, Perú</small></div>
+      </div>
+      <div class="inv-num"><small>${esc(p.id)}</small><b>${esc(ESTADO_TXT[p.estado]||p.estado)}</b><span>${esc(fecha)}</span></div>
     </div>
     <div class="inv-grid">
-      <div><small>Cliente</small><b>${esc(p.nombre||('+'+p.telefono))}</b><small>+${esc(p.telefono)}</small></div>
-      <div><small>Entrega</small><b>${p.entrega==='estacion'?('Recojo: '+esc(p.estacion||'estación')):p.entrega==='delivery'?'Delivery':'Por definir'}</b><small>${p.fechaEntrega?esc(p.fechaEntrega)+' '+esc(horaTxt(p.horaEntrega)):'—'}</small></div>
-      <div><small>Método de pago</small><b>${metodoTxt(p.metodo)}</b><small>Estado: ${esc(ESTADO_TXT[p.estado]||p.estado)}</small></div>
+      <div><small>Cliente</small><b>${esc(p.nombre||('+'+p.telefono))}</b><span>+${esc(p.telefono)}</span></div>
+      <div><small>Entrega</small><b>${p.entrega==='estacion'?('Recojo: '+esc(p.estacion||'estación')):p.entrega==='delivery'?'Delivery':'Por definir'}</b><span>${p.fechaEntrega?esc(p.fechaEntrega)+' '+esc(horaTxt(p.horaEntrega)):'Por coordinar'}</span></div>
+      <div><small>Pago</small><b>${metodoTxt(p.metodo)}</b><span>${p.adelanto?`Adelanto S/ ${Number(p.adelanto).toFixed(2)}`:'Sin adelanto'}</span></div>
     </div>
-    <table class="inv-table"><thead><tr><th>Producto</th><th>Tamaño</th><th>Cant.</th><th>Precio</th><th>Subtotal</th></tr></thead><tbody>${items||'<tr><td colspan="5">Sin productos</td></tr>'}</tbody></table>
-    <div class="inv-tot">
-      <div><span>Total</span><b>S/ ${Number(p.total||0).toFixed(2)}</b></div>
-      ${p.adelanto?`<div><span>Adelanto</span><b>S/ ${Number(p.adelanto).toFixed(2)}</b></div>`:''}
-      <div class="inv-saldo"><span>Saldo</span><b>S/ ${Number(p.saldo||0).toFixed(2)}</b></div>
+    <div class="inv-products">
+      <table class="inv-table"><thead><tr><th>Producto</th><th>Tamaño</th><th>Cant.</th><th>Precio</th><th>Subtotal</th></tr></thead><tbody>${items||'<tr><td colspan="5">Sin productos</td></tr>'}</tbody></table>
     </div>
-    ${p.notas?`<p class="inv-nota">Notas: ${esc(p.notas)}</p>`:''}
-    <p class="inv-foot">¡Gracias por tu compra! 🌸 Perfumería Fina Perú · WhatsApp +51 910 418 951</p>`;
+    <div class="inv-bottom">
+      <div class="inv-nota-wrap">${p.notas?`<p class="inv-nota"><b>Notas:</b> ${esc(p.notas)}</p>`:''}<p class="inv-foot">Gracias por tu compra · Perfumería Fina Perú</p></div>
+      <div class="inv-tot">
+        <div><span>Total</span><b>S/ ${Number(p.total||0).toFixed(2)}</b></div>
+        ${p.adelanto?`<div><span>Adelanto</span><b>S/ ${Number(p.adelanto).toFixed(2)}</b></div>`:''}
+        <div class="inv-saldo"><span>Saldo</span><b>S/ ${Number(p.saldo||0).toFixed(2)}</b></div>
+      </div>
+    </div>`;
   const dlg=$('#dlgInvoice');if(dlg&&!dlg.open)dlg.showModal();
 }
 $('#inv-x')?.addEventListener('click',()=>$('#dlgInvoice')?.close());
 $('#inv-print')?.addEventListener('click',()=>window.print());
+$('#dlgInvoice')?.addEventListener('click',e=>{if(e.target===$('#dlgInvoice'))$('#dlgInvoice').close()});
 $('#pe-list')?.addEventListener('click',e=>{const inv=e.target.closest('[data-inv]');if(inv){abrirInvoice(inv.dataset.inv);}});
 
 async function abrirComprobante(archivo){
@@ -2152,7 +2228,19 @@ function renderPedidos(j){
   const todos=[...locales,...pedidosCache];
   const ps=todos.filter(pedidoPasaFiltros);
   if($('#pe-count'))$('#pe-count').textContent=`${ps.length} de ${todos.length} pedidos${locales.length?' ('+locales.length+' local(es))':''} · ${j?.resumen?.abiertos||0} abiertos`;
-  if($('#pe-sub'))$('#pe-sub').textContent=`${j?.resumen?.abiertos||0} pedidos abiertos · S/ ${j?.resumen?.ventasEntregadas||0} entregados en total.`;
+  const entregados=todos.filter(p=>p.estado==='entregado').length;
+  if($('#pe-sub'))$('#pe-sub').textContent=`${j?.resumen?.abiertos||0} pedidos abiertos · Total de entregas: ${entregados}`;
+  if($('#pe-kpis')){
+    const ventas=todos.reduce((s,p)=>s+(Number(p.total)||0),0);
+    const abiertos=todos.filter(p=>!['entregado','cancelado'].includes(p.estado)).length;
+    const ticket=todos.length?Math.round(ventas/todos.length):0;
+    $('#pe-kpis').innerHTML=[
+      ['Pedidos abiertos',abiertos,'por atender'],
+      ['Total de entregas',entregados,'completadas'],
+      ['Ventas totales','S/ '+ventas,'pedidos registrados'],
+      ['Ticket promedio','S/ '+ticket,'por pedido']
+    ].map(([l,v,f])=>`<div class="kpi"><div><span class="klabel">${l}</span><b>${esc(String(v))}</b><span class="kfoot">${f}</span></div></div>`).join('');
+  }
   const estados=j?.estados||Object.keys(ESTADO_TXT);
   $('#pe-list').innerHTML=ps.map(p=>{
     const comp=(p.comprobantes||[]).slice(-1)[0];
@@ -2254,12 +2342,43 @@ function llenarClientesPedido(){
   const sel=$('#pe-cliente');if(!sel)return;
   const lista=(typeof clientes!=='undefined'?clientes:[]).filter(c=>c&&c.telefono).slice(0,500);
   sel.innerHTML='<option value="">— escribir manualmente —</option>'+lista.map(c=>`<option value="${esc(c.telefono)}" data-nombre="${esc(c.nombre||'')}">${esc(c.nombre||('+'+c.telefono))} · +${esc(c.telefono)}</option>`).join('');
+  pintarClientesPedido('');
+}
+function pintarClientesPedido(q=''){
+  const cont=$('#pe-cliente-list');if(!cont)return;
+  const lista=(typeof clientes!=='undefined'?clientes:[]).filter(c=>c&&c.telefono&&[c.nombre,c.telefono].join(' ').toLowerCase().includes(String(q||'').toLowerCase())).slice(0,40);
+  cont.innerHTML=lista.map(c=>`<div class="opt" role="option" data-pe-cliente="${esc(c.telefono)}" data-pe-nombre="${esc(c.nombre||'')}"><b>${esc(c.nombre||('+'+c.telefono))}</b><small>+${esc(c.telefono)}</small></div>`).join('')||'<div class="combo-empty">Sin contactos. Escribe el número manualmente abajo.</div>';
+  cont.hidden=false;
+  $('#pe-cliente-q')?.setAttribute('aria-expanded','true');
+}
+function cerrarClientesPedido(){const c=$('#pe-cliente-list');if(c)c.hidden=true;$('#pe-cliente-q')?.setAttribute('aria-expanded','false')}
+function elegirClientePedido(tel,nombre){
+  const sel=$('#pe-cliente');if(!sel)return;
+  sel.value=tel; if($('#pe-tel'))$('#pe-tel').value=tel; if($('#pe-nombre'))$('#pe-nombre').value=nombre||'';
+  if($('#pe-cliente-q'))$('#pe-cliente-q').value=nombre?`${nombre} · +${tel}`:`+${tel}`;
+  if($('#pe-cliente-info'))$('#pe-cliente-info').textContent=`Contacto seleccionado: ${nombre||('+'+tel)}`;
+  cerrarClientesPedido();
+}
+function limpiarClientePedido(){
+  if($('#pe-cliente'))$('#pe-cliente').value='';
+  if($('#pe-cliente-q'))$('#pe-cliente-q').value='';
+  if($('#pe-tel'))$('#pe-tel').value='';
+  if($('#pe-nombre'))$('#pe-nombre').value='';
+  if($('#pe-cliente-info'))$('#pe-cliente-info').textContent='Modo manual · escribe el WhatsApp y nombre abajo';
+  cerrarClientesPedido();
 }
 function abrirFormPedido(tel='',nombre=''){
   llenarClientesPedido();
   llenarProductosPedido();
+  const sel=$('#pe-cliente');
+  if(sel){sel.value='';}
+  if($('#pe-cliente-q'))$('#pe-cliente-q').value='';
+  if($('#pe-cliente-info'))$('#pe-cliente-info').textContent='Sin contacto seleccionado · puedes escribir los datos abajo';
+  cerrarClientesPedido();
   $('#pe-form').hidden=false;
   $('#pe-tel').value=tel||'';$('#pe-nombre').value=nombre||'';
+  const cliente=clientes.find(c=>c.telefono===tel);
+  if(cliente)elegirClientePedido(tel,nombre||cliente.nombre||'');
   $('#pe-cant').value=1;$('#pe-adelanto').value=0;$('#pe-metodo').value='';$('#pe-notas').value='';
   $('#pe-ml').value='100';$('#pe-precio').value=precioPedidoActual();
   peItems=[];renderPeItems();refrescarActualPe();
@@ -2267,14 +2386,19 @@ function abrirFormPedido(tel='',nombre=''){
   if($('#pe-estacion'))$('#pe-estacion').value='';
   if($('#pe-fecha-entrega'))$('#pe-fecha-entrega').value='';
   if($('#pe-hora-entrega'))$('#pe-hora-entrega').value='';
+  if($('#pe-hora-ampm'))$('#pe-hora-ampm').value='am';
   aplicarEntregaPe();
   $('#pe-form').scrollIntoView({block:'center',behavior:'smooth'});
 }
 function aplicarEntregaPe(){
   const t=$('#pe-entrega')?.value||'';
   if($('#pe-estacion-wrap'))$('#pe-estacion-wrap').hidden=t!=='estacion';
+  if(t==='estacion'&&$('#pe-estacion')&&!$('#pe-estacion').value)$('#pe-estacion').value='Estación VMT';
+  const fee=$('#pe-estacion')?.value==='Estación VMT'?'Recojo gratis en VMT':'Recojo en estación: S/ 5';
+  if($('#pe-estacion-fee'))$('#pe-estacion-fee').textContent=t==='estacion'?fee:'VMT gratis · las demás S/ 5';
 }
 $('#pe-entrega')?.addEventListener('change',aplicarEntregaPe);
+$('#pe-estacion')?.addEventListener('change',aplicarEntregaPe);
 $('#pe-add')?.addEventListener('click',agregarPeItem);
 $('#pe-items')?.addEventListener('click',e=>{
   const b=e.target.closest('[data-pe-del]');if(!b)return;
@@ -2298,9 +2422,27 @@ $('#pe-metodo')?.addEventListener('change',renderPeItems);
 $('#pe-cliente')?.addEventListener('change',e=>{
   const opt=e.target.selectedOptions[0];
   if(!opt||!opt.value)return;
-  if($('#pe-tel'))$('#pe-tel').value=opt.value;
-  if($('#pe-nombre'))$('#pe-nombre').value=opt.dataset.nombre||'';
+  elegirClientePedido(opt.value,opt.dataset.nombre||'');
 });
+$('#pe-cliente-q')?.addEventListener('focus',()=>pintarClientesPedido($('#pe-cliente-q').value));
+$('#pe-cliente-q')?.addEventListener('input',()=>pintarClientesPedido($('#pe-cliente-q').value));
+$('#pe-cliente-q')?.addEventListener('blur',()=>setTimeout(cerrarClientesPedido,180));
+$('#pe-cliente-q')?.addEventListener('keydown',e=>{if(e.key==='Escape')cerrarClientesPedido()});
+$('#pe-cliente-list')?.addEventListener('mousedown',e=>{
+  const o=e.target.closest('[data-pe-cliente]');if(!o)return;
+  e.preventDefault();elegirClientePedido(o.dataset.peCliente,o.dataset.peNombre||'');
+});
+$('#pe-cliente-clear')?.addEventListener('click',limpiarClientePedido);
+function horaPedido24(){
+  const v=$('#pe-hora-entrega')?.value||'';if(!v)return '';
+  const [h,m]=v.split(':').map(Number);
+  const p=$('#pe-hora-ampm')?.value||'am';
+  let hh=h||0;
+  if(p==='pm'&&hh<12)hh+=12;
+  if(p==='am'&&hh===12)hh=0;
+  if(p==='am'&&hh>12)hh-=12;
+  return `${String(hh).padStart(2,'0')}:${String(m||0).padStart(2,'0')}`;
+}
 async function guardarPedido(){
   const tel=norm($('#pe-tel').value);
   if(!/^\d{8,15}$/.test(tel))return toast('Escribe un WhatsApp válido.', 'error');
@@ -2319,7 +2461,7 @@ async function guardarPedido(){
       entrega:$('#pe-entrega')?.value||'',
       estacion:($('#pe-entrega')?.value==='estacion'?($('#pe-estacion')?.value||'').trim():''),
       fechaEntrega:$('#pe-fecha-entrega')?.value||'',
-      horaEntrega:$('#pe-hora-entrega')?.value||'',
+      horaEntrega:horaPedido24(),
       items
     })});
     peItems=[];renderPeItems();
@@ -2337,7 +2479,7 @@ async function guardarPedido(){
       entrega:$('#pe-entrega')?.value||'',
       estacion:($('#pe-entrega')?.value==='estacion'?($('#pe-estacion')?.value||'').trim():''),
       fechaEntrega:$('#pe-fecha-entrega')?.value||'',
-      horaEntrega:$('#pe-hora-entrega')?.value||'',
+      horaEntrega:horaPedido24(),
       items,
       total,saldo:Math.max(0,total-adelanto),estado:'borrador',local:true,
       actualizado:new Date().toISOString()
@@ -2611,13 +2753,15 @@ $('#pe-f-desde')?.addEventListener('change',()=>{peFiltroDesde=$('#pe-f-desde')?
 $('#pe-f-hasta')?.addEventListener('change',()=>{peFiltroHasta=$('#pe-f-hasta')?.value||'';guardarFiltrosPedidos();renderPedidos(peUltimoJ||{})});
 $('#pe-q')?.addEventListener('input',()=>{guardarFiltrosPedidos();renderPedidos(peUltimoJ||{})});
 $('#pe-flimpiar')?.addEventListener('click',()=>{
-  peFiltroEstado='';peFiltroEntrega='';peFiltroDesde='';peFiltroHasta='';
+  peFiltroEstado='';peFiltroEntrega='';peFiltroDesde='';peFiltroHasta='';peUltimoJ=null;
   if($('#pe-q'))$('#pe-q').value='';
   if($('#pe-f-estado'))$('#pe-f-estado').value='';
   if($('#pe-f-entrega'))$('#pe-f-entrega').value='';
   if($('#pe-f-desde'))$('#pe-f-desde').value='';
   if($('#pe-f-hasta'))$('#pe-f-hasta').value='';
-  guardarFiltrosPedidos();renderPedidos(peUltimoJ||{});
+  try{localStorage.removeItem(PEDIDOS_FILTROS_KEY)}catch(e){}
+  renderPedidos(peUltimoJ||{});
+  toast('Filtros limpiados');
 });
 $('#pe-close')?.addEventListener('click',()=>{$('#pe-form').hidden=true});
 $('#pe-cancel')?.addEventListener('click',()=>{$('#pe-form').hidden=true});
@@ -2937,6 +3081,38 @@ function renderAnaliticas(){
   renderMetaVentas();
 }
 $('#an-refresh')?.addEventListener('click',cargarAnaliticas);
+const RECS_KEY='pf_recomendaciones_ia_v1';
+function pintarRecomendaciones(texto,fecha){
+  const c=$('#an-ia-recs');if(!c)return;
+  const limpio=esc(String(texto||'')).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\n/g,'<br>');
+  c.innerHTML=limpio?`<div class="rec-ia">${limpio}</div>`:'<p class="empty">La IA no devolvió recomendaciones. Intenta de nuevo.</p>';
+  if($('#an-ia-fecha'))$('#an-ia-fecha').textContent=fecha?new Date(fecha).toLocaleDateString('es-PE'):'';
+}
+function cargarRecomendacionesGuardadas(){
+  try{const j=JSON.parse(localStorage.getItem(RECS_KEY)||'null');if(j&&j.texto&&j.fecha===hoyISO())pintarRecomendaciones(j.texto,j.fecha);}catch{}
+}
+async function generarRecomendaciones(){
+  const b=$('#an-ia-btn');if(b){b.disabled=true;b.textContent='Generando…'}
+  try{
+    const d=anData||{};
+    const resumen=[
+      `Pedidos totales: ${d.totalPedidos??0}; abiertos: ${d.pedidosActivos??0}; entregados: ${d.entregados??0}.`,
+      `Ventas entregadas: S/ ${d.ventas??0}; ticket promedio: S/ ${d.ticketPromedio??0}.`,
+      `Más consultados: ${(d.masConsultados||[]).slice(0,6).map(x=>x.nombre+' ('+x.menciones+')').join(', ')||'sin datos'}.`,
+      `Más pedidos: ${(d.masPedidos||[]).slice(0,6).map(x=>x.nombre+' ('+x.cantidad+')').join(', ')||'sin datos'}.`,
+      `Pagos: ${Object.entries(d.porMetodo||{}).filter(([,n])=>n>0).map(([m,n])=>m+': '+n).join(', ')||'sin datos'}.`,
+      `Estados: ${Object.entries(d.porEstado||{}).filter(([,n])=>n>0).map(([e,n])=>e+': '+n).join(', ')||'sin datos'}.`
+    ].join('\n');
+    const r=await botFetch('/api/analiticas/recomendaciones',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({resumen}),timeoutMs:120000});
+    if(!r.texto)throw new Error('respuesta vacía');
+    localStorage.setItem(RECS_KEY,JSON.stringify({texto:r.texto,fecha:hoyISO()}));
+    pintarRecomendaciones(r.texto,r.fecha||new Date().toISOString());
+    toast('Recomendaciones generadas');
+  }catch(e){toast('No se pudieron generar: '+e.message,'error')}
+  if(b){b.disabled=false;b.textContent='✨ Generar recomendaciones'}
+}
+$('#an-ia-btn')?.addEventListener('click',generarRecomendaciones);
+cargarRecomendacionesGuardadas();
 
 /* ---------- asistente IA ---------- */
 async function cargarIA(){

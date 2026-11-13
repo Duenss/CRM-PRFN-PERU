@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { config, validarConfig, esNumeroPeru, normalizar } from './config.js';
 import { sb, getCliente, getClientes, getProductos, logMensaje, historial, marcarBaja, importarClientes, estadoWaDe, hayColumnasWa, guardarEstadoWa } from './supabase.js';
 import { iniciarWhatsApp, enviar, enviarImagen, enviarVideo, enviarArchivo, estadoWa, cerrarSesion, reiniciarSesion, hayConexion, sesionDisponible, listarChatsWa, listarChatsActivosWa, listarContactosWa, historialWa, consultarNumeroWa, resolverTelefonoWa, recordarDestinoWa, recordarDestinoDirecto, telefonoCanonico, estadoSalud, idMensaje, descargarMediaWa, conTimeout, migrarCacheWebAntiguo } from './whatsapp.js';
-import { redactarRespuesta, transcribirAudio, redactarBorradores, redactarBienvenida, redactarAnuncio, productoPorId, productoMencionado, consultaCompuesta } from './ai.js';
+import { redactarRespuesta, transcribirAudio, redactarBorradores, redactarBienvenida, redactarAnuncio, productoPorId, productoMencionado, consultaCompuesta, redactarRecomendaciones } from './ai.js';
 import { Cola, dormir, esperaEntreEnvios, PRIORIDAD } from './queue.js';
 import { configValidacion, esperaValidacionMs, aplicarResultado, pausaTrasErrores, sinEtiqueta, conEtiqueta, ESTADOS_WA, enVentanaHoraria, msHastaApertura, proximaPausaLarga, esperaPausaLargaMs } from './validacion.js';
 import { estadoIA, actualizarIA, pausarIA, estaPausado, promptIA, resumenIA, podarPausados } from './ia.js';
@@ -13,7 +13,7 @@ import { estadoAjustes, actualizarAjustes, esperaMasivaMs, esperaChatMs } from '
 import { oculto, ocultar, limpiar as limpiarOcultos } from './ocultos.js';
 import { registrar, listar, buscar, marcarAgregados, aplicarContactos, aplicarNombresClientes, marcarSinWhatsApp, marcarSinChat, obtener, marcarLeido, respuestasIA, porDia, resumen as resumenChats, registrarCabecera, importarMensajes, yaExisteWa, actualizarAck, mensajesEntrantes, eliminar as eliminarConversacion, fijar as fijarChat, archivar as archivarChat, vaciar as vaciarConversaciones, flush as flushConversaciones, buscarMensajePorWa, actualizarMediaMensaje, fusionarDuplicados } from './conversaciones.js';
 import { telefonoDeDestino, claveTemporalLid } from './identidad.js';
-import { imagenLocalProducto } from './productos-media.js';
+import { imagenLocalProducto, PRODUCTOS_MEDIA_DIR } from './productos-media.js';
 import { saludoPorHora } from './saludo.js';
 import { datosMediaEntrante, esMarcadorMedia, tipoDeMarcador, guardarMediaChat, podarMediaChats, archivoMediaSeguro, rutaMediaSegura } from './media-chats.js';
 import * as pedidos from './pedidos.js';
@@ -2395,7 +2395,7 @@ app.use((req, res, next) => {
 app.get('/', authPanel, (_req, res) => res.redirect('/panel'));
 app.get('/panel', authPanel, (_req, res) => res.sendFile(panelPath));
 app.use('/media/comprobantes', express.static(comprobantesDir, { fallthrough: true, maxAge: '1h' }));
-app.use('/media/productos', express.static(path.join(raizProyecto, 'assets', 'img', 'products'), { fallthrough: true, maxAge: '1d' }));
+app.use('/media/productos', express.static(PRODUCTOS_MEDIA_DIR, { fallthrough: true, maxAge: '1h' }));
 
 // Página mínima: solo el QR, grande y autorefrescante.
 app.get('/qr', authPanel, (_req, res) => {
@@ -2633,6 +2633,16 @@ app.get('/api/analiticas', auth, async (_req, res) => {
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/analiticas/recomendaciones', auth, async (req, res) => {
+  try {
+    const resumen = String(req.body?.resumen || '').slice(0, 2500);
+    const texto = await redactarRecomendaciones({ resumen });
+    res.json({ ok: true, texto, fecha: new Date().toISOString() });
+  } catch (e) {
+    res.status(502).json({ error: 'No se pudieron generar recomendaciones: ' + e.message });
   }
 });
 
@@ -3312,6 +3322,33 @@ app.post('/api/anuncios/archivo', auth, (req, res) => {
     const buffer = Buffer.from(base64, 'base64');
     fs.writeFileSync(path.join(anunciosMediaDir, archivo), buffer);
     res.json({ ok: true, archivo, nombre: nombreOriginal, mimetype, tipo, bytes: buffer.length });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/* Fotos de producto: la que usa el bot es la misma que muestra el panel. */
+app.post('/api/productos/:id/foto', auth, async (req, res) => {
+  const id = String(req.params.id || '').trim().toLowerCase();
+  if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(id)) return res.status(400).json({ error: 'Producto inválido.' });
+  const base64 = String(req.body?.base64 || '').replace(/^data:[^;]+;base64,/, '');
+  if (!base64 || base64.length > 6 * 1024 * 1024) return res.status(413).json({ error: 'Imagen inválida o mayor a 4 MB.' });
+  try {
+    fs.mkdirSync(PRODUCTOS_MEDIA_DIR, { recursive: true });
+    const buffer = Buffer.from(base64, 'base64');
+    if (!buffer.length) return res.status(400).json({ error: 'Imagen vacía.' });
+    fs.writeFileSync(path.join(PRODUCTOS_MEDIA_DIR, `${id}.jpg`), buffer);
+    // La foto local por id es la que prioriza mediaProducto(); se conserva la
+    // columna imagen_ruta solo para que el panel muestre la versión nueva.
+    const version = Date.now();
+    const host = String(req.get('host') || 'bot.perfumeriafinaperu.com');
+    const url = `https://${host}/media/productos/${id}.jpg?v=${version}`;
+    if (sb) {
+      const { error } = await sb.from('productos').update({ imagen_ruta: url }).eq('id', id);
+      if (error) log(`No se pudo guardar imagen_ruta de ${id}: ${error.message}`);
+    }
+    log(`Foto de producto ${id} actualizada desde el panel (${Math.round(buffer.length / 1024)} KB).`);
+    res.json({ ok: true, id, url, version });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
