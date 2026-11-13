@@ -2083,37 +2083,34 @@ async function runE2E() {
       await sleep(400);
     }
 
-    await runner.case('E2E-21', 'Multimedia: miniatura de imagen y carga bajo demanda', async () => {
+    await runner.case('E2E-21', 'Multimedia: la imagen se muestra automáticamente (sin botón)', async () => {
       await page.click('#tabs button[data-tab="bandeja"]');
       await waitFor(async () => (await page.evaluate(() => document.querySelectorAll('#in-list .in-item').length)) >= 4, 8000, 'la bandeja no pintó los chats');
       const it = await page.$('#in-list .in-item');
       await it.click();
       await waitFor(async () => (await page.evaluate(() => document.querySelectorAll('#in-msgs .msg-media').length)) >= 2, 10000, 'no aparecieron las multimedia en el hilo');
-      const thumb = await page.evaluate(() => {
-        const c = document.querySelector('.msg-media[data-media-wa="wamid.IN.E2E.MEDIA"]');
-        return c ? { thumb: !!c.querySelector('img.msg-thumb'), btn: !!c.querySelector('.msg-media-btn') } : null;
-      });
-      assert(thumb && thumb.thumb, 'la imagen recibida no mostró miniatura');
-      assert(thumb.btn, 'la imagen no tiene botón para cargar el original');
-      await page.click('.msg-media[data-media-wa="wamid.IN.E2E.MEDIA"] .msg-media-btn');
-      await waitFor(async () => (await page.evaluate(() => !!document.querySelector('.msg-media[data-media-wa="wamid.IN.E2E.MEDIA"] img.msg-img'))), 10000, 'la imagen completa no cargó');
-      const cargada = await page.evaluate(() => {
+      // Sin clics: el observer debe descargar y pintar la imagen sola.
+      await waitFor(async () => (await page.evaluate(() => !!document.querySelector('.msg-media[data-media-wa="wamid.IN.E2E.MEDIA"] img.msg-img'))), 12000, 'la imagen no se visualizó automáticamente');
+      const ok = await page.evaluate(() => {
         const img = document.querySelector('.msg-media[data-media-wa="wamid.IN.E2E.MEDIA"] img.msg-img');
-        return !!(img && String(img.src).startsWith('blob:'));
+        const boton = document.querySelector('.msg-media[data-media-wa="wamid.IN.E2E.MEDIA"] .msg-media-btn');
+        return { blob: !!(img && String(img.src).startsWith('blob:')), boton: !!boton };
       });
-      assert(cargada, 'la imagen no se mostró como blob autenticado');
-      return 'miniatura visible + original cargado bajo demanda';
+      assert(ok.blob, 'la imagen no se mostró como blob autenticado');
+      assert(!ok.boton, 'no debe requerir botón de "Ver imagen"');
+      return 'imagen visible automáticamente';
     });
 
-    await runner.case('E2E-22', 'Multimedia antigua: el marcador [video] ofrece cargar el reproductor', async () => {
-      const etiqueta = await page.evaluate(() => {
-        const c = document.querySelector('.msg-media[data-media-wa="wamid.IN.E2E.VIDEO"]');
-        return c && c.querySelector('.msg-media-btn') ? c.querySelector('.msg-media-btn').textContent : '';
+    await runner.case('E2E-22', 'Multimedia antigua: el video se carga y reproduce solo (sin botón)', async () => {
+      await waitFor(async () => (await page.evaluate(() => !!document.querySelector('.msg-media[data-media-wa="wamid.IN.E2E.VIDEO"] video.msg-video'))), 15000, 'el video no se visualizó automáticamente');
+      const ok = await page.evaluate(() => {
+        const v = document.querySelector('.msg-media[data-media-wa="wamid.IN.E2E.VIDEO"] video.msg-video');
+        const boton = document.querySelector('.msg-media[data-media-wa="wamid.IN.E2E.VIDEO"] .msg-media-btn');
+        return { controls: !!(v && v.controls), blob: !!(v && String(v.src).startsWith('blob:')), boton: !!boton };
       });
-      assert(/video/i.test(etiqueta), `el video antiguo no mostró botón de carga: "${etiqueta}"`);
-      await page.click('.msg-media[data-media-wa="wamid.IN.E2E.VIDEO"] .msg-media-btn');
-      await waitFor(async () => (await page.evaluate(() => !!document.querySelector('.msg-media[data-media-wa="wamid.IN.E2E.VIDEO"] video.msg-video'))), 10000, 'el reproductor de video no apareció');
-      return 'marcador [video] → botón → reproductor';
+      assert(ok.controls && ok.blob, 'el video no quedó listo para reproducir');
+      assert(!ok.boton, 'no debe requerir botón de "Ver video"');
+      return 'video visible/reproducible automáticamente';
     });
 
     await runner.case('E2E-11', 'Cero errores de consola JS y cero pageerror en toda la corrida', async () => {

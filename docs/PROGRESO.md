@@ -32,3 +32,7 @@
 |---|---|---|---|
 | Chats duplicados LID (identidad canónica + fusión + script) | ✅ | 5dae80b | bot 248/249 (1 CRLF) |
 | Multimedia visible en el hilo (miniatura + carga bajo demanda) | ✅ | 5dae80b | e2e 22/22 |
+
+| Extra 2 | Horario 24/7 por defecto (migración de 9-20) | ✅ | _(pendiente de hash)_ | bot 262/263 |
+| Extra 3 | Multimedia automática (sin botones; video/sticker incluidos) | ✅ | _(pendiente de hash)_ | e2e 22/22 |
+| Extra 4 | Sync ≤2 min (lectura ligera + caché de destino directo) | ✅ | `9de6a28` | bot 261/262 |

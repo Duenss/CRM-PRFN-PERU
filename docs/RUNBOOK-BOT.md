@@ -170,3 +170,16 @@ limpias `no existe` en momentos distintos.
   ahora dice “suele tardar menos de 2 minutos”.
 - Variables: `HISTORIALES_MAX_CHATS` (60), `HISTORIALES_LIMITE` (80),
   `HISTORIALES_MAX_MS` (180000); `SYNC_MIN_MS`/`SYNC_MAX_MS` para la sync periódica.
+
+## 10 · Horario 24/7 y multimedia automática (2026-11-12)
+
+- **Horario**: por defecto el bot atiende **24/7** (`horaInicio=0`, `horaFin=24`) porque el
+  dueño suele dejar el negocio siempre activo. El panel es la fuente de verdad; las variables
+  `HORA_INICIO`/`HORA_FIN` del `.env` quedaron como legado (no pisan el 24/7). Si un
+  `data/ajustes.json` viejo tenía exactamente 9-20 se migra una sola vez a 0-24
+  (marca `horarioSiempre:true`); un horario elegido a mano se respeta.
+- **Multimedia**: ya no hay botón "Ver imagen/video". Al abrir un chat, cada multimedia
+  visible se descarga y se muestra sola (imagen, sticker, video con controles, audio y
+  documentos) con un máximo de 2 descargas simultáneas. Las miniaturas aparecen al instante
+  y el archivo completo se reemplaza al llegar. Si el archivo expiró en WhatsApp se muestra
+  “No disponible (archivo expirado)” y un clic reintenta la descarga.

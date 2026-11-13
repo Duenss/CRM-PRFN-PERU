@@ -1099,3 +1099,10 @@ dialog::backdrop{background:rgba(10,8,6,.72);backdrop-filter:blur(7px)}
   .msg-video{max-width:min(80vw,280px)}
   .msg-media-btn{min-height:40px}
 }
+
+/* Auto-visualización: el archivo completo aparece solo (sin botón). */
+.msg-media-hint{font-size:.74rem;opacity:.72}
+.msg-media-hint.err{color:#f87171;opacity:.9}
+.msg-media.loading .msg-thumb{opacity:.55;filter:blur(1px)}
+.msg-img{max-width:min(72vw,320px)}
+@media(max-width:760px){.msg-img{max-width:min(80vw,280px)}}

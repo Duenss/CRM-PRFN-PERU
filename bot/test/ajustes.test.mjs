@@ -30,6 +30,25 @@ test('valores por defecto coherentes', () => {
   assert.ok(a.intervaloMasivo >= 1);
 });
 
+test('horario por defecto 24/7 (el dueño suele dejar el bot siempre activo)', () => {
+  const a = ajustes.estadoAjustes();
+  assert.equal(a.horaInicio, 0);
+  assert.equal(a.horaFin, 24);
+});
+
+test('migra el horario viejo 9-20 a 24/7 una sola vez y respeta cambios posteriores', () => {
+  fs.writeFileSync(archivo, JSON.stringify({ horaInicio: 9, horaFin: 20 }), 'utf8');
+  const a = ajustes.recargarAjustes();
+  assert.equal(a.horaInicio, 0);
+  assert.equal(a.horaFin, 24);
+  const guardado = JSON.parse(fs.readFileSync(archivo, 'utf8'));
+  assert.equal(guardado.horarioSiempre, true, 'marca de migración persistida');
+  ajustes.actualizarAjustes({ horaInicio: 10, horaFin: 21 });
+  const b = ajustes.recargarAjustes();
+  assert.equal(b.horaInicio, 10, 'un horario elegido a mano se respeta');
+  assert.equal(b.horaFin, 21);
+});
+
 test('bienvenida: catálogo, video y foto activados por defecto', () => {
   const a = ajustes.estadoAjustes();
   assert.equal(a.enviarCatalogo, true);

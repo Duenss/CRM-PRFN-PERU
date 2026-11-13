@@ -33,8 +33,13 @@ const base = () => ({
   intervaloEntreChats: 5,
   // Segundos entre cada mensaje de un envío masivo (campaña/anuncio).
   intervaloMasivo: 30,
-  horaInicio: Math.min(23, Math.max(0, num(config.horaInicio, 9))),
-  horaFin: Math.min(24, Math.max(1, num(config.horaFin, 20))),
+  // Horario de atención (Lima). Por defecto SIEMPRE activo (0-24): el panel es
+  // la fuente de verdad y el dueño puede restringirlo cuando quiera. Las
+  // variables HORA_INICIO/HORA_FIN del .env quedan como legado (no pisan el 24/7).
+  horaInicio: 0,
+  horaFin: 24,
+  // Marca de migración: los ajustes viejos con el horario fijo 9-20 se pasan a 24/7.
+  horarioSiempre: false,
   // Mensaje de bienvenida (primer mensaje de cada chat). Admite {saludo} y {nombre}.
   bienvenidaTexto: '{saludo}, {nombre}. ✨ Bienvenido(a) a *Perfumería Fina Perú*, aromas que fascinan.\n\nNuestras fragancias son *equivalentes de alta calidad* con *50% de esencia*, inspiradas en las casas perfumeras más reconocidas: buena fijación y en envase propio.\n\n💳 En Lima aceptamos todos los medios de pago según tu preferencia: efectivo al recibir, Yape, Plin o transferencia.\n🚚 Envíos a Lima y provincia.\n\n📕 Te envío nuestro catálogo, un video y una foto para que conozcas las fragancias.\n🌐 Web: https://www.perfumeriafinaperu.com',
   // Secuencia de bienvenida: catálogo PDF, video y foto (activados por defecto).
@@ -62,7 +67,19 @@ const base = () => ({
 function cargar() {
   try {
     const j = JSON.parse(fs.readFileSync(archivo, 'utf8'));
-    return normalizar({ ...base(), ...j });
+    const a = normalizar({ ...base(), ...j });
+    // Migración puntual: el valor por defecto histórico era 9-20. Si el dueño
+    // nunca lo tocó (marca ausente) se pasa a 24/7 para que el bot responda
+    // siempre. Si ya lo personalizó, se respeta.
+    if (a.horarioSiempre !== true && Number(j.horaInicio) === 9 && Number(j.horaFin) === 20) {
+      a.horaInicio = 0;
+      a.horaFin = 24;
+    }
+    if (a.horarioSiempre !== true) {
+      a.horarioSiempre = true;
+      escribirAtomico(archivo, JSON.stringify(a, null, 2));
+    }
+    return a;
   } catch {
     return base();
   }
@@ -78,8 +95,9 @@ function normalizar(a = {}) {
     intervaloMax,
     intervaloEntreChats: clamp(a.intervaloEntreChats, 0, 3600),
     intervaloMasivo: clamp(a.intervaloMasivo, 1, 3600),
-    horaInicio: Math.min(23, Math.max(0, Math.round(num(a.horaInicio, 9)))),
-    horaFin: Math.min(24, Math.max(1, Math.round(num(a.horaFin, 20)))),
+    horaInicio: Math.min(23, Math.max(0, Math.round(num(a.horaInicio, 0)))),
+    horaFin: Math.min(24, Math.max(1, Math.round(num(a.horaFin, 24)))),
+    horarioSiempre: a.horarioSiempre === true,
     bienvenidaTexto: String(a.bienvenidaTexto || '').slice(0, 600),
     enviarCatalogo: a.enviarCatalogo !== false,
     enviarVideo: a.enviarVideo !== false,
@@ -111,6 +129,12 @@ function nombreSeguro(v) {
 
 export function estadoAjustes() {
   return { ...estado };
+}
+
+/** Recarga los ajustes desde disco (pruebas o cambios externos al proceso). */
+export function recargarAjustes() {
+  estado = cargar();
+  return aplicarAjustes();
 }
 
 /** Aplica los ajustes al objeto `config` en caliente (sin reiniciar el bot). */

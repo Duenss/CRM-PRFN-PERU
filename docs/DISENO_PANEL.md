@@ -191,3 +191,10 @@ Reglas: **nada de scroll horizontal** en 360/768/1280; todo bloque con
 - La multimedia va por la ruta autenticada del proxy (`/api/media/chats/...`): nunca
   hay URLs públicas ni base64 en el HTML (solo la miniatura data-URI, pequeña).
 - En móvil, imágenes/videos se limitan a ~72–80 vw y el botón mide 40 px.
+
+### Actualización 2026-11-12 · multimedia automática
+
+El bloque `.msg-media` ya no muestra botón: la miniatura se pinta al instante y, cuando el
+mensaje entra en el viewport, se descarga el archivo y se reemplaza por `img.msg-img`
+(imagen/sticker), `video.msg-video` con controles, `audio.msg-audio` o enlace `a.msg-doc`.
+Cola de auto-descarga con máximo 2 a la vez; errores discretos (“No disponible”).

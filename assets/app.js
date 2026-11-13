@@ -1498,9 +1498,6 @@ function tipoMediaDeMarcador(texto){
   if(/^\[(gif|archivo)\]/.test(t))return 'archivo';
   return '';
 }
-function etiquetaMedia(tipo){
-  return ({imagen:'🔍 Ver imagen',sticker:'🔍 Ver sticker',video:'▶ Ver video',audio:'🔊 Escuchar audio',documento:'📄 Abrir documento',archivo:'⬇ Abrir archivo'})[tipo]||'Ver archivo';
-}
 function formatoBytes(n){
   const b=Number(n)||0;
   if(!b)return '';
@@ -1514,12 +1511,52 @@ function htmlMediaMensaje(m,tel){
   if(!tipo)return '';
   const wa=String(m.waId||'');
   if(!wa)return '';
+  // La miniatura se muestra YA (sin botón). El archivo completo se trae solo
+  // cuando el mensaje entra en pantalla (ver observarMedia/cargarMediaEnHilo).
   const thumb=media&&media.thumb?`<img class="msg-thumb" src="${esc(media.thumb)}" alt="" loading="lazy">`:'';
   const meta=[formatoBytes(media&&media.bytes)];
   if(media&&media.duracion)meta.push(Math.round(media.duracion)+' s');
-  const nombre=media&&media.nombre?esc(media.nombre):'';
   const info=meta.filter(Boolean).length?`<small class="msg-media-meta">${meta.filter(Boolean).join(' · ')}</small>`:'';
-  return `<div class="msg-media" data-media-tel="${esc(tel)}" data-media-wa="${esc(wa)}" data-media-tipo="${esc(tipo)}">${thumb}<button class="msg-media-btn" type="button">${etiquetaMedia(tipo)}${nombre?' · '+nombre:''}</button>${info}</div>`;
+  const pista=thumb?'':`<span class="msg-media-hint">${tipo==='video'?'Cargando video…':tipo==='audio'?'Cargando audio…':'Cargando archivo…'}</span>`;
+  return `<div class="msg-media" data-media-tel="${esc(tel)}" data-media-wa="${esc(wa)}" data-media-tipo="${esc(tipo)}">${thumb}${pista}${info}</div>`;
+}
+/* Auto-visualización: en cuanto la multimedia entra en el viewport se descarga
+   y se muestra directamente (imagen/video/sticker/audio), sin pulsar botones. */
+let obsMedia=null;
+const colaMedia=[];
+let cargandoMedia=0;
+function encolarMedia(cont){
+  if(!cont||cont.dataset.mediaCargada==='1'||cont.dataset.mediaEnCola==='1')return;
+  cont.dataset.mediaEnCola='1';
+  colaMedia.push(cont);
+  bombearMedia();
+}
+function bombearMedia(){
+  while(cargandoMedia<2&&colaMedia.length){
+    const c=colaMedia.shift();
+    cargandoMedia++;
+    cargarMediaEnHilo(c).finally(()=>{cargandoMedia--;bombearMedia();});
+  }
+}
+function observarMedia(cont){
+  if(!cont)return;
+  cont.dataset.mediaObservada='1';
+  if(typeof IntersectionObserver==='undefined'){encolarMedia(cont);return;}
+  if(!obsMedia){
+    obsMedia=new IntersectionObserver(es=>{
+      for(const e of es){
+        if(!e.isIntersecting)continue;
+        obsMedia.unobserve(e.target);
+        encolarMedia(e.target);
+      }
+    },{root:null,rootMargin:'300px 0px'});
+  }
+  obsMedia.observe(cont);
+}
+function observarMediasDe(nodo){
+  if(!nodo)return;
+  if(nodo.matches&&nodo.matches('.msg-media[data-media-wa]'))observarMedia(nodo);
+  nodo.querySelectorAll&&nodo.querySelectorAll('.msg-media[data-media-wa]').forEach(observarMedia);
 }
 function nodoMensaje(m){
   const out=m.direccion!=='entrante';
@@ -1533,16 +1570,17 @@ function nodoMensaje(m){
   // Si el texto es solo el marcador de la multimedia, no se muestra el "[imagen]".
   const texto=media&&tipoMediaDeMarcador(m.texto)?'':waHTML(m.texto);
   el.innerHTML=`${who?`<span class="who">${who}</span>`:''}${media}${texto}${marca}<time>${esc(new Date(m.en).toLocaleString('es-PE',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}))}</time>`;
+  observarMediasDe(el);
   return el;
 }
-/** Descarga (bajo demanda) y muestra una multimedia del hilo. */
+/** Descarga y muestra una multimedia del hilo (automático al hacerse visible). */
 async function cargarMediaEnHilo(cont){
   const tel=cont.dataset.mediaTel,waId=cont.dataset.mediaWa,tipo=cont.dataset.mediaTipo||'';
   if(!tel||!waId)return;
-  const btn=cont.querySelector('.msg-media-btn');
-  const antes=btn?btn.textContent:'';
+  if(cont.dataset.mediaCargada==='1')return;
+  const thumbEl=cont.querySelector('img.msg-thumb');
+  const thumbSrc=thumbEl?thumbEl.src:'';
   cont.classList.add('loading');
-  if(btn){btn.disabled=true;btn.textContent='Cargando…';}
   try{
     const r=await botFetch('/api/conversaciones/'+encodeURIComponent(tel)+'/media',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({waId}),timeoutMs:210000});
     if(!r||!r.archivo)throw new Error((r&&r.error)||'sin archivo');
@@ -1551,21 +1589,27 @@ async function cargarMediaEnHilo(cont){
     const mim=String(r.mimetype||'');
     const tipoFinal=r.tipo||tipo;
     let nodo;
-    if(/^video\//.test(mim)||tipoFinal==='video'){nodo=document.createElement('video');nodo.className='msg-video';nodo.controls=true;nodo.playsInline=true;nodo.preload='metadata';nodo.src=url;}
+    if(/^video\//.test(mim)||tipoFinal==='video'){
+      nodo=document.createElement('video');nodo.className='msg-video';nodo.controls=true;nodo.playsInline=true;nodo.preload='metadata';nodo.src=url;
+      if(thumbSrc)nodo.poster=thumbSrc;
+    }
     else if(/^audio\//.test(mim)||tipoFinal==='audio'){nodo=document.createElement('audio');nodo.className='msg-audio';nodo.controls=true;nodo.src=url;}
     else if(/^image\//.test(mim)||['imagen','sticker'].includes(tipoFinal)){nodo=document.createElement('img');nodo.className='msg-img';nodo.src=url;nodo.alt='';}
-    else{nodo=document.createElement('a');nodo.className='msg-doc';nodo.href=url;nodo.download=r.nombre||r.archivo;nodo.target='_blank';nodo.rel='noopener';nodo.textContent='⬇ Descargar '+(r.nombre||'archivo');}
+    else{nodo=document.createElement('a');nodo.className='msg-doc';nodo.href=url;nodo.download=r.nombre||r.archivo;nodo.target='_blank';nodo.rel='noopener';nodo.textContent='⬇ '+(r.nombre||'Abrir archivo');}
     cont.innerHTML='';cont.appendChild(nodo);
+    cont.dataset.mediaCargada='1';
+    delete cont.dataset.mediaEnCola;
     cont.classList.remove('loading');
   }catch(err){
     cont.classList.remove('loading');
-    if(btn){btn.disabled=false;btn.textContent=antes||'Reintentar';}
-    toast('No disponible: '+err.message,'error');
+    delete cont.dataset.mediaEnCola;
+    cont.dataset.mediaError='1';
+    cont.innerHTML=`<span class="msg-media-hint err">No disponible (archivo expirado)</span>`;
   }
 }
 $('#in-msgs')?.addEventListener('click',e=>{
   const cont=e.target.closest('[data-media-wa]');
-  if(cont)cargarMediaEnHilo(cont);
+  if(cont&&cont.dataset.mediaError==='1'){delete cont.dataset.mediaError;cargarMediaEnHilo(cont);}
 });
 function pintarHilo(msgs){
   const c=$('#in-msgs');if(!c)return;

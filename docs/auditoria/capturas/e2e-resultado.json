@@ -1,8 +1,8 @@
 {
   "kind": "e2e",
-  "ts": "2026-11-13T00:07:02.281Z",
-  "startedAt": "2026-11-13T00:06:16.247Z",
-  "durationMs": 46034,
+  "ts": "2026-11-13T04:56:35.741Z",
+  "startedAt": "2026-11-13T04:55:49.097Z",
+  "durationMs": 46643,
   "environment": {
     "node": "v24.16.0",
     "platform": "win32/x64",
@@ -15,8 +15,8 @@
   "index": {
     "path": "C:\\Users\\Juan Pablo\\Documents\\WEB PROJECTS\\Crm Perfumeriafina\\index.html",
     "bytes": 54163,
-    "sha256": "7d295c1d72bd8bb285c2f32b23428e6b8db129bb2805b0e239d9d880d093e6a8",
-    "mtime": "2026-11-12T09:55:15.024Z"
+    "sha256": "455f18f1a4c332d4fb476f325127f0f566e945fc521ae7676c5adca2149da34b",
+    "mtime": "2026-11-13T04:53:08.686Z"
   },
   "supabaseScript": {
     "source": "bot/node_modules (offline)",
@@ -75,7 +75,7 @@
       "id": "E2E-09",
       "name": "Fallo de red del bot NO borra la lista ya pintada",
       "status": "PASS",
-      "detail": "4 items intactos · aviso \"⚠ Sin conexión con el bot · datos de 07:06 p. m.\" · recuperada y asentada"
+      "detail": "4 items intactos · aviso \"⚠ Sin conexión con el bot · datos de 11:56 p. m.\" · recuperada y asentada"
     },
     {
       "id": "E2E-10",
@@ -139,15 +139,15 @@
     },
     {
       "id": "E2E-21",
-      "name": "Multimedia: miniatura de imagen y carga bajo demanda",
+      "name": "Multimedia: la imagen se muestra automáticamente (sin botón)",
       "status": "PASS",
-      "detail": "miniatura visible + original cargado bajo demanda"
+      "detail": "imagen visible automáticamente"
     },
     {
       "id": "E2E-22",
-      "name": "Multimedia antigua: el marcador [video] ofrece cargar el reproductor",
+      "name": "Multimedia antigua: el video se carga y reproduce solo (sin botón)",
       "status": "PASS",
-      "detail": "marcador [video] → botón → reproductor"
+      "detail": "video visible/reproducible automáticamente"
     },
     {
       "id": "E2E-11",
@@ -167,7 +167,7 @@
     "pageErrors": [],
     "netErrors": [
       {
-        "ts": 1794528409735,
+        "ts": 1794545783130,
         "type": "error",
         "text": "Failed to load resource: net::ERR_EMPTY_RESPONSE",
         "url": "http://127.0.0.1:3199/api/conversaciones?limite=80&offset=0&filtro=todos&q="
@@ -175,7 +175,7 @@
     ],
     "requestFailures": [
       {
-        "ts": 1794528409728,
+        "ts": 1794545783124,
         "url": "http://127.0.0.1:3199/api/conversaciones?limite=80&offset=0&filtro=todos&q=",
         "method": "OPTIONS",
         "error": "net::ERR_EMPTY_RESPONSE"
@@ -196,14 +196,14 @@
       "/api/ajustes": 3,
       "/api/archivos": 3,
       "/api/logs": 1,
-      "/api/conversaciones/51910418951": 6,
+      "/api/conversaciones/51910418951": 5,
       "/api/conversaciones/51910418951/leido": 2,
       "/api/conversaciones/51910418951/importar": 2,
       "/api/conversaciones/51910418951/media": 2,
-      "/api/media/chats/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png": 1,
-      "/api/media/chats/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4": 1
+      "/api/media/chats/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4": 1,
+      "/api/media/chats/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png": 1
     },
-    "total": 68
+    "total": 67
   },
   "supabase": {
     "restRequests": 4,

@@ -42,8 +42,10 @@ export const config = {
   cooldownSegundos: Math.max(0, num(process.env.COOLDOWN_SEGUNDOS, 10)),
   // 0 = sin límite diario (solo se respeta el intervalo entre mensajes).
   maxPorDia: Math.max(0, num(process.env.MAX_POR_DIA, 0)),
-  horaInicio: Math.min(23, Math.max(0, num(process.env.HORA_INICIO, 9))),
-  horaFin: Math.min(24, Math.max(1, num(process.env.HORA_FIN, 20))),
+  // Horario de atención. Por defecto 24/7: el dueño muchas veces deja el bot
+  // siempre activo; si quiere restringirlo, lo cambia en Ajustes.
+  horaInicio: Math.min(23, Math.max(0, num(process.env.HORA_INICIO, 0))),
+  horaFin: Math.min(24, Math.max(1, num(process.env.HORA_FIN, 24))),
   lunesASabado: bool(process.env.LUNES_A_SABADO, true),
   zona: process.env.ZONA_HORARIA || 'America/Lima',
 
