@@ -1943,6 +1943,8 @@ async function runE2E() {
       el.dispatchEvent(new Event('change', { bubbles: true }));
     }, sel, valor);
     const limpiarFiltrosBandeja = async () => {
+      const panelVisible = await page.evaluate(() => !document.querySelector('#in-filtros-panel')?.hidden);
+      if (!panelVisible) await page.click('#in-toggle-filtros');
       await page.click('#in-flimpiar');
       await sleep(400);
       // Si había una carga en vuelo, el panel puede no repintar: refrescar una vez.
@@ -1953,6 +1955,7 @@ async function runE2E() {
     await runner.case('E2E-12', 'Filtro Bandeja "No leídos": solo chats con mensajes sin leer', async () => {
       await page.click('#tabs button[data-tab="bandeja"]');
       await waitFor(async () => (await contarItemsBandeja()) >= 4, 8000, 'la bandeja no pintó los 4 chats del mock');
+      await limpiarFiltrosBandeja();
       await page.click('#in-filtros button[data-inf="noLeidos"]');
       await waitFor(async () => (await contarItemsBandeja()) === 2, 8000, 'el filtro "No leídos" no dejó 2 chats');
       const tels = await page.evaluate(() => [...document.querySelectorAll('#in-list .in-item')].map(x => x.dataset.tel));

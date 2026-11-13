@@ -1934,6 +1934,14 @@ $('#in-q')?.addEventListener('input',()=>{
   inQTimer=setTimeout(()=>cargarBandeja({reset:true}),450);
 });
 $('#in-refresh')?.addEventListener('click',cargarBandeja);
+$('#in-toggle-filtros')?.addEventListener('click',()=>{
+  const panel=$('#in-filtros-panel'),boton=$('#in-toggle-filtros');
+  if(!panel)return;
+  panel.hidden=!panel.hidden;
+  boton?.classList.toggle('on',!panel.hidden);
+  if(boton)boton.textContent=panel.hidden?'Filtros':'Ocultar filtros';
+});
+$('#navQuick')?.addEventListener('click',()=>{pintarQuickConfig();$('#dlgQuick')?.showModal()});
 $('#in-pause')?.addEventListener('click',togglePausa);
 /* ---------- adjuntos del compositor (pegar o elegir imagen/video/PDF) ---------- */
 let inAdjuntos=[];

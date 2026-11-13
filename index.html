@@ -65,8 +65,10 @@
       <p class="navgroup">Personalización</p>
       <button data-tab="ia" aria-label="Asistente IA"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8z"/><path d="M18.5 15.2l.8 1.9 1.9.8-1.9.8-.8 1.9-.8-1.9-1.9-.8 1.9-.8z"/></svg><span class="nl">Asistente IA</span></button>
       <button data-tab="bienvenida" aria-label="Bienvenida"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 12h5"/></svg><span class="nl">Bienvenida</span></button>
+      <button type="button" id="navQuick" aria-label="Respuestas rápidas"><svg viewBox="0 0 24 24"><path d="M13 2 3 14h8l-1 8 10-12h-8z"/></svg><span class="nl">Respuestas rápidas</span></button>
       <button data-tab="bot" aria-label="Ajustes"><svg viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V4M8 14h.01M16 14h.01M9 18h6"/></svg><span class="nl">Ajustes</span></button>
     </nav>
+    <div class="side-status" id="sideMente"><span class="dot on"></span><div><b>Mente Activa</b><small>IA respondiendo normalmente</small></div></div>
     <button class="ghost" id="out">Salir</button>
   </aside>
   <main>
@@ -125,9 +127,10 @@
 
     <section class="tab" id="t-bandeja" hidden>
       <div class="pagehead">
-        <div><h1>Bandeja de entrada</h1><p class="muted" id="in-sub">Conversaciones de WhatsApp en vivo.</p></div>
-        <div class="bar" style="margin:0"><input id="in-q" type="search" placeholder="Buscar por nombre o número"><button class="ghost" id="in-notify" type="button" title="Activar sonido y notificaciones de derivaciones">Activar avisos</button><button class="ghost" id="in-sync" type="button">Sincronizar WhatsApp</button><button class="ghost" id="in-refresh" type="button">Actualizar</button><button class="ghost" id="in-pause" type="button" title="Pausar la IA en todos los chats">Pausar IA</button></div>
+        <div><h1>Bandeja</h1><p class="muted" id="in-sub">Conversaciones de WhatsApp en vivo.</p></div>
+        <div class="bar" style="margin:0"><input id="in-q" type="search" placeholder="Buscar por nombre o número"><button class="ghost" id="in-toggle-filtros" type="button">Filtros</button><button class="ghost" id="in-refresh" type="button">Actualizar</button><details class="in-tools"><summary title="Más acciones" aria-label="Más acciones">⋯</summary><div class="in-tools-menu"><button class="ghost" id="in-notify" type="button" title="Activar sonido y notificaciones de derivaciones">Activar avisos</button><button class="ghost" id="in-sync" type="button">Sincronizar WhatsApp</button><button class="ghost" id="in-pause" type="button" title="Pausar la IA en todos los chats">Pausar IA</button></div></details></div>
       </div>
+      <div id="in-filtros-panel" hidden>
       <div class="in-filtros-row"><div class="seg" id="in-filtros" role="group" aria-label="Filtrar chats"><button type="button" data-inf="todos" class="on">Todos</button><button type="button" data-inf="noLeidos">No leídos</button><button type="button" data-inf="sinResponder">Sin responder</button><button type="button" data-inf="conPedido">Con pedido</button><button type="button" data-inf="agregados">Agregados</button><button type="button" data-inf="noAgregados">No agregados</button><button type="button" data-inf="sinWhatsApp">Sin WhatsApp</button></div><span class="muted" id="in-filtro-info"></span></div>
       <div class="in-filtros-row filtros-extra">
         <span class="filtro-par"><label class="filtro-lbl" for="in-e">Etiqueta</label>
@@ -137,6 +140,7 @@
         <span class="filtro-par"><label class="filtro-lbl" for="in-fh">Hasta</label>
           <input id="in-fh" type="date" class="filtro-sel" aria-label="Mensajes hasta"></span>
         <button class="ghost" type="button" id="in-flimpiar" title="Quitar todos los filtros y la búsqueda">Limpiar filtros</button>
+      </div>
       </div>
       <div class="inbox">
         <div class="in-list" id="in-list"><p class="empty" style="padding:1rem">Cargando…</p></div>
@@ -148,11 +152,16 @@
               <div class="in-head-act">
                 <button class="ghost recabar-btn" id="in-recabar" type="button" title="Recabar los datos de este contacto"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg> Recabar</button>
                 <button class="ghost" id="in-ia" type="button" title="Activar o pausar la IA en este chat">IA: on</button>
-                <button class="ghost" id="in-pin" type="button" title="Fijar o desfijar este chat arriba">📌 Fijar</button>
-                <button class="ghost" id="in-seg" type="button" title="Activar o desactivar el seguimiento post-venta de este chat">Seguimiento: off</button>
                 <button class="ghost" id="in-neworder" type="button" title="Crear un pedido para este cliente">+ Pedido</button>
-                <button class="ghost" id="in-close" type="button" title="Cerrar la conversación y volver a la lista" aria-label="Cerrar conversación">✕</button>
-                <button class="ghost" id="in-resync" type="button" title="Volver a importar los últimos mensajes de este chat">⟳ Historial</button>
+                <details class="in-more">
+                  <summary title="Más acciones" aria-label="Más acciones">⋯</summary>
+                  <div class="in-more-menu">
+                    <button class="ghost" id="in-pin" type="button" title="Fijar o desfijar este chat arriba">📌 Fijar</button>
+                    <button class="ghost" id="in-seg" type="button" title="Activar o desactivar el seguimiento post-venta">Seguimiento: off</button>
+                    <button class="ghost" id="in-resync" type="button" title="Volver a importar los últimos mensajes de este chat">⟳ Historial</button>
+                    <button class="ghost" id="in-close" type="button" title="Cerrar la conversación y volver a la lista" aria-label="Cerrar conversación">✕ Cerrar chat</button>
+                  </div>
+                </details>
               </div>
             </div>
             <div class="in-tagsbar">
