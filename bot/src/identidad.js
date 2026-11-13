@@ -3,7 +3,7 @@
 // WhatsApp puede identificar al mismo cliente con @c.us, @s.whatsapp.net o un
 // @lid opaco. La regla de oro de este módulo: **un LID jamás es un teléfono**.
 // Si no hay un número resuelto con certeza, devolvemos '' y el llamador decide
-// (no registrar como teléfono, usar una clave `lid:` explícita o reintentar).
+// (usar clave temporal de LID, reintentar o responder sin registrar).
 
 /** ¿El waId es de un LID cuyo `user` es exactamente `digitos`? */
 export function esLidDeDigitos(waId, digitos) {
@@ -25,4 +25,18 @@ export function telefonoDeDestino(waId, { canonico = '', resuelto = '' } = {}) {
   const r = String(resuelto || '').replace(/[^\d]/g, '');
   if (/^\d{8,15}$/.test(r) && !esLidDeDigitos(waId, r)) return r;
   return '';
+}
+
+/**
+ * Clave temporal para un @lid que WhatsApp no deja resolver a teléfono.
+ * Se usa para NO dejar al cliente en visto: se atiende con el `user` del LID
+ * (solo dígitos) y, si más adelante se resuelve el teléfono, los chats se
+ * fusionan por su `waId` (ver fusion.js). Devuelve '' si no es un LID usable.
+ */
+export function claveTemporalLid(waId) {
+  const s = String(waId || '');
+  if (!s.endsWith('@lid')) return '';
+  const user = s.slice(0, -4);
+  // Los userid de LID suelen ser 12-16 dígitos (se aceptan hasta 20).
+  return /^\d{8,20}$/.test(user) ? user : '';
 }

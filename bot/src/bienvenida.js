@@ -75,14 +75,17 @@ export const DIAS_COOLDOWN_DEFECTO = 30;
 const MS_DIA = 24 * 60 * 60 * 1000;
 
 // data/bienvenida-enviadas.json (volumen bot-data-v2):
-//   { chats: { "519...": { enviadaEn, origen } }, backfillHecho, backfillEn }
+//   { chats: { "519...": { enviadaEn, origen } }, catalogos: { "519...": ISO },
+//     backfillHecho, backfillEn }
 let enviadas = null;
 function cargarEnviadas() {
   if (!enviadas) {
     const j = leerJson(enviadasFile, {});
     const chats = j && typeof j.chats === 'object' && j.chats ? j.chats : {};
+    const catalogos = j && typeof j.catalogos === 'object' && j.catalogos ? j.catalogos : {};
     enviadas = {
       chats,
+      catalogos,
       backfillHecho: j?.backfillHecho === true,
       backfillEn: j?.backfillEn || ''
     };
@@ -143,6 +146,36 @@ export function marcarBienvenidaEnviada(telefono, { ahoraMs = Date.now(), origen
   };
   escribirAtomico(enviadasFile, e);
   return true;
+}
+
+/**
+ * Marca que se envió (o se acaba de enviar) el catálogo a este chat. Sirve para
+ * no reenviar PDF+video si el cliente insiste en el catálogo minutos después.
+ */
+export function marcarCatalogoEnviado(telefono, { ahoraMs = Date.now() } = {}) {
+  const tel = limpiarTel(telefono);
+  if (!tel) return false;
+  const e = cargarEnviadas();
+  e.catalogos[tel] = new Date(Number(ahoraMs) || Date.now()).toISOString();
+  // Poda simple: no dejar crecer el JSON sin límite.
+  const claves = Object.keys(e.catalogos);
+  if (claves.length > 1000) {
+    claves.sort((a, b) => String(e.catalogos[a]).localeCompare(String(e.catalogos[b])));
+    for (const k of claves.slice(0, claves.length - 1000)) delete e.catalogos[k];
+  }
+  escribirAtomico(enviadasFile, e);
+  return true;
+}
+
+/** ¿Se envió el catálogo a este chat en los últimos `minutos`? */
+export function catalogoEnviadoHace(telefono, minutos = 180, { ahoraMs = Date.now() } = {}) {
+  const tel = limpiarTel(telefono);
+  if (!tel) return false;
+  const iso = cargarEnviadas().catalogos[tel];
+  const ms = Date.parse(iso || '');
+  if (!Number.isFinite(ms)) return false;
+  const ventana = Math.max(1, Number(minutos) || 180) * 60000;
+  return Number(ahoraMs) - ms < ventana;
 }
 
 /**
@@ -383,15 +416,25 @@ export async function ejecutarSecuencia({ telefono, nombre = '', clienteId = nul
   const pausaSegura = () => Math.min(4000, Math.max(500, Number(pausa()) || 2000));
 
   if (typeof enviarTexto === 'function') {
-    try {
-      await enviarTexto(texto);
-      res.texto = true;
-    } catch (e) {
-      res.errores.push(`texto: ${e.message}`);
-      log(`Bienvenida: no se pudo enviar el texto a +${telefono}: ${e.message}`);
+    // El texto de bienvenida es OBLIGATORIO: se reintenta una vez y, si falla,
+    // se aborta la secuencia (nunca mandar PDF/video/foto sueltos sin contexto).
+    for (let intento = 1; intento <= 2 && !res.texto; intento++) {
+      try {
+        await enviarTexto(texto);
+        res.texto = true;
+      } catch (e) {
+        const msg = `texto: ${e.message}`;
+        log(`Bienvenida: no se pudo enviar el texto a +${telefono} (intento ${intento}/2): ${e.message}`);
+        if (intento === 2) res.errores.push(msg);
+        else await dormir(Math.min(1500, pausaSegura()));
+      }
     }
   } else {
     res.errores.push('texto: sin enviador');
+  }
+  if (!res.texto) {
+    log(`Bienvenida: texto no enviado a +${telefono}; se omiten PDF/video/foto y la pregunta de asesoría para no mandar medios sin contexto.`);
+    return res;
   }
   await dormir(pausaSegura());
 
@@ -429,7 +472,10 @@ export async function ejecutarSecuencia({ telefono, nombre = '', clienteId = nul
   res.foto = await enviarMedio('foto', ajustes.enviarFoto !== false, ajustes.fotoArchivo, enviarFoto);
   await dormir(pausaSegura());
 
-  if (typeof programarSeguimiento === 'function') {
+  // La pregunta de asesoría solo tiene sentido si salió el texto y al menos un
+  // medio del catálogo; si no, el cliente vería una pregunta sobre algo que no
+  // recibió.
+  if (typeof programarSeguimiento === 'function' && (res.pdf || res.video || res.foto)) {
     try {
       programarSeguimiento();
       log(`Bienvenida: pregunta de asesoría programada para +${telefono}.`);
@@ -454,5 +500,6 @@ export default {
   programarPregunta, cancelarPregunta, preguntasPendientes, marcarPreguntaEnviada, vencerPreguntas, textoPregunta,
   ejecutarSecuencia, recargar,
   DIAS_COOLDOWN_DEFECTO, diasCooldown, marcadorBienvenida, tocaBienvenida,
-  marcarBienvenidaEnviada, backfillBienvenidas, backfillEstado, decidirBienvenida
+  marcarBienvenidaEnviada, backfillBienvenidas, backfillEstado, decidirBienvenida,
+  marcarCatalogoEnviado, catalogoEnviadoHace
 };

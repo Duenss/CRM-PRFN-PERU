@@ -12,7 +12,7 @@ import { estadoIA, actualizarIA, pausarIA, estaPausado, promptIA, resumenIA, pod
 import { estadoAjustes, actualizarAjustes, esperaMasivaMs, esperaChatMs } from './ajustes.js';
 import { oculto, ocultar, limpiar as limpiarOcultos } from './ocultos.js';
 import { registrar, listar, buscar, marcarAgregados, aplicarContactos, aplicarNombresClientes, marcarSinWhatsApp, marcarSinChat, obtener, marcarLeido, respuestasIA, porDia, resumen as resumenChats, registrarCabecera, importarMensajes, yaExisteWa, actualizarAck, mensajesEntrantes, eliminar as eliminarConversacion, fijar as fijarChat, archivar as archivarChat, vaciar as vaciarConversaciones, flush as flushConversaciones, buscarMensajePorWa, actualizarMediaMensaje, fusionarDuplicados } from './conversaciones.js';
-import { telefonoDeDestino } from './identidad.js';
+import { telefonoDeDestino, claveTemporalLid } from './identidad.js';
 import { datosMediaEntrante, esMarcadorMedia, tipoDeMarcador, guardarMediaChat, podarMediaChats, archivoMediaSeguro, rutaMediaSegura } from './media-chats.js';
 import * as pedidos from './pedidos.js';
 import * as anuncios from './anuncios.js';
@@ -415,7 +415,15 @@ async function ejecutarSecuenciaBienvenida({ tel, nombre, clienteId, sesionId })
     texto,
     deps: {
       enviarTexto: async (t) => {
-        await enviarRegistrado({ tel, texto: t, nombre, clienteId, sesionId, origen: 'ia', opciones: { linkPreview: true } });
+        // La vista previa de enlace a veces falla y hacía fallar TODO el saludo
+        // (luego salían PDF/video/foto sin texto). Si falla, se reintenta sin
+        // vista previa antes de darlo por perdido.
+        try {
+          await enviarRegistrado({ tel, texto: t, nombre, clienteId, sesionId, origen: 'ia', opciones: { linkPreview: true } });
+        } catch (e) {
+          log(`Bienvenida: fallo con vista previa de enlace (${e.message}); se reintenta sin ella.`);
+          await enviarRegistrado({ tel, texto: t, nombre, clienteId, sesionId, origen: 'ia', opciones: { linkPreview: false } });
+        }
         marcarSaludado(tel);
       },
       enviarPdf: async (ruta) => {
@@ -491,6 +499,7 @@ async function enviarCatalogo({ tel, nombre, clienteId, sesionId }) {
       const env = await enviarArchivo(tel, pdfRuta, 'application/pdf', 'Catalogo-Perfumeria-Fina.pdf', '📕 Catálogo *Perfumería Fina* · Perfumería Fina Perú', sesionId);
       await logMensaje({ clienteId, telefono: tel, direccion: 'saliente', texto: '📕 [catálogo PDF enviado]', origen: 'ia' });
       registrar({ telefono: tel, texto: '📕 Catálogo Perfumería Fina (PDF)', direccion: 'saliente', nombre, clienteId, origen: 'ia', waId: env?.waId || '' });
+      bienvenida.marcarCatalogoEnviado(tel);
       log(`Catálogo PDF enviado a +${tel}.`);
       await dormir(3500); // dejar terminar la subida del PDF antes del video
     } catch (e) {
@@ -515,6 +524,7 @@ async function enviarCatalogo({ tel, nombre, clienteId, sesionId }) {
         const captionVideo = '🎬 Así es *Perfumería Fina Perú*';
         const envV = await enviarVideo(tel, video, captionVideo, sesionId);
         registrar({ telefono: tel, texto: '🎬 Video de Perfumería Fina', direccion: 'saliente', nombre, clienteId, origen: 'ia', waId: envV?.waId || '' });
+        bienvenida.marcarCatalogoEnviado(tel);
         log(`Video enviado a +${tel}.`);
         programarChequeoVideo({ tel, video, caption: captionVideo, sesionId, waId: envV?.waId, nombre, clienteId });
       } catch (e) {
@@ -1646,9 +1656,22 @@ async function manejarMensaje(msg, sesionId = null) {
   if (!/^\d{8,15}$/.test(canonico) && chat.endsWith('@lid')) {
     resuelto = await resolverTelefonoWa(chat, sesionId);
   }
-  const tel = telefonoDeDestino(chat, { canonico, resuelto });
+  let tel = telefonoDeDestino(chat, { canonico, resuelto });
+  // Último recurso: un LID que WhatsApp no deja resolver (número oculto). Se
+  // atiende con una clave temporal para NO dejar al cliente en visto; si luego
+  // se resuelve el teléfono, los chats se fusionan por su waId.
+  if (!/^\d{8,15}$/.test(tel) && chat.endsWith('@lid')) {
+    const temporal = claveTemporalLid(chat);
+    if (temporal) {
+      tel = temporal;
+      log(`Aviso: LID ${chat} sin teléfono resoluble; se atiende con clave temporal ${temporal} (se fusionará si luego se resuelve).`);
+      try {
+        if (!obtener(tel)) registrarCabecera({ telefono: tel, waId: chat, nombre: msg._data?.notifyName || '' });
+      } catch { /* opcional */ }
+    }
+  }
   if (!/^\d{8,15}$/.test(tel)) {
-    if (chat.endsWith('@lid')) log(`Mensaje de un LID sin número resoluble (${chat}); no se crea chat.`);
+    if (chat.endsWith('@lid')) log(`Mensaje de un LID no utilizable (${chat}); se descarta.`);
     return;
   }
   // Refuerza el mapa teléfono→LID: los próximos mensajes propios/acks ya no
@@ -1658,7 +1681,9 @@ async function manejarMensaje(msg, sesionId = null) {
   // para descargar la multimedia de mensajes antiguos por su chat correcto.
   try {
     const chatLocal = obtener(tel);
-    if (chatLocal && !chatLocal.waId && chat) registrarCabecera({ telefono: tel, waId: chat });
+    // Guarda el id real del chat y, si ya existía como clave temporal de LID,
+    // lo fusiona con el teléfono real (mismo waId).
+    if (chat && (!chatLocal || !chatLocal.waId)) registrarCabecera({ telefono: tel, waId: chat });
   } catch { /* opcional */ }
 
   if (config.modoPrueba && !config.numerosPrueba.includes(tel)) {
@@ -1796,10 +1821,20 @@ async function manejarMensaje(msg, sesionId = null) {
       log(`Bienvenida omitida para +${tel}: ${puerta.motivo}.`);
       if (decisionBienvenida.saludo) return;
     } else {
+      let resSecuencia = null;
       try {
-        await ejecutarSecuenciaBienvenida({ tel, nombre: nombreChat, clienteId: cliente?.id, sesionId });
+        resSecuencia = await ejecutarSecuenciaBienvenida({ tel, nombre: nombreChat, clienteId: cliente?.id, sesionId });
         secuenciaEnviada = true;
-      } catch (e) { log('No se pudo enviar la bienvenida: ' + e.message); }
+      } catch (e) {
+        // El texto de bienvenida es obligatorio: si no salió, la secuencia se
+        // abortó (sin medios ni pregunta). No se cae al envío de catálogo para
+        // no mandar PDF/video sueltos ni repetidos; el cliente puede reintentar.
+        log('No se pudo enviar la bienvenida: ' + e.message);
+        return;
+      }
+      if (resSecuencia && (resSecuencia.pdf || resSecuencia.video || resSecuencia.foto)) {
+        bienvenida.marcarCatalogoEnviado(tel);
+      }
       log(`Secuencia de bienvenida a +${tel} (${decisionBienvenida.motivo}).`);
       if (decisionBienvenida.saludo) return;
       // Primer mensaje con consulta concreta: se sigue el flujo normal para
@@ -1810,8 +1845,22 @@ async function manejarMensaje(msg, sesionId = null) {
   }
 
   // Pedido explícito del catálogo: respuesta directa (saludo + PDF + video).
-  // Si la secuencia de bienvenida acaba de enviarlo, no se repite.
+  // Si la secuencia de bienvenida acaba de enviarlo, no se repite; si se envió
+  // hace poco (catálogo/PDF+video ya entregados), tampoco se reenvía.
   if (esTextoReal && !secuenciaEnviada && pideCatalogo(texto)) {
+    if (bienvenida.catalogoEnviadoHace(tel, 180)) {
+      const s = saludoONada(tel, nombreChat);
+      try {
+        await enviarRegistrado({
+          tel,
+          texto: `${s ? s + '. ' : ''}Ya te compartí el catálogo arriba 📕 ¿Buscas una fragancia en especial o te ayudo a elegir?`,
+          nombre: nombreChat,
+          clienteId: cliente?.id,
+          sesionId
+        });
+      } catch (e) { log('No se pudo responder el pedido del catálogo: ' + e.message); }
+      return;
+    }
     const s = saludoONada(tel, nombreChat);
     if (s) {
       try {
@@ -2510,6 +2559,7 @@ async function sincronizarChatsDesdeWhatsApp(sesionId = null, opciones = {}) {
   );
   const propios = estadoWa().map(s => String(s.numero || '')).filter(Boolean);
   let chats = 0, grupos = 0, sinNumero = 0, archivados = 0, sinConversacion = 0;
+  const nuevos = [];
   for (const c of lista) {
     // Grupos: no van a la Bandeja.
     if (c.grupo) { grupos++; continue; }
@@ -2520,6 +2570,7 @@ async function sincronizarChatsDesdeWhatsApp(sesionId = null, opciones = {}) {
     if (c.tieneMensajes === false) { sinConversacion++; continue; }
     if (oculto(c.telefono)) continue; // el dueño lo quitó de la Bandeja
     const esPropio = propios.includes(String(c.telefono));
+    const eraNuevo = !obtener(c.telefono);
     registrarCabecera({
       telefono: c.telefono,
       nombre: c.nombre,
@@ -2539,11 +2590,12 @@ async function sincronizarChatsDesdeWhatsApp(sesionId = null, opciones = {}) {
       waId: c.waId || ''
     });
     chats++;
+    if (eraNuevo) nuevos.push(c.telefono);
   }
   if (grupos || sinNumero) {
     log(`Sincronización de chats: ${chats} importados de ${lista.length} (${grupos} grupos, ${archivados} archivados, ${sinNumero} sin número, ${sinConversacion} sin conversación).`);
   }
-  return { lista, chats, grupos, sinNumero, archivados, sinConversacion, incremental };
+  return { lista, chats, grupos, sinNumero, archivados, sinConversacion, incremental, nuevos };
 }
 
 let sincronizacionEnCurso = false;
@@ -2729,12 +2781,23 @@ app.post('/api/sincronizar', auth, async (req, res) => {
   const salida = { ok: true, chats: 0, chatsTotal: 0, contactos: 0, contactosNuevos: 0, contactosExistentes: 0 };
   try {
     if (hacerChats) {
-      const r = await sincronizarChatsDesdeWhatsApp(req.body?.sesion || null);
+      // Incremental por defecto: si hubo una sincronización reciente se leen
+      // solo los chats con actividad nueva. La primera vez (o con
+      // `{completo:true}`) se hace la lectura completa.
+      const completo = req.body?.completo === true || !ultimaSyncExitosaEn;
+      const desdeMs = completo ? 0 : Math.max(0, ultimaSyncExitosaEn - 60000);
+      const t0 = Date.now();
+      const r = await sincronizarChatsDesdeWhatsApp(req.body?.sesion || null, { desdeMs });
+      marcarSyncExitosa();
+      log(`Sincronización manual ${completo ? 'completa' : 'incremental'}: ${r.chats}/${r.lista.length} chats importados en ${Date.now() - t0} ms.`);
       salida.chatsTotal = r.lista.length;
       salida.chats = r.chats;
-      // Chats nuevos: poner al día sus últimos mensajes en segundo plano para que
-      // la Bandeja no quede con conversaciones vacías tras sincronizar.
-      if (salida.chats > 0) setTimeout(() => { actualizarHistorialesConocidos({ forzar: true }).catch(() => {}); }, 1200);
+      // Chats nuevos: poner al día SOLO sus mensajes (no los 250 de siempre) y
+      // en segundo plano, para no bloquear WhatsApp/Chrome durante minutos.
+      const nuevosSync = Array.isArray(r.nuevos) ? r.nuevos : [];
+      if (nuevosSync.length) {
+        setTimeout(() => { actualizarHistorialesConocidos({ forzar: true, solo: nuevosSync }).catch(() => {}); }, 1200);
+      }
       salida.grupos = r.grupos || 0;
       salida.sinNumero = r.sinNumero || 0;
       salida.archivados = r.archivados || 0;
@@ -3394,6 +3457,23 @@ let ultimoEstadoConexion = false;
 let ultimaSyncExitosaEn = 0;
 let proximoSyncTimer = null;
 
+// Persistencia de la última sincronización OK (bot-data-v2): tras un reinicio o
+// un deploy se hace una sync INCREMENTAL rápida en vez de releer todo.
+const syncEstadoFile = path.join(botDataDir, 'sync-ultimo.json');
+try {
+  const j = JSON.parse(fs.readFileSync(syncEstadoFile, 'utf8'));
+  const t = Date.parse(j?.ultima || '');
+  if (Number.isFinite(t)) ultimaSyncExitosaEn = t;
+} catch { /* primera vez */ }
+function marcarSyncExitosa(ms = Date.now()) {
+  ultimaSyncExitosaEn = ms;
+  try {
+    escribirAtomico(syncEstadoFile, JSON.stringify({ ultima: new Date(ms).toISOString() }));
+  } catch (e) {
+    log('No se pudo guardar la marca de sincronización: ' + e.message);
+  }
+}
+
 /** Encola el sync automático (baja prioridad). Devuelve false si no se encoló. */
 function encolarSyncAuto(motivo) {
   if (config.modoPrueba || !hayConexion() || syncAutoEnCurso) return false;
@@ -3427,10 +3507,11 @@ async function sincronizarAuto(motivo) {
     // Incremental desde la última sincronización exitosa, con 1 min de margen
     // para no perder chats que quedaron justo al borde del corte.
     const desde = ultimaSyncExitosaEn ? Math.max(0, ultimaSyncExitosaEn - 60000) : 0;
+    const t0 = Date.now();
     const { chats, lista, incremental } = await sincronizarChatsDesdeWhatsApp(null, { desdeMs: desde });
-    ultimaSyncExitosaEn = Date.now();
+    marcarSyncExitosa();
     syncInicialHecho = true;
-    log(`Sincronización automática (${motivo}${incremental ? ', incremental' : ''}): ${chats}/${lista.length} chats actualizados en la Bandeja.`);
+    log(`Sincronización automática (${motivo}${incremental ? ', incremental' : ''}): ${chats}/${lista.length} chats actualizados en la Bandeja en ${Date.now() - t0} ms.`);
     emitir('sync', { motivo, chats, total: lista.length });
   } catch (e) {
     log(`No se pudo sincronizar la Bandeja (${motivo}): ${e.message}`);
@@ -3469,14 +3550,30 @@ let historialesEnCurso = false;
 let bandejaVaciadaEn = 0;
 let historialesHechos = false;
 
-async function actualizarHistorialesConocidos({ limite = 160, maxChats = 250, forzar = false } = {}) {
+async function actualizarHistorialesConocidos({
+  limite = Number(process.env.HISTORIALES_LIMITE) || 80,
+  maxChats = Number(process.env.HISTORIALES_MAX_CHATS) || 60,
+  maxMs = Number(process.env.HISTORIALES_MAX_MS) || 180000,
+  forzar = false,
+  solo = []
+} = {}) {
   if (config.modoPrueba || historialesEnCurso || !hayConexion()) return;
   if (!forzar && Date.now() - bandejaVaciadaEn < 120000) return; // Bandeja recién vaciada
   historialesEnCurso = true;
   try {
-    const chats = listar(400).filter(c => /^\d{8,15}$/.test(String(c.telefono || ''))).slice(0, maxChats);
+    const base = (Array.isArray(solo) && solo.length)
+      ? solo.map(t => ({ telefono: String(t) }))
+      : listar(400);
+    const chats = base.filter(c => /^\d{8,15}$/.test(String(c.telefono || ''))).slice(0, maxChats);
+    const t0 = Date.now();
     let actualizados = 0;
+    let procesados = 0;
     for (const c of chats) {
+      // Presupuesto de tiempo: nunca monopolizar WhatsApp/Chrome durante minutos.
+      if (Date.now() - t0 > maxMs) {
+        log(`Historiales: tope de ${Math.round(maxMs / 1000)} s alcanzado tras ${procesados}/${chats.length} chats; el resto queda para la próxima pasada.`);
+        break;
+      }
       try {
         // Si el chat se borró mientras corría esta puesta al día, no se recrea.
         if (!obtener(c.telefono)) continue;
@@ -3489,10 +3586,11 @@ async function actualizarHistorialesConocidos({ limite = 160, maxChats = 250, fo
         // Un chat problemático no debe detener la puesta al día de los demás.
         log(`No se pudo actualizar el historial de +${c.telefono}: ${e.message}`);
       }
+      procesados++;
       await dormir(200);
     }
-    log(`Historiales al día: ${actualizados}/${chats.length} chats actualizados (últimos ${limite} mensajes).`);
-    emitir('sync', { motivo: 'historiales', chats: actualizados, total: chats.length });
+    log(`Historiales al día: ${actualizados}/${procesados} chats actualizados (últimos ${limite} mensajes) en ${Date.now() - t0} ms.`);
+    emitir('sync', { motivo: 'historiales', chats: actualizados, total: procesados });
     historialesHechos = true;
   } catch (e) {
     log('No se pudieron actualizar los historiales: ' + e.message);

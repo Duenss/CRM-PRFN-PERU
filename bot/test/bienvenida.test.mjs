@@ -184,6 +184,55 @@ test('backfill: marca una sola vez los chats con historial usando la fecha de su
   assert.equal(bw.marcadorBienvenida('51900000205'), null, 'el backfill no se repite');
 });
 
+test('si el texto de bienvenida falla, NO se envían medios ni se programa la pregunta', async () => {
+  limpiarEnviadas();
+  const llamadas = [];
+  const r = await bw.ejecutarSecuencia({
+    telefono: '51900000301',
+    texto: 'Hola',
+    deps: {
+      enviarTexto: async () => { llamadas.push('texto'); throw new Error('sin conexión'); },
+      enviarPdf: async () => { llamadas.push('pdf'); },
+      enviarVideo: async () => { llamadas.push('video'); },
+      enviarFoto: async () => { llamadas.push('foto'); },
+      programarSeguimiento: () => llamadas.push('pregunta'),
+      log: () => {},
+      pausa: () => 1000,
+      dormir: async () => {}
+    }
+  });
+  assert.equal(r.texto, false);
+  assert.equal(r.pdf, false);
+  assert.equal(r.video, false);
+  assert.equal(r.foto, false);
+  assert.deepEqual(llamadas, ['texto', 'texto'], 'solo reintenta el texto; nunca envía medios sin contexto');
+});
+
+test('sin texto no hay pregunta; con texto y sin medios tampoco', async () => {
+  limpiarEnviadas();
+  let pregunta = 0;
+  const base = {
+    telefono: '51900000302',
+    texto: 'Hola',
+    deps: { enviarTexto: async () => {}, enviarPdf: async () => {}, enviarVideo: async () => {}, enviarFoto: async () => {}, programarSeguimiento: () => { pregunta++; }, log: () => {}, pausa: () => 1000, dormir: async () => {} }
+  };
+  // Texto OK + todos los medios desactivados → no se pregunta por el catálogo.
+  await bw.ejecutarSecuencia({ ...base, ajustes: { enviarCatalogo: false, enviarVideo: false, enviarFoto: false } });
+  assert.equal(pregunta, 0);
+  // Texto + un medio activo → sí se programa.
+  await bw.ejecutarSecuencia({ ...base, ajustes: { enviarCatalogo: true, enviarVideo: false, enviarFoto: false }, deps: { ...base.deps, enviarPdf: async () => {} } });
+  assert.equal(pregunta, 1);
+});
+
+test('catálogo: marcador persistente con ventana de 180 minutos', () => {
+  limpiarEnviadas();
+  const t0 = Date.parse('2026-11-12T12:00:00Z');
+  assert.equal(bw.catalogoEnviadoHace('51900000303', 180, { ahoraMs: t0 }), false);
+  bw.marcarCatalogoEnviado('51900000303', { ahoraMs: t0 });
+  assert.equal(bw.catalogoEnviadoHace('51900000303', 180, { ahoraMs: t0 + 60 * 60000 }), true);
+  assert.equal(bw.catalogoEnviadoHace('51900000303', 180, { ahoraMs: t0 + 181 * 60000 }), false);
+});
+
 /* ---------------- pregunta diferida (¿te ayudo a elegir?) ---------------- */
 
 test('la pregunta se programa y vence a los minutos configurados', () => {

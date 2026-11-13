@@ -1,7 +1,7 @@
 // Pruebas de identidad LID y fusión de chats duplicados (sin red ni disco).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { telefonoDeDestino, esLidDeDigitos } from '../src/identidad.js';
+import { telefonoDeDestino, esLidDeDigitos, claveTemporalLid } from '../src/identidad.js';
 import {
   fusionarChats, elegirDestino, detectarDuplicados, aplicarFusiones,
   nombrePareceTelefono, claveEsTelefonoPeru
@@ -25,6 +25,13 @@ test('telefonoDeDestino: @lid sin resolver NO se convierte en teléfono', () => 
   assert.equal(telefonoDeDestino('123456789012345@lid', { canonico: 'lid:123456789012345', resuelto: '123456789012345' }), '');
   assert.equal(esLidDeDigitos('123456789012345@lid', '123456789012345'), true);
   assert.equal(esLidDeDigitos('51995227235@c.us', '51995227235'), false);
+});
+
+test('claveTemporalLid: permite atender un LID no resoluble sin guardarlo como teléfono real', () => {
+  assert.equal(claveTemporalLid('123456789012345@lid'), '123456789012345');
+  assert.equal(claveTemporalLid('1234567890123456@lid'), '1234567890123456');
+  assert.equal(claveTemporalLid('51995227235@c.us'), '');
+  assert.equal(claveTemporalLid('abc@lid'), '');
 });
 
 /* ---------------- fusión de chats (el caso Esther + número) ---------------- */

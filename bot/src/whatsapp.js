@@ -1021,6 +1021,59 @@ export async function resolverTelefonoWa(widSerializado, sesionId = null) {
 const pareceTelefonoWa = s => /^[+\d\s().-]+$/.test(String(s || '').trim());
 
 /**
+ * Resuelve VARIOS @lid a teléfono en UNA sola evaluación de página.
+ * Antes se hacía una llamada por chat (timeout 15 s cada una, serializadas por
+ * la cola de página): con la migración LID eso podía tardar minutos.
+ * Devuelve un Map `widSerializado → teléfono`.
+ */
+export async function resolverTelefonosWa(wids = [], sesionId = null, { limite = 150 } = {}) {
+  const lista = [...new Set((Array.isArray(wids) ? wids : [])
+    .map(w => String(w || ''))
+    .filter(w => /^\d{8,20}@lid$/.test(w)))].slice(0, Math.max(1, Number(limite) || 150));
+  if (!lista.length) return new Map();
+  const s = sesionParaEnviar(sesionId) || [...sesiones.values()].find(x => x.client && x.client.pupPage);
+  if (!s) return new Map();
+  try {
+    const res = await evalPagina(s, async (ids) => {
+      const W = window;
+      const out = {};
+      let apiContact = null;
+      let widFactory = null;
+      try {
+        apiContact = W.require('WAWebApiContact');
+        widFactory = W.require('WAWebWidFactory');
+      } catch (e) { /* sin helpers: se intenta con enforce */ }
+      for (const wid of ids) {
+        try {
+          let phone = null;
+          if (apiContact && widFactory) {
+            try { phone = apiContact.getPhoneNumber(widFactory.createWid(wid)); } catch (e) { phone = null; }
+          }
+          if (!phone && W.WWebJS && W.WWebJS.enforceLidAndPnRetrieval) {
+            try {
+              const r = await W.WWebJS.enforceLidAndPnRetrieval(wid);
+              phone = (r && r.phone) || null;
+            } catch (e) { /* noop */ }
+          }
+          if (phone && phone._serialized) out[wid] = String(phone._serialized).split('@')[0];
+        } catch (e) { /* un LID problemático no frena al resto */ }
+      }
+      return out;
+    }, lista, 60000, 'resolver teléfonos LID en lote');
+    const mapa = new Map();
+    for (const [wid, telRaw] of Object.entries(res || {})) {
+      const tel = normalizar(telRaw);
+      if (!/^\d{8,15}$/.test(tel)) continue;
+      mapa.set(wid, tel);
+      recordarTelefonoDeLid(wid, tel);
+    }
+    return mapa;
+  } catch (e) {
+    console.warn('[chats] no se pudieron resolver los LID en lote:', e.message);
+    return new Map();
+  }
+}
+/**
  * Nombre que conviene mostrar para un chat de WhatsApp:
  * - Empresa: su nombre verificado (aunque el título sea el teléfono).
  * - Persona: el título del chat (pushname, p. ej. "@Jvampi"), salvo que sea solo un teléfono.
@@ -1357,14 +1410,17 @@ export async function listarChatsWa(sesionId = null) {
 
   // Chats con identificador @lid (número oculto en el chat): se resuelve el
   // teléfono real para que la Bandeja los pueda importar.
-  const sinTel = crudos.filter(c => !c.esGrupo && !c.tel && c.lid);
+  // Chats con identificador @lid (número oculto): se resuelven EN LOTE en una
+  // sola lectura de página (antes: una llamada de 15 s por chat, en serie).
+  const sinTel = crudos.filter(c => !c.esGrupo && !c.tel && c.lid).slice(0, 150);
   if (sinTel.length) {
-    await Promise.all(sinTel.map(async c => {
-      try {
-        const tel = await resolverTelefonoWa(`${c.lid}@lid`, sesionId);
-        if (tel) c.tel = tel;
-      } catch { /* se queda sin número y se omite */ }
-    }));
+    const mapa = await resolverTelefonosWa(sinTel.map(c => `${c.lid}@lid`), sesionId);
+    let resueltos = 0;
+    for (const c of sinTel) {
+      const tel = mapa.get(`${c.lid}@lid`);
+      if (tel) { c.tel = tel; resueltos++; }
+    }
+    if (resueltos) console.log(`[chats] teléfonos LID resueltos en lote: ${resueltos}/${sinTel.length}`);
   }
 
   const propio = normalizar(s.numero);

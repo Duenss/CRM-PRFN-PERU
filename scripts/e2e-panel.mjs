@@ -61,6 +61,11 @@ const SUPABASE_AUTH_KEY = 'sb-pcesvmsewfpvmqmfmswn-auth-token';
 const SUPABASE_CDN_RE = /cdn\.jsdelivr\.net\/.*supabase/i;
 // PNG de 1×1 px para simular multimedia sin binarios externos.
 const PNG_1PX = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+// Fecha LOCAL (YYYY-MM-DD): los filtros del panel y los pedidos usan el día
+// local, no el UTC. Usar toISOString() aquí hacía fallar los E2E de fechas
+// después de las 19:00 hora de Perú (UTC-5).
+const fechaLocal = (d = new Date()) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 const ARGS = parseArgs(process.argv.slice(2));
 const PANEL_PORT = Number(process.env.E2E_PANEL_PORT || 8099);
@@ -356,7 +361,7 @@ function createBotMock() {
   const findChat = tel => chats.find(c => c.telefono === String(tel));
 
   function resumen() {
-    const hoy = new Date().toISOString().slice(0, 10);
+    const hoy = fechaLocal();
     return {
       chats: chats.length,
       noLeidos: chats.reduce((n, c) => n + (c.noLeidos || 0), 0),
@@ -597,7 +602,7 @@ function createBotMock() {
 
     /* pedidos */
     if (p === '/api/pedidos') {
-      const hoyISO = new Date(nowMs).toISOString().slice(0, 10);
+      const hoyISO = fechaLocal(new Date(nowMs));
       return json(res, 200, {
         pedidos: [
           {
@@ -1899,8 +1904,8 @@ async function runE2E() {
     });
 
     /* ---------- Filtros de Bandeja y Pedidos (Parte 5) ---------- */
-    const hoyFiltro = new Date().toISOString().slice(0, 10);
-    const mananaFiltro = (() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10); })();
+    const hoyFiltro = fechaLocal();
+    const mananaFiltro = (() => { const d = new Date(); d.setDate(d.getDate() + 1); return fechaLocal(d); })();
     const contarItemsBandeja = () => page.evaluate(() => document.querySelectorAll('#in-list .in-item').length);
     const contarFilasPedidos = () => page.evaluate(() => document.querySelectorAll('#pe-list .lrow').length);
     const setValor = (sel, valor) => page.evaluate((s, v) => {
