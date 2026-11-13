@@ -2715,6 +2715,7 @@ function datosAnuncioForm(){
     texto:($('#anu-texto')?.value||'').trim(),
     filtro:filtroAnuncioForm(),
     incluirSinConsentimiento:true,
+    embebido:!!$('#anu-embed')?.checked,
     adjuntos:[
       ...(($('#anu-adj-catalogo')?.checked)?['catalogo']:[]),
       ...(($('#anu-adj-video')?.checked)?['video']:[]),
@@ -2731,6 +2732,7 @@ function limpiarFormAnuncio(){
   if($('#anu-sin-consent'))$('#anu-sin-consent').checked=false;
   if($('#anu-adj-catalogo'))$('#anu-adj-catalogo').checked=false;
   if($('#anu-adj-video'))$('#anu-adj-video').checked=false;
+  if($('#anu-embed'))$('#anu-embed').checked=false;
   anuAdjuntos=[];renderAnuAdjuntos();
   if($('#anu-filtro'))$('#anu-filtro').value='todos';
   actualizarWrapsAnuncio();vistaAnuncio();
@@ -2838,6 +2840,7 @@ $('#anu-list')?.addEventListener('click',async e=>{
     if($('#anu-adj-catalogo'))$('#anu-adj-catalogo').checked=(a.adjuntos||[]).includes('catalogo');
     if($('#anu-adj-video'))$('#anu-adj-video').checked=(a.adjuntos||[]).includes('video');
     anuAdjuntos=(a.adjuntos||[]).filter(x=>x&&typeof x==='object');
+    if($('#anu-embed'))$('#anu-embed').checked=!!a.embebido;
     renderAnuAdjuntos();
     anuEditId=a.id;
     actualizarWrapsAnuncio();vistaAnuncio();

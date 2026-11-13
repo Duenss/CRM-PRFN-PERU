@@ -1133,18 +1133,39 @@ async function enviarAnuncio(id) {
     }
     const texto = String(anuncio.texto || '').replaceAll('{nombre}', primerNombre(d.nombre));
     try {
-      const r = await enviar(d.telefono, texto);
-      registrar({
-        telefono: d.telefono,
-        texto,
-        direccion: 'saliente',
-        nombre: d.nombre,
-        clienteId: d.clienteId,
-        origen: 'anuncio',
-        waId: r?.waId || ''
-      });
-      try { await logMensaje({ clienteId: d.clienteId, telefono: d.telefono, direccion: 'saliente', texto, origen: 'anuncio' }); } catch { /* historial opcional */ }
-      await enviarAdjuntosAnuncio(anuncio, d);
+      const adjuntos = Array.isArray(anuncio.adjuntos) ? anuncio.adjuntos : [];
+      const primero = adjuntos[0];
+      const primeraImagen = anuncio.embebido && primero && typeof primero === 'object'
+        && String(primero.mimetype || '').startsWith('image/')
+        && fs.existsSync(path.join(anunciosMediaDir, String(primero.archivo || '')));
+      if (primeraImagen) {
+        const ruta = path.join(anunciosMediaDir, String(primero.archivo));
+        const r = await enviarImagen(d.telefono, { archivo: ruta }, texto);
+        registrar({
+          telefono: d.telefono,
+          texto: '📷 ' + texto,
+          direccion: 'saliente',
+          nombre: d.nombre,
+          clienteId: d.clienteId,
+          origen: 'anuncio',
+          waId: r?.waId || ''
+        });
+        try { await logMensaje({ clienteId: d.clienteId, telefono: d.telefono, direccion: 'saliente', texto: '📷 ' + texto, origen: 'anuncio' }); } catch { /* historial opcional */ }
+        await enviarAdjuntosAnuncio({ ...anuncio, adjuntos: adjuntos.slice(1) }, d);
+      } else {
+        const r = await enviar(d.telefono, texto);
+        registrar({
+          telefono: d.telefono,
+          texto,
+          direccion: 'saliente',
+          nombre: d.nombre,
+          clienteId: d.clienteId,
+          origen: 'anuncio',
+          waId: r?.waId || ''
+        });
+        try { await logMensaje({ clienteId: d.clienteId, telefono: d.telefono, direccion: 'saliente', texto, origen: 'anuncio' }); } catch { /* historial opcional */ }
+        await enviarAdjuntosAnuncio(anuncio, d);
+      }
       yaEnviados.add(String(d.telefono));
       contarEnvio();
       enviados++;

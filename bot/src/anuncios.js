@@ -119,6 +119,7 @@ export function crear(datos = {}) {
     filtro: normalizarFiltro(datos.filtro),
     incluirSinConsentimiento: datos.incluirSinConsentimiento === true,
     adjuntos: normalizarAdjuntos(datos.adjuntos),
+    embebido: datos.embebido === true,
     estado: 'borrador',
     stats: { total: 0, enviados: 0, omitidos: 0, errores: 0 },
     creado: ahora(),
@@ -160,6 +161,7 @@ export function actualizar(id, cambios = {}) {
   }
   if (cambios.filtro !== undefined) a.filtro = normalizarFiltro(cambios.filtro);
   if (cambios.adjuntos !== undefined) a.adjuntos = normalizarAdjuntos(cambios.adjuntos);
+  if (typeof cambios.embebido === 'boolean') a.embebido = cambios.embebido;
   if (typeof cambios.incluirSinConsentimiento === 'boolean') a.incluirSinConsentimiento = cambios.incluirSinConsentimiento;
   if (cambios.estado !== undefined && ESTADOS.includes(String(cambios.estado))) a.estado = String(cambios.estado);
   a.actualizado = ahora();
