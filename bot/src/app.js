@@ -83,6 +83,9 @@ function partesLima(fecha = new Date()) {
 }
 function dentroHorario() {
   const p = partesLima();
+  // 0-24 = 24/7 REAL: también domingos. El dueño suele dejar el bot siempre
+  // activo; si quiere restringir días, usa un horario distinto en Ajustes.
+  if (Number(config.horaInicio) === 0 && Number(config.horaFin) >= 24) return true;
   if (config.lunesASabado && p.wd === 0) return false;
   return p.h >= config.horaInicio && p.h < config.horaFin;
 }
