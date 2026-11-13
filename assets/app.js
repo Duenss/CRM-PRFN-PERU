@@ -1226,8 +1226,8 @@ async function sincronizar(opts = {}) {
       timeoutMs: 120000
     });
     if (j.enCurso) {
-      toast('Sincronización iniciada en segundo plano. Con miles de chats puede tardar varios minutos.');
-      if (estado) estado.textContent = 'Sincronizando en segundo plano… puedes seguir usando el panel.';
+      toast('Sincronización iniciada. Suele tardar menos de 2 minutos.');
+      if (estado) estado.textContent = 'Sincronizando… normalmente menos de 2 min. Puedes seguir usando el panel.';
       setTimeout(async () => {
         if (origen === 'bandeja') cargarBandeja({ reset: true });
         if (contactos && typeof load === 'function') await load();

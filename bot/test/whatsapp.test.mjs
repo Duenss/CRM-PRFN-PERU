@@ -13,6 +13,8 @@ import {
   cerrarSesion,
   telefonoCanonico,
   recordarDestinoWa,
+  recordarDestinoDirecto,
+  destinoCacheado,
   recordarTelefonoDeLid,
   esperaReintentoMs,
   clasificarDesconexion,
@@ -77,6 +79,14 @@ test('recordarDestinoWa y recordarTelefonoDeLid alimentan el mapa lid→teléfon
   assert.equal(telefonoCanonico('111111111111@lid'), '51911111111');
   recordarTelefonoDeLid('222222222222@lid', '51922222222');
   assert.equal(telefonoCanonico('222222222222@lid'), '51922222222');
+});
+
+test('recordarDestinoDirecto: responde sin getNumberId a chats ya conocidos', () => {
+  recordarDestinoDirecto('51933333333', '51933333333@c.us');
+  assert.equal(destinoCacheado('51933333333'), '51933333333@c.us');
+  // Un LID no se cachea como destino directo (va por destinosLid).
+  recordarDestinoDirecto('51944444444', '123456789012@lid');
+  assert.equal(destinoCacheado('51944444444'), '');
 });
 
 test('grupos tienen clave propia', () => {

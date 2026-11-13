@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config, validarConfig, esNumeroPeru, normalizar } from './config.js';
 import { sb, getCliente, getClientes, getProductos, logMensaje, historial, marcarBaja, importarClientes, estadoWaDe, hayColumnasWa, guardarEstadoWa } from './supabase.js';
-import { iniciarWhatsApp, enviar, enviarImagen, enviarVideo, enviarArchivo, estadoWa, cerrarSesion, reiniciarSesion, hayConexion, sesionDisponible, listarChatsWa, listarChatsActivosWa, listarContactosWa, historialWa, consultarNumeroWa, resolverTelefonoWa, recordarDestinoWa, telefonoCanonico, estadoSalud, idMensaje, descargarMediaWa, conTimeout, migrarCacheWebAntiguo } from './whatsapp.js';
+import { iniciarWhatsApp, enviar, enviarImagen, enviarVideo, enviarArchivo, estadoWa, cerrarSesion, reiniciarSesion, hayConexion, sesionDisponible, listarChatsWa, listarChatsActivosWa, listarContactosWa, historialWa, consultarNumeroWa, resolverTelefonoWa, recordarDestinoWa, recordarDestinoDirecto, telefonoCanonico, estadoSalud, idMensaje, descargarMediaWa, conTimeout, migrarCacheWebAntiguo } from './whatsapp.js';
 import { redactarRespuesta, transcribirAudio, redactarBorradores, redactarBienvenida, redactarAnuncio, productoPorId, productoMencionado } from './ai.js';
 import { Cola, dormir, esperaEntreEnvios, PRIORIDAD } from './queue.js';
 import { configValidacion, esperaValidacionMs, aplicarResultado, pausaTrasErrores, sinEtiqueta, conEtiqueta, ESTADOS_WA, enVentanaHoraria, msHastaApertura, proximaPausaLarga, esperaPausaLargaMs } from './validacion.js';
@@ -1677,6 +1677,9 @@ async function manejarMensaje(msg, sesionId = null) {
   // Refuerza el mapa teléfono→LID: los próximos mensajes propios/acks ya no
   // dependen de resolver el LID otra vez (menos fallos y cero duplicados).
   recordarDestinoWa(tel, chat);
+  // Caché de destino directo: la respuesta a este chat no llamará getNumberId
+  // (que se bloquea mientras corre una sincronización).
+  recordarDestinoDirecto(tel, chat);
   // Guarda el id real del chat (@lid o @c.us): sirve para fusionar duplicados y
   // para descargar la multimedia de mensajes antiguos por su chat correcto.
   try {
@@ -2552,11 +2555,13 @@ async function sincronizarChatsDesdeWhatsApp(sesionId = null, opciones = {}) {
   }
   const desdeMs = Math.max(0, Number(opciones.desdeMs) || 0);
   const incremental = desdeMs > 0;
+  const tLista = Date.now();
   const lista = await conTimeout(
     incremental ? listarChatsActivosWa(desdeMs, sesionId) : listarChatsWa(sesionId),
-    240000,
+    110000,
     incremental ? 'listar chats activos de WhatsApp' : 'listar chats de WhatsApp'
   );
+  log(`Sincronización: ${incremental ? 'incremental' : 'completa'}, lista leída en ${Date.now() - tLista} ms (${lista.length} chats).`);
   const propios = estadoWa().map(s => String(s.numero || '')).filter(Boolean);
   let chats = 0, grupos = 0, sinNumero = 0, archivados = 0, sinConversacion = 0;
   const nuevos = [];

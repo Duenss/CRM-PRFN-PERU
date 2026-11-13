@@ -720,6 +720,9 @@ function sesionParaEnviar(sesionId) {
 // Destinos @lid ya conocidos (el teléfono real puede no estar disponible):
 // se envía directo al id del chat para no fallar con "no tiene WhatsApp".
 const destinosLid = new Map();
+// teléfono → waId @c.us/@s.whatsapp.net ya conocido (evita getNumberId en cada
+// envío: durante un sync largo esa llamada se bloqueaba y la respuesta tardaba).
+const destinosDirectos = new Map();
 // Mapa inverso lid→teléfono, poblado SOLO cuando la resolución es segura.
 const lidATelefono = new Map();
 
@@ -765,8 +768,25 @@ export function telefonoCanonico(waId, { mapa } = {}) {
 }
 
 function destinoConocido(limpio) {
-  const w = destinosLid.get(String(limpio || ''));
+  const w = destinosLid.get(String(limpio || '')) || destinosDirectos.get(String(limpio || ''));
   return w ? { _serialized: w } : null;
+}
+
+/**
+ * Recuerda el waId real de un chat con teléfono (@c.us / @s.whatsapp.net) para
+ * que los envíos posteriores NO dependan de getNumberId (lento/bloqueado si hay
+ * un sync en curso). No guarda LIDs aquí: esos van a destinosLid.
+ */
+export function recordarDestinoDirecto(telefono, wid) {
+  const tel = String(telefono || '').replace(/\D/g, '');
+  const id = String(wid || '');
+  if (tel && /@(c\.us|s\.whatsapp\.net)$/.test(id)) destinosDirectos.set(tel, id);
+}
+
+/** Destino ya cacheado para un teléfono ('' si no se conoce). Para tests. */
+export function destinoCacheado(telefono) {
+  const tel = String(telefono || '').replace(/\D/g, '');
+  return destinosDirectos.get(tel) || destinosLid.get(tel) || '';
 }
 
 /**
@@ -802,6 +822,8 @@ export async function enviar(telefono, texto, sesionId = null, opciones = {}) {
 
   const id = await idDestino(s, limpio, opciones);
   if (!id) throw new Error(`El número +${limpio} no tiene WhatsApp`);
+  // Aprendido: los siguientes envíos a este número ya no pagan getNumberId.
+  if (id?._serialized) recordarDestinoDirecto(limpio, id._serialized);
   recordarEnvio(texto);
   const opcionesWa = {};
   if (opciones && opciones.linkPreview && /https?:\/\//i.test(String(texto || ''))) opcionesWa.linkPreview = true;
@@ -1113,6 +1135,11 @@ function formatearChatsWa(crudos, propioNumero) {
       // resolverá por sus mensajes o se omitirá de la sincronización).
       const telCrudo = c.esGrupo ? telGrupo : telDe({ isGroup: false, number: c.tel });
       const telefono = (!c.esGrupo && c.lid && String(telCrudo) === String(c.lid)) ? '' : telCrudo;
+      // Caché de destino directo: los envíos a chats ya sincronizados no
+      // bloquearán la cola de Chrome con getNumberId.
+      if (!c.esGrupo && /^\d{8,15}$/.test(String(telefono)) && /@(c\.us|s\.whatsapp\.net)$/.test(idSerial)) {
+        destinosDirectos.set(String(telefono), idSerial);
+      }
       return {
         telefono,
         waiver: '',
@@ -1146,8 +1173,8 @@ export async function listarChatsWa(sesionId = null) {
   await esperarPagina(s);
 
   // WhatsApp Web carga la lista de chats por partes. Se baja la lista para
-  // que cargue todo el historial conocido (así aparecen todos los chats, no
-  // solo los primeros que ya estaban en memoria).
+  // que cargue todo el historial conocido. Con tope corto: si hay muchos
+  // chats, es mejor sincronizar lo cargado YA y no bloquear la página minutos.
   try {
     await evalPagina(s, async () => {
       const pane = document.querySelector('#pane-side');
@@ -1158,20 +1185,29 @@ export async function listarChatsWa(sesionId = null) {
       };
       let anterior = -1;
       let estable = 0;
-      for (let i = 0; i < 120; i++) {
+      const t0 = Date.now();
+      for (let i = 0; i < 40 && Date.now() - t0 < 15000; i++) {
         try { pane.scrollTop = pane.scrollHeight; } catch (e) { break; }
-        await new Promise(r => setTimeout(r, 400));
+        await new Promise(r => setTimeout(r, 300));
         const n = total();
         if (n === anterior) estable++; else { anterior = n; estable = 0; }
-        if (estable >= 4) break;       // dejó de crecer: ya está toda la lista
+        if (estable >= 3) break;       // dejó de crecer: ya está lo que hay
       }
-    }, undefined, 120000, 'cargar lista de chats');
+    }, undefined, 18000, 'cargar lista de chats');
   } catch { /* si no se puede, se sigue con lo cargado */ }
+
+  // Vía RÁPIDA: lectura ligera de la colección de chats en UNA evaluación de
+  // página (sin serializar todo con getChats, que puede tardar minutos y
+  // bloquear la cola de Chrome). Si no devuelve nada, se usa el wrapper.
+  try {
+    const ligeros = await listarChatsActivosWa(1, sesionId, { noFallback: true });
+    if (ligeros && ligeros.length) return ligeros;
+  } catch { /* se intenta la vía clásica */ }
 
   let crudos;
   try {
-    // Vía normal: el wrapper de whatsapp-web.js.
-    const chats = await conTimeout(s.client.getChats(), 180000, 'getChats');
+    // Vía clásica de whatsapp-web.js (respaldo).
+    const chats = await conTimeout(s.client.getChats(), 70000, 'getChats');
     crudos = chats.map(c => {
       const esEmpresa = !!(c.contact?.isBusiness || c.contact?.isEnterprise || c.contact?.businessProfile);
       const nombreGuardado = c.contact?.name || '';
@@ -1349,7 +1385,7 @@ export async function listarChatsWa(sesionId = null) {
         }
       } catch (e) {}
       return out;
-    }, undefined, 180000, 'getChats (respaldo)');
+    }, undefined, 50000, 'getChats (respaldo)');
   }
 
   // WhatsApp Web no trae el último mensaje de todos los chats hasta abrirlos.
@@ -1399,7 +1435,7 @@ export async function listarChatsWa(sesionId = null) {
           } catch (e) { /* chat problemático */ }
         }
         return out;
-      }, vacios, 90000, 'enriquecer chats');
+      }, vacios, 20000, 'enriquecer chats');
       let puestos = 0;
       for (const c of crudos) {
         if (c.id && enriquecidos && enriquecidos[c.id] && !String(c.ultimoTexto || '').trim()) {
@@ -1437,22 +1473,26 @@ export async function listarChatsWa(sesionId = null) {
  * lectura barata que usa la sincronización periódica anti-bloqueo (15-30 min).
  * Si la lectura ligera falla, cae al listado completo (más pesado, pero seguro).
  */
-export async function listarChatsActivosWa(desdeMs = 0, sesionId = null) {
+export async function listarChatsActivosWa(desdeMs = 0, sesionId = null, { noFallback = false } = {}) {
   const s = sesionParaEnviar(sesionId);
   if (!s) throw new Error('Ningún WhatsApp está conectado');
   const corte = Math.max(0, Number(desdeMs) || 0);
   if (!corte) return listarChatsWa(sesionId); // sin corte: lista completa
   await esperarPagina(s);
   try {
-    const crudos = await evalPagina(s, async ({ desdeTs }) => {
+    const crudos = await evalPagina(s, async ({ desdeTs, maxMs, maxLidMs }) => {
       const out = [];
       const W = window;
+      const t0 = Date.now();
+      const agotado = () => Date.now() - t0 > maxMs;
+      let lidEnforce = 0;
       let widFactory;
       try { widFactory = W.require('WAWebWidFactory'); } catch (e) {}
       let col;
       try { col = W.require('WAWebCollections'); } catch (e) { return out; }
       const arr = (col.Chat && col.Chat.getModelsArray && col.Chat.getModelsArray()) || [];
       for (const c of arr) {
+        if (agotado()) break; // presupuesto de tiempo: no bloquear la página
         try {
           const t = (c.t || 0) || (c.lastMessage && (c.lastMessage.t || 0)) || 0;
           if (!(t >= desdeTs)) continue; // solo actividad nueva
@@ -1490,7 +1530,11 @@ export async function listarChatsActivosWa(desdeMs = 0, sesionId = null) {
                 const wid = widFactory.createWid((c.id && c.id._serialized) || '');
                 let phone = null;
                 try { phone = W.require('WAWebApiContact').getPhoneNumber(wid); } catch (e) {}
-                if (!phone && W.WWebJS && W.WWebJS.enforceLidAndPnRetrieval) {
+                // enforceLidAndPnRetrieval es una llamada de red: solo se usa si
+                // queda presupuesto (si no, ese chat se resolverá al recibir).
+                if (!phone && W.WWebJS && W.WWebJS.enforceLidAndPnRetrieval
+                  && Date.now() - t0 < maxLidMs && lidEnforce < 20) {
+                  lidEnforce++;
                   const r = await W.WWebJS.enforceLidAndPnRetrieval((c.id && c.id._serialized) || '');
                   phone = r && r.phone;
                 }
@@ -1513,7 +1557,7 @@ export async function listarChatsActivosWa(desdeMs = 0, sesionId = null) {
             ts: t,
             tsReal: t,
             real: true,
-            tieneMensajes: true,
+            tieneMensajes: !!(t || ultimoTexto || c.lastMessage),
             pin: !!(c.pin || c.pinned || c.isPinned),
             archived: !!(c.archive || c.archived || c.isArchived),
             noLeidos: c.unreadCount || 0
@@ -1521,7 +1565,7 @@ export async function listarChatsActivosWa(desdeMs = 0, sesionId = null) {
         } catch (e) { /* chat problemático: se omite */ }
       }
       return out;
-    }, { desdeTs: corte / 1000 }, 90000, 'listar chats activos');
+    }, { desdeTs: corte / 1000, maxMs: 30000, maxLidMs: 6000 }, 40000, 'listar chats activos');
 
     // Los @lid resueltos a teléfono se recuerdan en el mapa lid→teléfono
     // (en contexto Node, no dentro de la página).
@@ -1531,6 +1575,7 @@ export async function listarChatsActivosWa(desdeMs = 0, sesionId = null) {
     const propio = normalizar(s.numero);
     return formatearChatsWa(crudos, propio);
   } catch {
+    if (noFallback) throw new Error('La lectura rápida de chats falló');
     // Respaldo: si la lectura ligera falla, se cae al listado completo.
     return listarChatsWa(sesionId);
   }

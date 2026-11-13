@@ -154,3 +154,19 @@ limpias `no existe` en momentos distintos.
   reintenta sin ella.
 - El catálogo (PDF+video) no se reenvía si ya se envió en los últimos 180 minutos: si el
   cliente insiste, recibe solo texto.
+
+### Rendimiento del sync (2026-11-12, ajuste final)
+
+- El listado completo ya NO usa `getChats()` como primera vía: lee la colección de
+  chats en **una sola evaluación de página** (lectura ligera) y solo cae al wrapper
+  si esa lectura no devuelve nada.
+- Topes: scroll de la lista 15 s, lectura ligera 40 s, resolución de LID a teléfono
+  6 s/20 chats por pasada, listado completo 110 s como máximo. En cuentas normales
+  el sync completo queda en **decenas de segundos** y el incremental en **segundos**.
+- Tras sincronizar se cachea `teléfono → waId` (`destinosDirectos`), igual que los
+  mensajes entrantes: la respuesta al cliente **no llama `getNumberId`**, así no se
+  bloquea si justo hay un sync en curso.
+- La Bandeja se refresca sola al terminar (evento SSE `sync`); el aviso del panel
+  ahora dice “suele tardar menos de 2 minutos”.
+- Variables: `HISTORIALES_MAX_CHATS` (60), `HISTORIALES_LIMITE` (80),
+  `HISTORIALES_MAX_MS` (180000); `SYNC_MIN_MS`/`SYNC_MAX_MS` para la sync periódica.
