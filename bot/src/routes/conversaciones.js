@@ -1,5 +1,9 @@
 // Router de la bandeja de entrada: clientes, conversaciones y envío manual.
 import { idempotenciaEnvios } from '../idempotencia.js';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { enviarImagen, enviarVideo, enviarArchivo } from '../whatsapp.js';
 
 export function registrarConversaciones(app, ctx) {
   const {
@@ -56,6 +60,52 @@ export function registrarConversaciones(app, ctx) {
   app.post('/api/conversaciones/:telefono/leido', auth, (req, res) => {
     marcarLeido(normalizar(req.params.telefono));
     res.json({ ok: true });
+  });
+
+  app.post('/api/conversaciones/:telefono/enviar-media', auth, async (req, res) => {
+    const tel = normalizar(req.params.telefono);
+    const base64 = String(req.body?.base64 || '');
+    const mimetype = String(req.body?.mimetype || '').toLowerCase();
+    const nombre = String(req.body?.nombre || 'archivo').slice(0, 180);
+    const caption = String(req.body?.caption || '').slice(0, 1000);
+    if (!/^\d{8,15}$/.test(tel)) return res.status(400).json({ error: 'Teléfono inválido.' });
+    if (!/^[A-Za-z0-9+/=\s]+$/.test(base64) || base64.length < 16) {
+      return res.status(400).json({ error: 'Archivo inválido.' });
+    }
+    if (base64.length > 28 * 1024 * 1024) return res.status(413).json({ error: 'El archivo supera 20 MB.' });
+    const esImagen = /^image\//.test(mimetype);
+    const esVideo = /^video\//.test(mimetype);
+    const esPdf = mimetype === 'application/pdf';
+    if (!esImagen && !esVideo && !esPdf) return res.status(400).json({ error: 'Solo imagen, video o PDF.' });
+    if (!config.modoPrueba && !sesionDisponible(req.body?.sesion || null)) {
+      return res.status(503).json({ error: 'Ningún WhatsApp está conectado.' });
+    }
+    const ext = esImagen ? (mimetype.includes('png') ? '.png' : mimetype.includes('webp') ? '.webp' : '.jpg')
+      : esVideo ? (mimetype.includes('webm') ? '.webm' : '.mp4') : '.pdf';
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-panel-media-'));
+    const ruta = path.join(dir, 'archivo' + ext);
+    try {
+      fs.writeFileSync(ruta, Buffer.from(base64, 'base64'));
+      const cliente = await getCliente(tel);
+      const env = esImagen
+        ? await enviarImagen(tel, { archivo: ruta }, caption, req.body?.sesion || null)
+        : esVideo
+          ? await enviarVideo(tel, ruta, caption, req.body?.sesion || null)
+          : await enviarArchivo(tel, ruta, mimetype, nombre || 'archivo.pdf', caption, req.body?.sesion || null);
+      const marcador = (esImagen ? '📷 ' : esVideo ? '🎬 ' : '📄 ') + (caption || nombre);
+      await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'saliente', texto: marcador, origen: 'panel' });
+      registrar({
+        telefono: tel, texto: marcador, direccion: 'saliente',
+        nombre: cliente?.nombre || '', clienteId: cliente?.id,
+        origen: 'panel', waId: env?.waId || ''
+      });
+      log(`Multimedia manual a +${tel}: ${marcador.slice(0, 100)}`);
+      res.json({ ok: true, tipo: esImagen ? 'imagen' : esVideo ? 'video' : 'pdf' });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    } finally {
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* noop */ }
+    }
   });
 
   app.post('/api/conversaciones/:telefono/enviar', auth, async (req, res) => {

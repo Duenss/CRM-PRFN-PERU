@@ -319,7 +319,7 @@ async function load(){
 }
 
 /* ---------- pestañas ---------- */
-const CRUMBS={bienvenida:['Bienvenida','Mensaje automático'],inicio:['Inicio','Resumen'],bandeja:['Bandeja','WhatsApp'],pedidos:['Pedidos','Ventas y pagos'],analiticas:['Analíticas','Consultas y ventas'],campanas:['Campañas','Envíos'],anuncios:['Anuncios','Mensajes masivos'],clientes:['Clientes','Base de datos'],catalogo:['Catálogo','Perfumes'],calendario:['Calendario','Agenda'],ia:['Asistente IA','Automático'],bot:['Ajustes','Conexión']};
+const CRUMBS={bienvenida:['Bienvenida','Mensaje automático'],inicio:['Inicio','Resumen'],bandeja:['Bandeja','WhatsApp'],pedidos:['Pedidos','Ventas y pagos'],analiticas:['Métricas','Consultas y ventas'],campanas:['Campañas','Envíos'],anuncios:['Anuncios','Mensajes masivos'],clientes:['Clientes','Base de datos'],catalogo:['Catálogo','Perfumes'],calendario:['Calendario','Agenda'],ia:['Asistente IA','Automático'],bot:['Ajustes','Conexión']};
 let tabActual='inicio';
 function arrancarTareasBase(){
   if(!TAREAS.size){
@@ -378,13 +378,14 @@ $('#c-list').onclick=e=>{
   const r=e.target.closest('[data-restaurar]');if(r)restaurarSinWsp(r.dataset.restaurar);
 };
 $('#c-new').onclick=()=>abrirCliente(null);
-function abrirCliente(id){
-  editId=id;const c=clientes.find(x=>x.id===id)||{};
-  $('#d-tit').textContent=id?'Editar cliente':'Nuevo cliente';
+function abrirCliente(id,prefill){
+  editId=id;const base=clientes.find(x=>x.id===id)||{};
+  const c=prefill?{...base,nombre:base.nombre||prefill.nombre||'',telefono:base.telefono||prefill.telefono||''}:base;
+  $('#d-tit').textContent=id?'Editar cliente':(prefill?'Recabar contacto':'Recabar contacto');
   $('#f-nom').value=c.nombre||'';$('#f-tel').value=c.telefono||'';
   $('#f-tag').value=(c.etiquetas||[]).join(', ');$('#f-cum').value=c.fecha_cumpleanos||'';
   $('#f-ult').value=c.ultima_compra||'';
-  $('#f-not').value=c.notas||'';if($('#f-con'))$('#f-con').checked=!!c.consentimiento;$('#f-baja').checked=!!c.baja;
+  $('#f-not').value=c.notas||(prefill&&prefill.notas)||'';if($('#f-con'))$('#f-con').checked=!!c.consentimiento;$('#f-baja').checked=!!c.baja;
   $('#f-del').hidden=!id;$('#dlg').showModal();
 }
 $('#f-x').onclick=()=>$('#dlg').close();
@@ -1918,18 +1919,60 @@ $('#in-q')?.addEventListener('input',()=>{
 });
 $('#in-refresh')?.addEventListener('click',cargarBandeja);
 $('#in-pause')?.addEventListener('click',togglePausa);
+/* ---------- adjuntos del compositor (pegar o elegir imagen/video/PDF) ---------- */
+let inAdjuntos=[];
+function inRenderAdjuntos(){
+  const cont=$('#in-attach-preview');if(!cont)return;
+  cont.hidden=!inAdjuntos.length;
+  cont.innerHTML=inAdjuntos.map((a,i)=>`<span class="in-attach-chip">${a.tipo==='imagen'?`<img src="${a.url}" alt="">`:a.tipo==='pdf'?'📄':'🎬'}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px">${esc(a.nombre)}</span><button type="button" data-in-att-quitar="${i}" title="Quitar">✕</button></span>`).join('');
+  cont.querySelectorAll('[data-in-att-quitar]').forEach(b=>b.addEventListener('click',()=>{const i=Number(b.dataset.inAttQuitar);try{URL.revokeObjectURL(inAdjuntos[i].url)}catch(e){}inAdjuntos.splice(i,1);inRenderAdjuntos()}));
+}
+function inLimpiarAdjuntos(){for(const a of inAdjuntos){try{URL.revokeObjectURL(a.url)}catch(e){}}inAdjuntos=[];inRenderAdjuntos()}
+function inAgregarArchivos(files){
+  for(const f of files||[]){
+    if(f.size>20*1024*1024){toast('Máximo 20 MB por archivo.','error');continue}
+    const tipo=f.type.startsWith('image/')?'imagen':f.type.startsWith('video/')?'video':f.type==='application/pdf'?'pdf':'';
+    if(!tipo){toast('Solo imagen, video o PDF.','error');continue}
+    if(tipo==='pdf'&&inAdjuntos.filter(a=>a.tipo==='pdf').length>=2){toast('Máximo 2 PDF (dama y varón).','error');continue}
+    inAdjuntos.push({tipo,nombre:f.name,file:f,url:URL.createObjectURL(f)});
+  }
+  inRenderAdjuntos();
+  if(inAdjuntos.length)toast(inAdjuntos.length+' archivo(s) listos para enviar');
+}
+$('#in-attach-btn')?.addEventListener('click',()=>$('#in-file')?.click());
+$('#in-file')?.addEventListener('change',e=>{inAgregarArchivos(e.target.files);e.target.value=''});
+$('#in-text')?.addEventListener('paste',e=>{
+  const items=e.clipboardData?.items;if(!items)return;
+  const files=[];for(const it of items){if(it.kind==='file'){const f=it.getAsFile();if(f)files.push(f)}}
+  if(files.length){e.preventDefault();inAgregarArchivos(files)}
+});
 $('#in-form')?.addEventListener('submit',async e=>{
   e.preventDefault();
-  const t=$('#in-text');const texto=t.value.trim();if(!texto||!inTel)return;
+  const t=$('#in-text');const texto=t.value.trim();
+  if((!texto&&!inAdjuntos.length)||!inTel)return;
   const b=$('#in-send');b.disabled=true;
   try{
-    await botFetch('/api/conversaciones/'+inTel+'/enviar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({texto}),timeoutMs:60000});
-    t.value='';await refrescarHiloAbierto();toast('Mensaje enviado');
+    if(inAdjuntos.length){
+      for(let i=0;i<inAdjuntos.length;i++){
+        const a=inAdjuntos[i];
+        const base64=await leerArchivoBase64(a.file);
+        await botFetch('/api/conversaciones/'+inTel+'/enviar-media',{
+          method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({nombre:a.nombre,mimetype:a.file.type||'application/octet-stream',base64,caption:i===0?texto:''}),
+          timeoutMs:180000
+        });
+      }
+      inLimpiarAdjuntos();t.value='';
+      await refrescarHiloAbierto();toast('Adjunto enviado');
+    }else{
+      await botFetch('/api/conversaciones/'+inTel+'/enviar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({texto}),timeoutMs:60000});
+      t.value='';await refrescarHiloAbierto();toast('Mensaje enviado');
+    }
   }catch(err){
     const msg=String(err?.message||'');
     toast(/no tiene WhatsApp|no está registrado/i.test(msg)
       ? 'Este número no está en WhatsApp: no se puede enviar. Puedes responder desde el celular.'
-      : 'No se pudo enviar el mensaje. Revisa la conexión del bot.');
+      : 'No se pudo enviar. Revisa la conexión del bot.');
   }
   b.disabled=false;
 });
@@ -2504,6 +2547,14 @@ async function pollEventos(){
 document.addEventListener('pointerdown',()=>asegurarAudio(),{once:true});
 $('#in-notify')?.addEventListener('click',activarAvisos);
 $('#in-seg')?.addEventListener('click',toggleSeguimiento);
+$('#in-recabar')?.addEventListener('click',()=>{
+  if(!inTel)return toast('Elige un chat primero.','error');
+  const item=inChats.find(c=>c.telefono===inTel);
+  const nombre=item?.nombreWa||item?.nombre||($('#in-name')?.textContent||'').trim();
+  const existente=clientes.find(c=>c.telefono===inTel);
+  irTab('clientes');
+  setTimeout(()=>abrirCliente(existente?.id||null,{nombre,telefono:inTel,notas:'Contacto recabado desde la Bandeja'}),90);
+});
 $('#in-neworder')?.addEventListener('click',()=>{if(!inTel)return toast('Elige un chat primero.','error');irTab('pedidos');setTimeout(()=>abrirFormPedido(inTel,$('#in-name').textContent),180)});
 $('#pe-refresh')?.addEventListener('click',cargarPedidos);
 $('#pe-new')?.addEventListener('click',()=>abrirFormPedido());

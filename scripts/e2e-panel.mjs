@@ -2118,6 +2118,24 @@ async function runE2E() {
       return 'video visible/reproducible automáticamente';
     });
 
+    await runner.case('E2E-23', 'Modo oscuro del panel: cambia sin romper el chat y mantiene contraste', async () => {
+      await page.click('#themeToggle');
+      await new Promise(r => setTimeout(r, 350));
+      const estado = await page.evaluate(() => {
+        const tema = document.documentElement.dataset.theme;
+        const out = document.querySelector('.msg.out');
+        const cs = out ? getComputedStyle(out) : null;
+        return { tema, color: cs?.color || '', fondo: cs?.backgroundColor || '' };
+      });
+      assert(estado.tema === 'dark', 'no cambió a modo oscuro');
+      assert(estado.color && estado.color !== estado.fondo, 'texto del mensaje saliente sin contraste');
+      await page.screenshot({ path: path.join(SHOTS_DIR, '04-oscuro.png') });
+      await page.click('#themeToggle');
+      await new Promise(r => setTimeout(r, 250));
+      assert((await page.evaluate(() => document.documentElement.dataset.theme)) === 'light', 'no volvió al modo claro');
+      return `oscuro ${estado.color} sobre ${estado.fondo} · captura 04-oscuro.png`;
+    });
+
     await runner.case('E2E-11', 'Cero errores de consola JS y cero pageerror en toda la corrida', async () => {
       // El assert real es "0 errores de consola JS y 0 pageerror". Los avisos de red
       // que el propio arnés provoca (fallo simulado de E2E-09) o que vienen de recursos
