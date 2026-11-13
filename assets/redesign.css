@@ -88,6 +88,13 @@ a{color:var(--gold);text-underline-offset:2px}
 #in-filtros-panel{padding-bottom:10px}
 #in-toggle-filtros.on{border-color:var(--gold);color:var(--gold);background:var(--gold-soft)}
 
+/* Avisos flotantes (toast): contraste inverso, legible en ambos temas. */
+#toast{
+  background:var(--ink);color:var(--s1);border:1px solid transparent;
+  box-shadow:0 16px 40px -18px rgba(0,0,0,.45);font-weight:500;
+}
+html[data-theme="dark"] #toast{background:#f2ebdf;color:#1b2a22;border-color:transparent}
+
 /* La barra de Bandeja sube a la barra superior en escritorio: más alto para el chat. */
 #bandejaBar{flex:1 1 auto;min-width:0;display:flex;justify-content:flex-end;align-items:center}
 #bandejaBar[hidden]{display:none!important}
