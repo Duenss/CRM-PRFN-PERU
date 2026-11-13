@@ -457,9 +457,12 @@ async function crearSesionSinLock(id, { onMensaje, onMensajePropio, onAck, log }
   }
   const opcionesWa = {
     authStrategy: new LocalAuth({ clientId: `sesion-${id}`, dataPath: config.sessionPath }),
-    // La librería resuelve `<webVersionCache.path>/<webVersion>.html`: la
-    // versión pedida debe coincidir con el pin descargado (si no, no usa el HTML).
-    webVersion: WEB_VERSION_PIN,
+    // IMPORTANTE: NO se fija `webVersion`. Servir un HTML de versión fijado
+    // (pin) puede dejar a WhatsApp Web en una versión incompatible: el bot
+    // "conecta" pero deja de procesar mensajes. Se deja que WhatsApp Web cargue
+    // su versión actual desde la red (como antes del hotfix); el caché local
+    // sigue siendo un DIRECTORIO y la librería guarda ahí el HTML real sin
+    // lanzar EEXIST.
     webVersionCache: cacheWeb,
     puppeteer: {
       headless: config.headless,
