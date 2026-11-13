@@ -2090,6 +2090,7 @@ async function runE2E() {
         ['inicio', 'kpis-inicio'],
         ['bandeja', 'bandeja'],
         ['pedidos', 'pedidos'],
+        ['campanas', 'campanas'],
         ['bot', 'ajustes'],
         ['bienvenida', 'bienvenida'],
       ];
@@ -2109,7 +2110,18 @@ async function runE2E() {
         console.log(`  capturas ${nombre}: 360/768/1280`);
       }
       await page.setViewport({ width: 1280, height: 1000 });
+      await page.click('#themeToggle');
+      await page.click('#tabs button[data-tab="campanas"]');
+      await sleep(500);
+      await page.screenshot({ path: path.join(CAPTURAS_DIR, 'campanas-oscuro-1280.png') });
+      await page.click('#themeToggle');
       await page.click('#tabs button[data-tab="inicio"]');
+      await page.click('#tabs button[data-tab="bandeja"]');
+      await sleep(350);
+      await page.click('.in-tools summary');
+      await sleep(250);
+      await page.screenshot({ path: path.join(CAPTURAS_DIR, 'bandeja-menu-1280.png') });
+      await page.click('.in-tools summary');
       await sleep(400);
     }
 
