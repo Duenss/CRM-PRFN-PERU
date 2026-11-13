@@ -136,3 +136,21 @@ limpias `no existe` en momentos distintos.
 - Limpieza diaria: `MEDIA_CHATS_MAX_MB` (por defecto `1500`) y `MEDIA_CHATS_DIAS`
   (por defecto `90`). `bot/data/chats/` **no se incluye** en el backup diario.
 - Ajustes por variable de entorno (opcionales): `MEDIA_CHATS_MAX_MB`, `MEDIA_CHATS_DIAS`.
+
+## 9 · Velocidad de sincronización y chats LID sin número (2026-11-12)
+
+- La sincronización guarda la hora de la última pasada OK en `bot/data/sync-ultimo.json`:
+  tras un reinicio o deploy hace una pasada **incremental** (chats con actividad nueva) en
+  vez de releer todos los chats. La pasada completa solo ocurre la primera vez o con
+  `POST /api/sincronizar {"chats":true,"completo":true}`.
+- Tras sincronizar chats nuevos se actualizan **solo esos** historiales (no 250) y con tope
+  de tiempo. Variables opcionales: `HISTORIALES_MAX_CHATS` (60), `HISTORIALES_LIMITE` (80),
+  `HISTORIALES_MAX_MS` (180000).
+- Los `@lid` se resuelven a teléfono **en lote** (una sola lectura de Chrome). Si WhatsApp no
+  permite resolverlo, el bot atiende igual con una clave temporal del LID (no deja al cliente
+  en visto); si más adelante se resuelve el teléfono, el chat se fusiona por su `waId`.
+- La bienvenida ahora es atómica: si el texto no sale, NO se envían PDF/video/foto sueltos y
+  no se programa la pregunta de asesoría. Si el texto falla con vista previa de enlace, se
+  reintenta sin ella.
+- El catálogo (PDF+video) no se reenvía si ya se envió en los últimos 180 minutos: si el
+  cliente insiste, recibe solo texto.
