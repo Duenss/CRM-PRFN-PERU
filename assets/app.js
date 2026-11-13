@@ -25,6 +25,7 @@ const BAJA='\n\nSi no quieres recibir más mensajes, responde BAJA.';
 const MESES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 
 let clientes=[],productos=[],plantillas=[],campanas=[],editId=null,openK=null,sending=false;
+let ajustesPanel={};
 let prodsIA=[],impRows=[],pLimit=60,calCursor=new Date(),calSel=hoyISO();
 
 /* ---------- utilidades ---------- */
@@ -307,6 +308,7 @@ async function load(){
   $('#k-pla').innerHTML='<option value="">Escribir desde cero</option>'+plantillas.map(x=>`<option value="${esc(x.id)}">${esc(x.nombre)}</option>`).join('');
   $('#k-prod').innerHTML=productos.map(x=>`<option value="${esc(x.id)}">${esc(x.nombre)} (${esc(x.casa_inspirada||'')})</option>`).join('');
   renderClientes();renderCatalogo();renderCampanas();infoDest();renderInicio();renderCalendario();prev();
+  cargarAjustesPanel();
   // Respaldo si RLS/sesión no deja ver clientes: se pide al bot SIN bloquear la UI,
   // así el panel abre rápido aunque el bot esté apagado.
   if(!clientes.length){
@@ -319,7 +321,7 @@ async function load(){
 }
 
 /* ---------- pestañas ---------- */
-const CRUMBS={bienvenida:['Bienvenida','Mensaje automático'],inicio:['Inicio','Resumen'],bandeja:['Bandeja','WhatsApp'],pedidos:['Pedidos','Ventas y pagos'],analiticas:['Métricas','Consultas y ventas'],campanas:['Campañas','Envíos'],anuncios:['Anuncios','Mensajes masivos'],clientes:['Clientes','Base de datos'],catalogo:['Catálogo','Perfumes'],calendario:['Calendario','Agenda'],ia:['Asistente IA','Automático'],bot:['Ajustes','Conexión']};
+const CRUMBS={bienvenida:['Bienvenida','Mensaje automático'],inicio:['Inicio','Resumen'],bandeja:['Bandeja','WhatsApp'],pedidos:['Pedidos','Ventas y pagos'],analiticas:['Métricas','Consultas y ventas'],campanas:['Campañas','Envíos'],anuncios:['Anuncios','Mensajes masivos'],promociones:['Promociones','Envíos rápidos'],clientes:['Clientes','Base de datos'],catalogo:['Catálogo','Perfumes'],calendario:['Calendario','Agenda'],ia:['Asistente IA','Automático'],bot:['Ajustes','Conexión']};
 let tabActual='inicio';
 function arrancarTareasBase(){
   if(!TAREAS.size){
@@ -536,38 +538,52 @@ $('#k-ai').onclick=async()=>{
   }finally{clearTimeout(timer);btn.disabled=false;btn.textContent='Generar 3 borradores'}
 };
 
-async function crearCampana(estado){
+async function crearCampana(estado,fechas=null){
   if(sending)return;
   const tit=$('#k-tit').value.trim(),msg=$('#k-msg').value.trim(),dest=destinos();
   if(!tit||!msg)return alert('Escribe el nombre interno y el mensaje.');
   if(!dest.length)return alert('Ningún cliente cumple las condiciones (etiqueta o bajas).');
-  let fecha=null;
+  let fechasISO=[];
   if(estado==='programada'){
-    const raw=$('#k-fecha').value;
-    fecha=raw?new Date(raw):new Date(Date.now()+60000);
-    if(isNaN(fecha))return alert('La fecha no es válida.');
-    if(fecha.getTime()<Date.now()-60000)return alert('Esa fecha ya pasó. Elige una futura o usa "Preparar envío manual".');
-    fecha=fecha.toISOString();
-    if(!confirm(`Se enviará automáticamente con el bot a ${dest.length} clientes, de a uno cada 25-40 segundos. ¿Continuar?`))return;
+    if(Array.isArray(fechas)&&fechas.length){
+      fechasISO=fechas.map(f=>f instanceof Date?f:new Date(f)).filter(f=>!isNaN(f));
+      if(!fechasISO.length)return alert('No hay fechas válidas para programar.');
+      if(fechasISO.some(f=>f.getTime()<Date.now()-60000))return alert('Una de las fechas ya pasó. Elige fechas futuras.');
+    }else{
+      const raw=$('#k-fecha').value;
+      const fecha=raw?new Date(raw):new Date(Date.now()+60000);
+      if(isNaN(fecha))return alert('La fecha no es válida.');
+      if(fecha.getTime()<Date.now()-60000)return alert('Esa fecha ya pasó. Elige una futura o usa "Preparar envío manual".');
+      fechasISO=[fecha];
+    }
+    fechasISO.sort((a,b)=>a-b);
+    if(fechasISO.length>31)return alert('Máximo 31 envíos por programación.');
+    if(!confirm(`Se enviará automáticamente con el bot a ${dest.length} clientes${fechasISO.length>1?` en ${fechasISO.length} días`:''}, de a uno cada 25-40 segundos. ¿Continuar?`))return;
   }
   sending=true;
+  const creadas=[];
   try{
     const segmento=[...tagsOf($('#k-seg').value)];
-    const{data:k,error}=await sb.from('campanas').insert({titulo:tit,mensaje_final:msg+($('#k-baja').checked?BAJA:''),segmento,fecha_programada:fecha,estado,numero_emisor:$('#k-num').value}).select().single();
-    if(error)throw error;
-    const{error:e2}=await sb.from('envios').insert(dest.map(c=>({campana_id:k.id,cliente_id:c.id})));
-    if(e2){
-      // Sin transacción en el cliente: si fallan los destinatarios, se retira la
-      // campaña huérfana para no dejar una campaña "programada" vacía.
-      try{await sb.from('campanas').delete().eq('id',k.id)}catch(_){}
-      throw e2;
+    const listaFechas=estado==='programada'?fechasISO:[null];
+    for(const fecha of listaFechas){
+      const tituloFecha=fecha&&listaFechas.length>1?`${tit} · ${fmtDia(localISO(fecha))}`:tit;
+      const{data:k,error}=await sb.from('campanas').insert({titulo:tituloFecha,mensaje_final:msg+($('#k-baja').checked?BAJA:''),segmento,fecha_programada:fecha?fecha.toISOString():null,estado,numero_emisor:$('#k-num').value}).select().single();
+      if(error)throw error;
+      creadas.push(k);
+      const{error:e2}=await sb.from('envios').insert(dest.map(c=>({campana_id:k.id,cliente_id:c.id})));
+      if(e2){
+        try{await sb.from('campanas').delete().eq('id',k.id)}catch(_){}
+        creadas.pop();
+        throw e2;
+      }
     }
-    toast(estado==='programada'?`Programada para ${fmtFechaHora(fecha)}`:'Campaña lista para envío manual');
-    await load();abrirCampana(k.id);
+    toast(estado==='programada'?`Programada${creadas.length>1?' en '+creadas.length+' días':''} para ${fmtFechaHora(creadas[0].fecha_programada)}`:'Campaña lista para envío manual');
+    await load();
+    if(creadas[0])abrirCampana(creadas[0].id);
   }catch(e){alert(e.message)}finally{sending=false}
 }
 $('#k-manual').onclick=()=>crearCampana('aprobada');
-$('#k-program').onclick=()=>crearCampana('programada');
+$('#k-program').onclick=abrirProgramarCampana;
 
 function renderCampanas(){
   const aviso=problemasBot.find(p=>p.codigo==='campanas_estado');
@@ -2604,7 +2620,33 @@ $('#pe-list')?.addEventListener('change',async e=>{
   catch(err){toast('No se actualizó: '+err.message,'error')}
   s.disabled=false;
 });
-/* ---------- anuncios ---------- */
+let anuAdjuntos=[];
+function renderAnuAdjuntos(){
+  const cont=$('#anu-file-list');if(!cont)return;
+  cont.innerHTML=anuAdjuntos.map((a,i)=>`<div class="row" style="padding:.45rem .6rem"><div><b style="font-size:.78rem">${a.tipo==='imagen'?'🖼':a.tipo==='video'?'🎬':'📄'} ${esc(a.nombre)}</b><small>${Math.round((a.bytes||0)/1024)} KB</small></div><div class="bar" style="margin:0"><button class="ghost" type="button" data-anu-up="${i}">↑</button><button class="ghost" type="button" data-anu-down="${i}">↓</button><button class="ghost" type="button" data-anu-quitar="${i}">✕</button></div></div>`).join('')||'<p class="muted" style="font-size:.76rem">Sin adjuntos propios.</p>';
+}
+async function subirAdjuntoAnuncio(file){
+  if(file.size>20*1024*1024)return toast('Máximo 20 MB por archivo.','error');
+  const tipo=file.type.startsWith('image/')?'imagen':file.type.startsWith('video/')?'video':file.type==='application/pdf'?'pdf':'';
+  if(!tipo)return toast('Solo imagen, video o PDF.','error');
+  if(anuAdjuntos.length>=6)return toast('Máximo 6 adjuntos.','error');
+  try{
+    const base64=await leerArchivoBase64(file);
+    const r=await botFetch('/api/anuncios/archivo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre:file.name,mimetype:file.type,base64}),timeoutMs:180000});
+    anuAdjuntos.push({archivo:r.archivo,nombre:r.nombre||file.name,mimetype:r.mimetype,tipo:r.tipo,bytes:r.bytes||file.size});
+    renderAnuAdjuntos();toast('Adjunto agregado');
+  }catch(e){toast('No se subió: '+e.message,'error')}
+}
+$('#anu-file')?.addEventListener('change',async e=>{
+  for(const f of e.target.files||[])await subirAdjuntoAnuncio(f);
+  e.target.value='';
+});
+$('#anu-file-list')?.addEventListener('click',e=>{
+  const up=e.target.closest('[data-anu-up]'),down=e.target.closest('[data-anu-down]'),del=e.target.closest('[data-anu-quitar]');
+  if(up){const i=Number(up.dataset.anuUp);if(i>0){[anuAdjuntos[i-1],anuAdjuntos[i]]=[anuAdjuntos[i],anuAdjuntos[i-1]];renderAnuAdjuntos()}}
+  if(down){const i=Number(down.dataset.anuDown);if(i<anuAdjuntos.length-1){[anuAdjuntos[i+1],anuAdjuntos[i]]=[anuAdjuntos[i],anuAdjuntos[i+1]];renderAnuAdjuntos()}}
+  if(del){anuAdjuntos.splice(Number(del.dataset.anuQuitar),1);renderAnuAdjuntos()}
+});
 let anunciosCache=[],anuEditId=null,anuPreviewTimer=null;
 const ESTADO_ANU={borrador:'Borrador',enviando:'Enviando',enviado:'Enviado',cancelado:'Cancelado'};
 function filtroAnuncioForm(){
@@ -2652,7 +2694,7 @@ function renderAnuncios(){
     const s=a.stats||{};
     const pct=s.total?Math.round((s.enviados||0)/s.total*100):0;
     const seg=a.filtro?.tipo==='etiquetas'?`Etiquetas: ${esc((a.filtro.etiquetas||[]).join(', ')||'—')}`:a.filtro?.tipo==='telefonos'?`${(a.filtro.telefonos||[]).length} números`:'Todos (clientes + chats)';
-    const ADJ=(a.adjuntos||[]).length?' · '+a.adjuntos.map(x=>x==='catalogo'?'📕 catálogo':'🎬 video').join(' + '):'';
+    const ADJ=(a.adjuntos||[]).length?' · '+a.adjuntos.map(x=>typeof x==='string'?(x==='catalogo'?'📕 catálogo':'🎬 video'):(x.tipo==='imagen'?'🖼 ':x.tipo==='video'?'🎬 ':'📄 ')+String(x.nombre||'')).join(' + '):'';
     return `<div class="lrow"><div class="lt">
       <b>${esc(a.id)} · ${esc(a.titulo)} <i class="tag ${a.estado==='enviado'?'ok':a.estado==='enviando'?'warn':''}">${ESTADO_ANU[a.estado]||a.estado}</i></b>
       <small>${seg} · ${s.enviados||0}/${s.total||0} enviados${s.errores?` · ${s.errores} errores`:''}${ADJ}</small>
@@ -2673,7 +2715,11 @@ function datosAnuncioForm(){
     texto:($('#anu-texto')?.value||'').trim(),
     filtro:filtroAnuncioForm(),
     incluirSinConsentimiento:true,
-    adjuntos:[$('#anu-adj-catalogo')?.checked?'catalogo':null,$('#anu-adj-video')?.checked?'video':null].filter(Boolean)
+    adjuntos:[
+      ...(($('#anu-adj-catalogo')?.checked)?['catalogo']:[]),
+      ...(($('#anu-adj-video')?.checked)?['video']:[]),
+      ...anuAdjuntos
+    ]
   };
 }
 function limpiarFormAnuncio(){
@@ -2685,6 +2731,7 @@ function limpiarFormAnuncio(){
   if($('#anu-sin-consent'))$('#anu-sin-consent').checked=false;
   if($('#anu-adj-catalogo'))$('#anu-adj-catalogo').checked=false;
   if($('#anu-adj-video'))$('#anu-adj-video').checked=false;
+  anuAdjuntos=[];renderAnuAdjuntos();
   if($('#anu-filtro'))$('#anu-filtro').value='todos';
   actualizarWrapsAnuncio();vistaAnuncio();
 }
@@ -2790,6 +2837,8 @@ $('#anu-list')?.addEventListener('click',async e=>{
     if($('#anu-sin-consent'))$('#anu-sin-consent').checked=true;
     if($('#anu-adj-catalogo'))$('#anu-adj-catalogo').checked=(a.adjuntos||[]).includes('catalogo');
     if($('#anu-adj-video'))$('#anu-adj-video').checked=(a.adjuntos||[]).includes('video');
+    anuAdjuntos=(a.adjuntos||[]).filter(x=>x&&typeof x==='object');
+    renderAnuAdjuntos();
     anuEditId=a.id;
     actualizarWrapsAnuncio();vistaAnuncio();
     toast('Anuncio cargado en el formulario');
@@ -2852,6 +2901,7 @@ function renderAnaliticas(){
   if($('#an-sub'))$('#an-sub').textContent=`${d.masConsultados?.[0]?('Lo más consultado: '+d.masConsultados[0].nombre):'Sin consultas todavía'} · ${d.chats?.chats||0} chats · ${d.analizados||0} mensajes analizados.`;
   if($('#an-chart'))$('#an-chart').innerHTML=chart14(d.dias||[]);
   if($('#an-dias-sub'))$('#an-dias-sub').textContent=`${(d.dias||[]).reduce((n,x)=>n+x.entrantes,0)} recibidos · ${(d.dias||[]).reduce((n,x)=>n+x.salientes,0)} enviados`;
+  renderMetaVentas();
 }
 $('#an-refresh')?.addEventListener('click',cargarAnaliticas);
 
@@ -3025,6 +3075,191 @@ document.addEventListener('click',e=>{
   if($('#gsearch')&&!$('#gsearch').contains(e.target))cerrarBusqueda();
 });
 $('#top-logo')?.addEventListener('click',()=>irTab('inicio'));
+
+/* ============================================================
+   Comercial ampliado: metas, promociones, respuestas y campañas
+   ============================================================ */
+async function cargarAjustesPanel(){
+  try {
+    const j = await botFetch('/api/ajustes');
+    ajustesPanel = j.ajustes || {};
+  } catch { ajustesPanel = ajustesPanel || {}; }
+  renderPromociones();
+  renderQuickPersonalizadas();
+  renderMetaVentas();
+}
+async function guardarAjustesPanel(cambios){
+  const r = await botFetch('/api/ajustes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cambios)});
+  ajustesPanel = r.ajustes || {...ajustesPanel,...cambios};
+  renderQuickPersonalizadas();
+  return ajustesPanel;
+}
+function ventasMesActual(){
+  const mes=hoyISO().slice(0,7);
+  return (pedidosCache||[]).filter(p=>{
+    const f=String(p.fechaEntrega||p.actualizado||p.creadoEn||p.creado_en||'');
+    return f.startsWith(mes)&&p.estado!=='cancelado';
+  }).reduce((s,p)=>s+(Number(p.total)||0),0);
+}
+function renderMetaVentas(){
+  const meta=Number(ajustesPanel.metaVentasMes)||0,actual=ventasMesActual();
+  if($('#an-meta'))$('#an-meta').value=meta||'';
+  const pct=meta>0?Math.min(100,Math.round(actual/meta*100)):0;
+  if($('#an-meta-bar'))$('#an-meta-bar').style.width=pct+'%';
+  if($('#an-meta-pct'))$('#an-meta-pct').textContent=meta>0?`${pct}% · S/ ${actual} de S/ ${meta}`:'Sin meta';
+  if($('#an-meta-info'))$('#an-meta-info').textContent=meta>0?`Faltan S/ ${Math.max(0,meta-actual)}`:'Define un objetivo';
+}
+$('#an-meta-save')?.addEventListener('click',async()=>{
+  const v=Math.max(0,Number($('#an-meta')?.value)||0);
+  try{await guardarAjustesPanel({metaVentasMes:v});renderMetaVentas();toast('Meta guardada')}
+  catch(e){toast('No se guardó la meta: '+e.message,'error')}
+});
+
+/* ---------- promociones ---------- */
+let promoEdit=null;
+function promosPanel(){return Array.isArray(ajustesPanel.promociones)?ajustesPanel.promociones:[];}
+function renderPromociones(){
+  const cont=$('#promo-list');if(!cont)return;
+  const lista=promosPanel();
+  cont.innerHTML=lista.map(p=>`<div class="row"><div><b>${esc(p.titulo)}</b><small>${esc(p.texto||'')}${p.precio?' · '+esc(p.precio):''}</small></div><div class="bar" style="margin:0"><i class="tag ${p.activa?'ok':''}">${p.activa?'activa':'pausada'}</i><button class="ghost" data-promo-edit="${esc(p.id)}" type="button">Editar</button><button class="ghost" data-promo-del="${esc(p.id)}" type="button">Borrar</button></div></div>`).join('')||'<p class="empty">Sin promociones. Crea la primera con “+ Nueva promoción”.</p>';
+  const prev=$('#promo-preview');
+  if(prev)prev.innerHTML=lista[0]?`<div class="wa-bubble">${lista[0].imagen?`<img src="${esc(lista[0].imagen)}" alt="" style="width:100%;border-radius:8px;margin-bottom:6px">`:''}${waHTML(lista[0].texto)}${lista[0].precio?`<br><b>${esc(lista[0].precio)}</b>`:''}</div>`:'<p class="muted">Escribe una promoción para verla.</p>';
+}
+function abrirPromoForm(p){
+  promoEdit=p||null;
+  if($('#promo-form-title'))$('#promo-form-title').textContent=p?'Editar promoción':'Nueva promoción';
+  if($('#promo-titulo'))$('#promo-titulo').value=p?.titulo||'';
+  if($('#promo-texto'))$('#promo-texto').value=p?.texto||'';
+  if($('#promo-precio'))$('#promo-precio').value=p?.precio||'';
+  if($('#promo-imagen'))$('#promo-imagen').value=p?.imagen||'/assets/img/promos/promo-navidad.jpg';
+  if($('#promo-activa'))$('#promo-activa').checked=p?p.activa!==false:true;
+  if($('#promo-embed'))$('#promo-embed').checked=!!p?.embed;
+  if($('#promo-form'))$('#promo-form').hidden=false;
+  actualizarPromoPreview();
+}
+function actualizarPromoPreview(){
+  const cont=$('#promo-preview');if(!cont)return;
+  const texto=$('#promo-texto')?.value||'';const precio=$('#promo-precio')?.value||'';const img=$('#promo-imagen')?.value||'';
+  cont.innerHTML=`<div class="wa-bubble">${img?`<img src="${esc(img)}" alt="" style="width:100%;border-radius:8px;margin-bottom:6px" onerror="this.style.display='none'">`:''}${waHTML(texto)}${precio?`<br><b>${esc(precio)}</b>`:''}</div>`;
+}
+['promo-titulo','promo-texto','promo-precio','promo-imagen'].forEach(id=>$('#'+id)?.addEventListener('input',actualizarPromoPreview));
+$('#promo-new')?.addEventListener('click',()=>abrirPromoForm(null));
+$('#promo-close')?.addEventListener('click',()=>{$('#promo-form').hidden=true});
+$('#promo-cancel')?.addEventListener('click',()=>{$('#promo-form').hidden=true});
+$('#promo-refresh')?.addEventListener('click',cargarAjustesPanel);
+$('#promo-save')?.addEventListener('click',async()=>{
+  const titulo=$('#promo-titulo')?.value.trim()||'',texto=$('#promo-texto')?.value.trim()||'';
+  if(!titulo||!texto)return toast('Completa título y texto.','error');
+  const item={id:promoEdit?.id||('promo-'+Date.now().toString(36)),titulo,texto,precio:$('#promo-precio').value.trim(),imagen:$('#promo-imagen').value.trim(),activa:$('#promo-activa').checked,embed:$('#promo-embed').checked};
+  const lista=promosPanel().slice();const i=lista.findIndex(x=>x.id===item.id);
+  if(i>=0)lista[i]=item;else lista.push(item);
+  try{await guardarAjustesPanel({promociones:lista});renderPromociones();$('#promo-form').hidden=true;toast('Promoción guardada')}
+  catch(e){toast('No se guardó: '+e.message,'error')}
+});
+$('#promo-list')?.addEventListener('click',async e=>{
+  const ed=e.target.closest('[data-promo-edit]'),del=e.target.closest('[data-promo-del]');
+  if(ed){const p=promosPanel().find(x=>x.id===ed.dataset.promoEdit);if(p)abrirPromoForm(p);return}
+  if(del&&confirm('¿Borrar esta promoción?')){
+    try{await guardarAjustesPanel({promociones:promosPanel().filter(x=>x.id!==del.dataset.promoDel)});renderPromociones();toast('Promoción borrada')}
+    catch(err){toast('No se borró: '+err.message,'error')}
+  }
+});
+
+/* ---------- respuestas rápidas configurables ---------- */
+function rapidaPanel(){return Array.isArray(ajustesPanel.respuestasRapidas)?ajustesPanel.respuestasRapidas:[];}
+function renderQuickPersonalizadas(){
+  const cont=$('#in-quick-custom');if(!cont)return;
+  const promos=promosPanel().filter(p=>p.activa!==false);
+  cont.innerHTML=promos.map(p=>`<button type="button" data-promo-id="${esc(p.id)}" title="${esc(p.texto)}">${esc(p.titulo)}</button>`).join('')
+    +rapidaPanel().map(r=>`<button type="button" data-resp-id="${esc(r.id)}" title="${esc(r.texto)}">${esc(r.titulo)}</button>`).join('');
+}
+function pintarQuickConfig(){
+  const cont=$('#quick-list');if(!cont)return;
+  cont.innerHTML=rapidaPanel().map(r=>`<div class="row"><div><b>${esc(r.titulo)}</b><small>${r.palabraClave?'Palabra: '+esc(r.palabraClave)+' · ':''}${esc(r.texto)}</small></div><div class="bar" style="margin:0"><button class="ghost" type="button" data-qedit="${esc(r.id)}">Editar</button><button class="ghost" type="button" data-qdel="${esc(r.id)}">Borrar</button></div></div>`).join('')||'<p class="empty">Aún no hay respuestas personalizadas.</p>';
+}
+$('#in-quick-config')?.addEventListener('click',()=>{pintarQuickConfig();$('#dlgQuick').showModal()});
+$('#q-cancel')?.addEventListener('click',()=>$('#dlgQuick').close());
+$('#q-save')?.addEventListener('click',async()=>{
+  const titulo=$('#q-titulo').value.trim(),texto=$('#q-texto').value.trim();
+  if(!titulo||!texto)return toast('Completa título y respuesta.','error');
+  const item={id:'q-'+Date.now().toString(36),titulo,palabraClave:$('#q-palabra').value.trim().toLowerCase(),texto,idea:$('#q-idea').value.trim()};
+  const lista=rapidaPanel().slice();const i=lista.findIndex(x=>x.id===editQuick);
+  if(i>=0)lista[i]={...item,id:editQuick};else lista.push(item);
+  try{await guardarAjustesPanel({respuestasRapidas:lista});pintarQuickConfig();$('#q-titulo').value='';$('#q-palabra').value='';$('#q-texto').value='';$('#q-idea').value='';editQuick=null;toast('Respuesta guardada')}
+  catch(e){toast('No se guardó: '+e.message,'error')}
+});
+let editQuick=null;
+$('#quick-list')?.addEventListener('click',async e=>{
+  const ed=e.target.closest('[data-qedit]'),del=e.target.closest('[data-qdel]');
+  if(ed){const r=rapidaPanel().find(x=>x.id===ed.dataset.qedit);if(!r)return;editQuick=r.id;$('#q-titulo').value=r.titulo;$('#q-palabra').value=r.palabraClave||'';$('#q-texto').value=r.texto;$('#q-idea').value=r.idea||'';return}
+  if(del&&confirm('¿Borrar esta respuesta?')){
+    try{await guardarAjustesPanel({respuestasRapidas:rapidaPanel().filter(x=>x.id!==del.dataset.qdel)});pintarQuickConfig();toast('Respuesta borrada')}
+    catch(err){toast('No se borró: '+err.message,'error')}
+  }
+});
+$('#in-quick')?.addEventListener('click',async e=>{
+  const promo=e.target.closest('[data-promo-id]');
+  if(promo){await enviarPromoRapida(promo.dataset.promoId);return}
+  const resp=e.target.closest('[data-resp-id]');
+  if(resp){const r=rapidaPanel().find(x=>x.id===resp.dataset.respId);if(r)await enviarTextoChat(r.texto)}
+});
+async function enviarTextoChat(texto){
+  if(!inTel)return toast('Elige un chat primero.','error');
+  try{await botFetch('/api/conversaciones/'+inTel+'/enviar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({texto}),timeoutMs:60000});await refrescarHiloAbierto();toast('Mensaje enviado')}
+  catch(err){toast('No se envió: '+err.message,'error')}
+}
+async function enviarPromoRapida(id){
+  if(!inTel)return toast('Elige un chat primero.','error');
+  const p=promosPanel().find(x=>x.id===id);if(!p)return;
+  const texto=[p.texto,p.precio].filter(Boolean).join('\n');
+  try{
+    if(p.imagen){
+      let blob=null;
+      try{const r=await fetch(p.imagen,{cache:'no-store'});if(r.ok)blob=await r.blob()}catch(e){}
+      if(blob){
+        const base64=await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(String(fr.result||'').split(',')[1]||'');fr.onerror=rej;fr.readAsDataURL(blob)});
+        await botFetch('/api/conversaciones/'+inTel+'/enviar-media',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre:'promo',mimetype:blob.type||'image/jpeg',base64,caption:p.embed?texto:''}),timeoutMs:180000});
+        if(!p.embed)await botFetch('/api/conversaciones/'+inTel+'/enviar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({texto}),timeoutMs:60000});
+        await refrescarHiloAbierto();toast('Promoción enviada');return;
+      }
+    }
+    await enviarTextoChat(texto);
+  }catch(err){toast('No se envió la promoción: '+err.message,'error')}
+}
+$('#an-refresh')?.addEventListener('click',()=>{cargarAjustesPanel()});
+
+/* ---------- campañas: día, rango o semana ---------- */
+function actualizarProgramarCampana(){
+  const modo=$('#pg-modo')?.value||'dia';
+  const ini=$('#pg-inicio')?.value||hoyISO();
+  const finEl=$('#pg-fin');if(!finEl)return;
+  if(modo==='dia'){finEl.value=ini;finEl.disabled=true}
+  else if(modo==='semana'){const d=parseISO(ini);d.setDate(d.getDate()+6);finEl.value=localISO(d);finEl.disabled=true}
+  else{finEl.disabled=false;if(finEl.value<ini)finEl.value=ini}
+  if($('#pg-aviso'))$('#pg-aviso').textContent=modo==='dia'?'Se enviará ese día a la hora de inicio.':modo==='semana'?'Se creará un envío por cada día de la semana.':'Se creará un envío por cada día del rango.';
+}
+function abrirProgramarCampana(){
+  if(!$('#pg-inicio'))return;
+  $('#pg-inicio').value=hoyISO();
+  $('#pg-hora').value='10:00';$('#pg-fin').value=hoyISO();
+  if($('#pg-modo'))$('#pg-modo').value='dia';
+  actualizarProgramarCampana();
+  $('#dlgProgramar').showModal();
+}
+['pg-modo','pg-inicio'].forEach(id=>$('#'+id)?.addEventListener('change',actualizarProgramarCampana));
+$('#pg-cancel')?.addEventListener('click',()=>$('#dlgProgramar').close());
+$('#pg-save')?.addEventListener('click',async()=>{
+  const ini=$('#pg-inicio').value,fin=$('#pg-fin').value||ini,modo=$('#pg-modo').value;
+  if(!ini)return toast('Elige fecha de inicio.','error');
+  const a=parseISO(ini),b=parseISO(fin);
+  if(b<a)return toast('La fecha final es anterior a la inicial.','error');
+  if(diffDays(ini,fin)>31)return toast('Máximo 31 días por programación.','error');
+  const hora=$('#pg-hora').value||'10:00';
+  const fechas=[];for(let d=a;d<=b;d=new Date(d.getFullYear(),d.getMonth(),d.getDate()+1))fechas.push(new Date(localISO(d)+'T'+hora+':00'));
+  $('#dlgProgramar').close();
+  await crearCampana('programada',fechas);
+});
+
 document.addEventListener('keydown',e=>{
   if(e.key==='/'&&!e.ctrlKey&&!e.metaKey&&document.activeElement?.tagName!=='INPUT'&&document.activeElement?.tagName!=='TEXTAREA'){
     e.preventDefault();$('#gq')?.focus();

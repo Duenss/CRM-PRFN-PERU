@@ -61,6 +61,12 @@ const base = () => ({
   catalogoArchivo: '',
   videoArchivo: '',
   fotoArchivo: '',
+  // Meta comercial del mes (solo panel; 0 = sin meta).
+  metaVentasMes: 0,
+  // Promociones rápidas del panel (no se usan solas: el dueño pulsa el botón).
+  promociones: [],
+  // Respuestas por palabra clave: sirven como botones y como respuesta exacta.
+  respuestasRapidas: [],
   actualizado: new Date().toISOString()
 });
 
@@ -110,8 +116,31 @@ function normalizar(a = {}) {
     catalogoArchivo: nombreSeguro(a.catalogoArchivo),
     videoArchivo: nombreSeguro(a.videoArchivo),
     fotoArchivo: nombreSeguro(a.fotoArchivo),
+    metaVentasMes: Math.min(1_000_000, Math.max(0, Math.round(num(a.metaVentasMes, 0)))),
+    promociones: normalizarLista(a.promociones, 20, p => ({
+      id: String(p.id || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40),
+      titulo: String(p.titulo || '').trim().slice(0, 80),
+      texto: String(p.texto || '').trim().slice(0, 1000),
+      precio: String(p.precio || '').trim().slice(0, 40),
+      imagen: String(p.imagen || '').trim().slice(0, 500),
+      activa: p.activa !== false,
+      embed: p.embed === true
+    })),
+    respuestasRapidas: normalizarLista(a.respuestasRapidas, 30, r => ({
+      id: String(r.id || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40),
+      titulo: String(r.titulo || '').trim().slice(0, 80),
+      palabraClave: String(r.palabraClave || '').trim().toLowerCase().slice(0, 60),
+      texto: String(r.texto || '').trim().slice(0, 1000),
+      idea: String(r.idea || '').trim().slice(0, 300)
+    })),
     actualizado: new Date().toISOString()
   };
+}
+
+/** Listas editables del panel: máximo N, sin entradas vacías. */
+function normalizarLista(valor, max, fn) {
+  const lista = Array.isArray(valor) ? valor : [];
+  return lista.filter(x => x && typeof x === 'object').slice(0, max).map(fn).filter(x => x && (x.titulo || x.texto));
 }
 
 let estado = cargar();

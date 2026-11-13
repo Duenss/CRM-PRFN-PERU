@@ -81,10 +81,30 @@ export function normalizarFiltro(filtro = {}) {
 
 export function normalizarAdjuntos(lista) {
   const permitidos = ['catalogo', 'video'];
-  return (Array.isArray(lista) ? lista : String(lista || '').split(','))
-    .map(a => String(a || '').trim().toLowerCase())
-    .filter(a => permitidos.includes(a))
-    .slice(0, 2);
+  const salida = [];
+  for (const item of Array.isArray(lista) ? lista : String(lista || '').split(',')) {
+    if (salida.length >= 6) break;
+    if (typeof item === 'string') {
+      const clave = item.trim().toLowerCase();
+      if (permitidos.includes(clave) && !salida.includes(clave)) salida.push(clave);
+      continue;
+    }
+    if (!item || typeof item !== 'object') continue;
+    const archivo = String(item.archivo || '').replace(/[^A-Za-z0-9._-]/g, '').slice(0, 120);
+    const mimetype = String(item.mimetype || '').toLowerCase().slice(0, 100);
+    const tipo = ['imagen', 'video', 'pdf'].includes(item.tipo) ? item.tipo
+      : mimetype.startsWith('image/') ? 'imagen'
+        : mimetype.startsWith('video/') ? 'video'
+          : mimetype === 'application/pdf' ? 'pdf' : '';
+    if (!archivo || !tipo) continue;
+    salida.push({
+      archivo,
+      nombre: String(item.nombre || archivo).replace(/[\\/:*?"<>|]/g, '').slice(0, 120),
+      mimetype: mimetype || (tipo === 'imagen' ? 'image/jpeg' : tipo === 'video' ? 'video/mp4' : 'application/pdf'),
+      tipo
+    });
+  }
+  return salida;
 }
 
 export function crear(datos = {}) {

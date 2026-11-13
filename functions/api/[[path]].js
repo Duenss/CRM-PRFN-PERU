@@ -46,6 +46,7 @@ export function rutaPermitida(metodo, ruta) {
   // Los de chats van a una ruta AUTENTICADA del bot (no al /media estático).
   if (metodo === 'GET' && /^\/api\/media\/(comprobantes|productos)\/[A-Za-z0-9._\-]+$/.test(ruta)) return true;
   if (metodo === 'GET' && /^\/api\/media\/chats\/[a-f0-9]{16,64}\.(jpg|jpeg|png|webp|gif|mp4|webm|mov|ogg|mp3|m4a|pdf|bin)$/.test(ruta)) return true;
+  if (metodo === 'GET' && /^\/api\/media\/anuncios\/[A-Za-z0-9._-]+$/.test(ruta)) return true;
   if (!/^\/api\/[A-Za-z0-9/_\-]*$/.test(ruta)) return false;
   return lista.some(prefijo => ruta === prefijo || ruta.startsWith(prefijo + '/') || ruta.startsWith(prefijo + '?'));
 }
@@ -57,6 +58,7 @@ const TIEMPOS_LENTOS = [
   { re: /^\/api\/anuncios\/ia/, ms: 120000 },
   { re: /^\/api\/(enviar|revisar)/, ms: 60000 },
   { re: /^\/api\/conversaciones\/[^/]+\/enviar-media$/, ms: 180000 },
+  { re: /^\/api\/anuncios\/archivo$/, ms: 180000 },
   { re: /^\/api\/archivos/, ms: 180000 }
 ];
 function tiempoMaximo(ruta) {

@@ -238,6 +238,7 @@ function createBotMock() {
     eventos: [],
     evSeq: 0,
     ia: { activa: true, autoRespuesta: true, maxPorConversacion: 0, prompt: '', pausados: [] },
+    mediaEnviados: 0,
     logs: ['[e2e] bot simulado iniciado', '[e2e] WhatsApp conectado (mock)'],
   };
 
@@ -640,13 +641,25 @@ function createBotMock() {
 
     /* ajustes de límites y tiempos */
     if (p === '/api/ajustes') {
+      if (method === 'POST') {
+        let body = '';
+        req.on('data', c => { body += c; });
+        req.on('end', () => {
+          let j = {}; try { j = JSON.parse(body || '{}'); } catch { /* noop */ }
+          state.ajustesPanel = { ...(state.ajustesPanel || {}), ...j };
+          json(res, 200, { ok: true, ajustes: state.ajustesPanel });
+        });
+        return;
+      }
       return json(res, 200, {
         ajustes: {
           maxPorDia: 0, maxRespuestasPorChat: 0,
           intervaloMin: 25, intervaloMax: 40,
           intervaloEntreChats: 5, intervaloMasivo: 30,
           horaInicio: 9, horaFin: 20,
-          actualizado: new Date().toISOString()
+          metaVentasMes: 0, promociones: [], respuestasRapidas: [],
+          actualizado: new Date().toISOString(),
+          ...(state.ajustesPanel || {})
         }
       });
     }
@@ -706,6 +719,15 @@ function createBotMock() {
     }
 
     /* multimedia de chats: descarga bajo demanda simulada */
+    if (method === 'POST' && /^\/api\/conversaciones\/[^/]+\/enviar-media$/.test(p)) {
+      let body = '';
+      req.on('data', c => { body += c; });
+      req.on('end', () => {
+        state.mediaEnviados++;
+        json(res, 200, { ok: true, tipo: 'imagen' });
+      });
+      return;
+    }
     if (method === 'POST' && /^\/api\/conversaciones\/[^/]+\/media$/.test(p)) {
       let body = '';
       req.on('data', c => { body += c; });
@@ -2134,6 +2156,57 @@ async function runE2E() {
       await new Promise(r => setTimeout(r, 250));
       assert((await page.evaluate(() => document.documentElement.dataset.theme)) === 'light', 'no volvió al modo claro');
       return `oscuro ${estado.color} sobre ${estado.fondo} · captura 04-oscuro.png`;
+    });
+
+    await runner.case('E2E-24', 'Módulos nuevos: promoción, meta y programación por rango', async () => {
+      await page.click('#tabs button[data-tab="promociones"]');
+      await sleep(350);
+      assert(await page.$('#promo-new'), 'la pestaña Promociones no abrió');
+      await page.click('#promo-new');
+      await page.type('#promo-titulo', 'Promo E2E');
+      await page.type('#promo-texto', '2x50 ml por S/ 99');
+      await page.click('#promo-save');
+      await sleep(500);
+      assert(/Promo E2E/.test(await page.$eval('#promo-list', el => el.textContent)), 'la promoción no se guardó');
+      await page.click('#tabs button[data-tab="analiticas"]');
+      await sleep(350);
+      assert(await page.$('#an-meta'), 'falta la meta de ventas en Métricas');
+      await page.click('#tabs button[data-tab="campanas"]');
+      await sleep(300);
+      await page.click('#k-program');
+      await sleep(300);
+      const dlgAbierto = await page.evaluate(() => !!document.querySelector('#dlgProgramar')?.open);
+      assert(dlgAbierto, 'no abrió el modal de programación');
+      await page.click('#pg-cancel');
+      await page.click('#tabs button[data-tab="bandeja"]');
+      await sleep(300);
+      await page.click('#in-quick-config');
+      await sleep(250);
+      assert(await page.evaluate(() => !!document.querySelector('#dlgQuick')?.open), 'no abrió la configuración de respuestas');
+      await page.click('#q-cancel');
+      return 'promoción guardada · meta visible · modal de rango y respuestas OK';
+    });
+
+    await runner.case('E2E-25', 'Bandeja: adjuntar imagen y enviarla por el endpoint real del panel', async () => {
+      await page.click('#tabs button[data-tab="bandeja"]');
+      await sleep(350);
+      const item = await page.$('#in-list .in-item');
+      assert(item, 'no hay chats para probar el adjunto');
+      await item.click();
+      await sleep(350);
+      const tmp = path.join(os.tmpdir(), 'e2e-adjunto.png');
+      fs.writeFileSync(tmp, Buffer.from(PNG_1PX, 'base64'));
+      const input = await page.$('#in-file');
+      assert(input, 'falta el input de adjuntos');
+      await input.uploadFile(tmp);
+      await sleep(300);
+      const chips = await page.$$eval('#in-attach-preview .in-attach-chip', xs => xs.length);
+      assert(chips === 1, 'el adjunto no apareció en la vista previa');
+      const antes = bot.state.mediaEnviados;
+      await page.click('#in-send');
+      await waitFor(() => bot.state.mediaEnviados > antes, 8000, 'el panel no llamó al endpoint de adjuntos');
+      fs.rmSync(tmp, { force: true });
+      return 'imagen adjuntada y enviada por /enviar-media';
     });
 
     await runner.case('E2E-11', 'Cero errores de consola JS y cero pageerror en toda la corrida', async () => {

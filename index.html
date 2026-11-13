@@ -56,6 +56,7 @@
       <p class="navgroup">Comunicación</p>
       <button data-tab="campanas" aria-label="Campañas"><svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg><span class="nl">Campañas</span></button>
       <button data-tab="anuncios" aria-label="Anuncios"><svg viewBox="0 0 24 24"><path d="M3 11v3a1 1 0 0 0 1 1h2l4 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M15 8a5 5 0 0 1 0 8M18 5a9 9 0 0 1 0 14"/></svg><span class="nl">Anuncios</span></button>
+      <button data-tab="promociones" aria-label="Promociones"><svg viewBox="0 0 24 24"><path d="M20.6 13.4 12 22l-9-9V4a1 1 0 0 1 1-1h9z"/><circle cx="7.5" cy="7.5" r="1.2"/></svg><span class="nl">Promociones</span></button>
       <p class="navgroup">Contactos</p>
       <button data-tab="clientes" aria-label="Clientes"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6M17 4a4 4 0 0 1 0 8M22 21c0-3-2-5-5-5.7"/></svg><span class="nl">Clientes</span></button>
       <p class="navgroup">Contenido</p>
@@ -166,6 +167,8 @@
               <button type="button" data-quick="promo" title="Promoción 3 perfumes por S/ 90">🎁 Promo 3×90</button>
               <button type="button" data-quick="pagos" title="Medios de pago">💳 Pagos</button>
               <button type="button" data-quick="horario" title="Horario de atención">⏰ Horario</button>
+              <span id="in-quick-custom" style="display:contents"></span>
+              <button type="button" id="in-quick-config" title="Configurar respuestas rápidas">⚙</button>
             </div>
             <p class="muted" id="in-note" hidden style="padding:.5rem .9rem;margin:0;border-top:1px solid var(--line)">Los grupos son solo lectura por ahora.</p>
             <div class="in-attach-preview" id="in-attach-preview" hidden></div>
@@ -264,6 +267,16 @@
         <div class="bar" style="margin:0"><button class="ghost" id="an-refresh" type="button">Actualizar</button></div>
       </div>
       <div class="kpis" id="an-kpis"></div>
+      <div class="card" id="an-meta-card" style="margin-bottom:.8rem">
+        <div class="card-h"><b>Meta de ventas</b><span class="muted" id="an-meta-pct">—</span></div>
+        <div style="padding:1rem">
+          <div class="grid2">
+            <div><label for="an-meta">Objetivo del mes (S/)</label><input id="an-meta" type="number" min="0" step="10" placeholder="Ej. 4000"></div>
+            <div style="display:flex;align-items:flex-end;gap:.5rem"><button id="an-meta-save" type="button">Guardar meta</button><span class="muted" id="an-meta-info" style="font-size:.78rem">—</span></div>
+          </div>
+          <div class="meta-track"><i id="an-meta-bar"></i></div>
+        </div>
+      </div>
       <div class="dash2">
         <div class="card">
           <div class="card-h"><b>Perfumes más consultados</b><span class="muted">por menciones en chats</span></div>
@@ -380,6 +393,9 @@
             </div>
             <label style="display:flex;gap:.5rem;align-items:center;margin:.7rem 0 .2rem"><input type="checkbox" id="anu-adj-catalogo" style="width:auto"> <span>📕 Adjuntar catálogo PDF (Navidad 2026)</span></label>
             <label style="display:flex;gap:.5rem;align-items:center;margin:.1rem 0 .5rem"><input type="checkbox" id="anu-adj-video" style="width:auto"> <span>🎬 Adjuntar video explicativo del CRM</span></label>
+            <label for="anu-file">Adjuntos propios (imagen, video o PDF)</label>
+            <input type="file" id="anu-file" accept="image/*,video/*,application/pdf" multiple>
+            <div id="anu-file-list"></div>
             <div class="grid2">
               <div>
                 <label for="anu-filtro">Destinatarios</label>
@@ -413,6 +429,32 @@
       <div class="card">
         <div class="card-h"><b>Anuncios</b><span class="muted" id="anu-count">—</span></div>
         <div id="anu-list" style="padding:.4rem 1rem 1rem"><p class="empty">Cargando...</p></div>
+      </div>
+    </section>
+
+    <section class="tab" id="t-promociones" hidden>
+      <div class="pagehead">
+        <div><h1>Promociones</h1><p class="muted">Crea promociones con su botón de envío rápido en la Bandeja. Se guardan en los ajustes del bot.</p></div>
+        <div class="bar" style="margin:0"><button class="ghost" id="promo-refresh" type="button">Actualizar</button><button id="promo-new" type="button">+ Nueva promoción</button></div>
+      </div>
+      <div class="two">
+        <div>
+          <div class="box" id="promo-form" hidden>
+            <div class="card-h" style="padding:0 0 .6rem"><b id="promo-form-title">Nueva promoción</b><button class="ghost" id="promo-close" type="button">Cerrar</button></div>
+            <label for="promo-titulo">Título</label><input id="promo-titulo" maxlength="80" placeholder="2×50 ml S/ 99">
+            <label for="promo-texto">Texto / mensaje</label><textarea id="promo-texto" maxlength="1000" rows="4" placeholder="¡Hola! Tenemos la promo 2×50 ml por S/ 99…"></textarea>
+            <div class="grid2">
+              <div><label for="promo-precio">Precio destacado</label><input id="promo-precio" maxlength="40" placeholder="S/ 99"></div>
+              <div><label for="promo-imagen">Imagen (URL)</label><input id="promo-imagen" maxlength="500" value="/assets/img/promos/promo-navidad.jpg"></div>
+            </div>
+            <label class="ck"><input type="checkbox" id="promo-activa" checked> Activa</label>
+            <label class="ck"><input type="checkbox" id="promo-embed"> Enviar imagen embebida con el texto (un solo mensaje)</label>
+            <div class="acts"><button class="ghost" id="promo-cancel" type="button">Cancelar</button><button id="promo-save" type="button">Guardar promoción</button></div>
+            <p class="muted" id="promo-status" style="margin-top:.5rem">—</p>
+          </div>
+          <h2>Promociones activas</h2><div id="promo-list"><p class="empty">Cargando…</p></div>
+        </div>
+        <aside class="phone"><small>Vista previa en WhatsApp</small><div id="promo-preview" class="wa-preview"><p class="muted">Escribe una promoción para verla.</p></div></aside>
       </div>
     </section>
 
@@ -657,6 +699,38 @@
 </dialog>
 
 <div id="toast" role="status" aria-live="polite"></div>
+
+<dialog id="dlgQuick">
+  <h2>Respuestas rápidas</h2>
+  <p class="muted" style="margin-top:0">Aparecen como botones en la Bandeja. La palabra clave sirve para que el bot responda solo cuando el cliente escribe esa palabra exacta.</p>
+  <div id="quick-list"></div>
+  <div class="box" style="margin-top:.8rem;box-shadow:none">
+    <div class="grid2">
+      <div><label for="q-titulo">Título del botón</label><input id="q-titulo" maxlength="60" placeholder="Envíos y ubicación"></div>
+      <div><label for="q-palabra">Palabra clave</label><input id="q-palabra" maxlength="40" placeholder="envíos"></div>
+    </div>
+    <div class="grid2">
+      <div><label for="q-texto">Respuesta / ejemplo</label><textarea id="q-texto" rows="3" maxlength="800" placeholder="Sí, hacemos envíos a todo el Perú por Shalom y Olva…"></textarea></div>
+      <div><label for="q-idea">Idea para la IA (opcional)</label><textarea id="q-idea" rows="3" maxlength="300" placeholder="Responder natural y no inventar costos"></textarea></div>
+    </div>
+    <div class="acts"><button type="button" class="ghost" id="q-cancel">Cerrar</button><button type="button" id="q-save">Agregar respuesta</button></div>
+  </div>
+</dialog>
+
+<dialog id="dlgProgramar">
+  <h2>Programar campaña</h2>
+  <p class="muted" style="margin-top:0">Un día, un rango o toda una semana. Se crea un envío por cada día, a la hora indicada.</p>
+  <label for="pg-modo">Tipo de programación</label>
+  <select id="pg-modo"><option value="dia">Un día concreto</option><option value="rango">Rango de días</option><option value="semana">Toda una semana</option></select>
+  <div class="grid2">
+    <div><label for="pg-inicio">Fecha de inicio</label><input id="pg-inicio" type="date"></div>
+    <div><label for="pg-fin">Fecha de fin</label><input id="pg-fin" type="date"></div>
+    <div><label for="pg-hora">Hora de inicio</label><input id="pg-hora" type="time" value="10:00"></div>
+    <div><label for="pg-hora-fin">Hora de fin</label><input id="pg-hora-fin" type="time" value="20:00"></div>
+  </div>
+  <p class="muted" id="pg-aviso" style="font-size:.78rem">—</p>
+  <div class="acts"><button type="button" class="ghost" id="pg-cancel">Cancelar</button><button type="button" id="pg-save">Programar</button></div>
+</dialog>
 
 <script src="assets/vendor/supabase-2.45.4.min.js"></script>
 <script src="assets/app.js"></script>

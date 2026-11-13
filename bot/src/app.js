@@ -145,6 +145,7 @@ const comprobantesDir = path.join(botDataDir, 'comprobantes');
 const archivosDir = path.join(botDataDir, 'archivos');
 // Multimedia de los chats descargada bajo demanda (no se respalda: ver RUNBOOK).
 const chatsMediaDir = path.join(botDataDir, 'chats');
+const anunciosMediaDir = path.join(botDataDir, 'anuncios-media');
 const raizProyecto = path.join(botDataDir, '..', '..');
 
 /** Guarda la imagen de un comprobante y devuelve su nombre de archivo. */
@@ -1041,16 +1042,33 @@ function adjuntosAnuncio() {
 async function enviarAdjuntosAnuncio(anuncio, destino) {
   const disponibles = adjuntosAnuncio();
   for (const clave of anuncio.adjuntos || []) {
-    const adj = disponibles[clave];
+    let adj = null;
+    if (typeof clave === 'string') {
+      adj = disponibles[clave];
+    } else if (clave && clave.archivo) {
+      const ruta = path.join(anunciosMediaDir, String(clave.archivo));
+      if (!ruta.startsWith(anunciosMediaDir)) continue;
+      adj = {
+        ruta,
+        mimetype: String(clave.mimetype || ''),
+        nombre: String(clave.nombre || clave.archivo),
+        caption: String(clave.caption || ''),
+        tipo: String(clave.tipo || '')
+      };
+    }
     if (!adj) continue;
     if (!fs.existsSync(adj.ruta)) {
-      log(`Anuncio: el adjunto "${clave}" no está en el servidor (${path.basename(adj.ruta)}).`);
+      log(`Anuncio: el adjunto "${String(clave?.archivo || clave)}" no está en el servidor.`);
       continue;
     }
     try {
-      const env = String(adj.mimetype || '').startsWith('video/')
+      const esVideo = String(adj.mimetype || '').startsWith('video/');
+      const esImagen = String(adj.mimetype || '').startsWith('image/');
+      const env = esVideo
         ? await enviarVideo(destino.telefono, adj.ruta, adj.caption)
-        : await enviarArchivo(destino.telefono, adj.ruta, adj.mimetype, adj.nombre, adj.caption);
+        : esImagen
+          ? await enviarImagen(destino.telefono, { archivo: adj.ruta }, adj.caption)
+          : await enviarArchivo(destino.telefono, adj.ruta, adj.mimetype, adj.nombre, adj.caption);
       await dormir(2500);
       registrar({
         telefono: destino.telefono,
@@ -1062,7 +1080,7 @@ async function enviarAdjuntosAnuncio(anuncio, destino) {
         waId: env?.waId || ''
       });
     } catch (e) {
-      log(`Anuncio: no se pudo enviar "${clave}" a +${destino.telefono}: ${e.message}`);
+      log(`Anuncio: no se pudo enviar "${String(clave?.archivo || clave)}" a +${destino.telefono}: ${e.message}`);
     }
   }
 }
@@ -1650,6 +1668,17 @@ async function avisarFalloIA(tel, nombre, motivo, sesionId = null) {
   }
 }
 
+/** Respuesta rápida exacta configurada desde el panel (ej. "envíos"). */
+function respuestaRapidaExacta(texto) {
+  const norm = s => String(s || '').toLowerCase().normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9ñ\s]/gi, ' ')
+    .replace(/\s+/g, ' ').trim();
+  const t = norm(texto);
+  if (!t || t.length > 120) return null;
+  const lista = Array.isArray(estadoAjustes().respuestasRapidas) ? estadoAjustes().respuestasRapidas : [];
+  return lista.find(r => r && r.palabraClave && r.texto && norm(r.palabraClave) === t) || null;
+}
+
 async function manejarMensaje(msg, sesionId = null) {
   if (msg.fromMe || msg.isStatus) return;
   if (String(msg.type || '') === 'reaction' || msg.isNotification) return;
@@ -2035,6 +2064,21 @@ ${String(texto).slice(0, 300)}
     }
   }
   cooldown.set(tel, Date.now());
+
+  // Respuesta rápida exacta configurada por el dueño (ej. "envíos").
+  const rapida = respuestaRapidaExacta(texto);
+  if (rapida) {
+    try {
+      const envR = await enviar(tel, rapida.texto, sesionId);
+      await logMensaje({ clienteId: cliente?.id, telefono: tel, direccion: 'saliente', texto: rapida.texto, origen: 'bot' });
+      registrar({ telefono: tel, texto: rapida.texto, direccion: 'saliente', nombre: nombreChat, clienteId: cliente?.id, origen: 'bot', waId: envR?.waId || '' });
+      log(`Respuesta rápida "${rapida.palabraClave}" enviada a +${tel}.`);
+      emitir('mensaje', { telefono: tel, direccion: 'saliente', origen: 'bot' });
+    } catch (e) {
+      log(`No se pudo enviar la respuesta rápida a +${tel}: ${e.message}`);
+    }
+    return;
+  }
 
   // El bot atiende chat por chat: respeta el intervalo configurado entre
   // respuestas a conversaciones distintas (anti-baneo). Las consultas
@@ -3231,6 +3275,38 @@ function nombreArchivoAjuste(tipo) {
   if (tipo === 'video') return cfg.videoArchivo;
   return cfg.fotoArchivo;
 }
+
+/* Archivos adjuntos de anuncios (imagen/video/PDF, guardados en data/). */
+app.post('/api/anuncios/archivo', auth, (req, res) => {
+  try {
+    const base64 = String(req.body?.base64 || '').replace(/^data:[^;]+;base64,/, '');
+    const mimetype = String(req.body?.mimetype || '').toLowerCase();
+    const nombreOriginal = String(req.body?.nombre || 'archivo').slice(0, 180);
+    if (!base64 || base64.length > 28 * 1024 * 1024) return res.status(413).json({ error: 'Archivo inválido o mayor a 20 MB.' });
+    const tipo = mimetype.startsWith('image/') ? 'imagen' : mimetype.startsWith('video/') ? 'video' : mimetype === 'application/pdf' ? 'pdf' : '';
+    if (!tipo) return res.status(400).json({ error: 'Solo imagen, video o PDF.' });
+    const ext = tipo === 'pdf' ? '.pdf' : tipo === 'video' ? (mimetype.includes('webm') ? '.webm' : '.mp4') : (mimetype.includes('png') ? '.png' : mimetype.includes('webp') ? '.webp' : '.jpg');
+    fs.mkdirSync(anunciosMediaDir, { recursive: true });
+    const archivo = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 9) + ext;
+    const buffer = Buffer.from(base64, 'base64');
+    fs.writeFileSync(path.join(anunciosMediaDir, archivo), buffer);
+    res.json({ ok: true, archivo, nombre: nombreOriginal, mimetype, tipo, bytes: buffer.length });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/media/anuncios/:archivo', auth, (req, res) => {
+  const archivo = String(req.params.archivo || '');
+  if (!/^[A-Za-z0-9._-]{1,120}$/.test(archivo)) return res.status(400).json({ error: 'Archivo inválido.' });
+  const ruta = path.join(anunciosMediaDir, archivo);
+  if (!ruta.startsWith(anunciosMediaDir) || !fs.existsSync(ruta)) return res.status(404).json({ error: 'No encontrado.' });
+  const ext = path.extname(archivo).toLowerCase();
+  const tipos = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.mp4': 'video/mp4', '.webm': 'video/webm', '.pdf': 'application/pdf' };
+  res.setHeader('Content-Type', tipos[ext] || 'application/octet-stream');
+  res.setHeader('Cache-Control', 'private, max-age=3600');
+  fs.createReadStream(ruta).pipe(res);
+});
 
 app.get('/api/archivos', auth, (_req, res) => {
   try {

@@ -249,6 +249,10 @@ html[data-theme="dark"] .in-msgs{background:radial-gradient(700px 400px at 18% 0
 .in-attach-chip img{width:34px;height:34px;object-fit:cover;border-radius:6px}
 .in-attach-chip button{background:none;border:0;color:var(--bad);min-height:0;padding:0 2px;font-size:.85rem}
 .in-adjunto{display:inline-flex;align-items:center;gap:7px;margin-top:4px;font-size:.74rem;opacity:.9}
+.meta-track{height:10px;background:var(--s2);border:1px solid var(--line);border-radius:999px;overflow:hidden;margin-top:10px}
+.meta-track i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--gold),#3fae8a);border-radius:999px;transition:width .3s var(--ease)}
+#promo-preview .wa-bubble{max-width:100%}
+#in-quick-custom{display:contents}
 .in-head-act button{min-height:30px;padding:.2rem .6rem;font-size:.72rem;background:var(--s1);border:1px solid var(--line);color:var(--ink)}
 .in-head-act button:hover{background:var(--s2)}
 .quick{background:var(--s1);border-color:var(--line);padding:8px 12px;gap:6px}
